@@ -1,0 +1,531 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "EV91 Rider Service API",
+    "version": "1.0.0",
+    "description": "API for EV91 rider registration, KYC verification, and booking management. Uses Twilio for reliable OTP-based phone authentication with admin dashboard capabilities.",
+    "contact": {
+      "name": "EV91 Development Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4004",
+      "description": "Development server"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "summary": "Health check with dependency status",
+        "description": "Comprehensive health check including database, Twilio, and external service status",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/live": {
+      "get": {
+        "summary": "Health check - liveness probe", 
+        "description": "Simple endpoint to check if the service is alive",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimpleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/cors": {
+      "get": {
+        "summary": "CORS test endpoint",
+        "description": "Test endpoint to verify CORS configuration is working correctly",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "CORS is working correctly",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rider-register/start": {
+      "post": {
+        "summary": "Start registration using Twilio OTP",
+        "description": "Creates or updates rider registration and sends OTP via Twilio for phone verification.",
+        "tags": ["Registration"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { 
+            "description": "Registration started and OTP sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/rider-register/verify-otp": {
+      "post": {
+        "summary": "Verify OTP sent via Twilio",
+        "description": "Verifies the OTP sent to the user's phone and completes registration if valid.",
+        "tags": ["Registration"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { 
+            "description": "OTP verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOtpResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/v1/rider-register/resend-otp": {
+      "post": {
+        "summary": "Resend OTP via Twilio",
+        "description": "Resends OTP to the user's phone number if the previous one was not received.",
+        "tags": ["Registration"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { 
+            "description": "OTP resent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/v1/rider-register/status/{phone}": {
+      "get": {
+        "summary": "Get registration status",
+        "description": "Check the current registration status for a phone number.",
+        "tags": ["Registration"],
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Phone number with country code"
+          }
+        ],
+        "responses": {
+          "200": { 
+            "description": "Registration status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/rider-register/profile/{riderId}": {
+      "post": {
+        "summary": "Save profile information",
+        "description": "Save rider's personal information and address details",
+        "tags": ["Registration"],
+        "parameters": [
+          {
+            "name": "riderId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier for the rider"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { 
+            "description": "Profile saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "get": {
+        "summary": "Get rider profile",
+        "description": "Retrieve rider's profile information",
+        "tags": ["Registration"],
+        "parameters": [
+          {
+            "name": "riderId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier for the rider"
+          }
+        ],
+        "responses": {
+          "200": { 
+            "description": "Profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/RiderProfile" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/rider-register/emergency-contact/{riderId}": {
+      "post": {
+        "summary": "Save emergency contact details",
+        "description": "Save emergency contact information separately",
+        "tags": ["Registration"],
+        "parameters": [
+          {
+            "name": "riderId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier for the rider"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergencyContactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { 
+            "description": "Emergency contact saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "error": { "type": "string" },
+          "data": { "type": "object" }
+        },
+        "required": ["success"]
+      },
+      "StartRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "phone": { 
+            "type": "string",
+            "description": "Phone number with country code (to receive OTP via Twilio)",
+            "example": "+919876543210"
+          },
+          "consent": { 
+            "type": "boolean",
+            "description": "User consent for data processing",
+            "example": true
+          }
+        },
+        "required": ["phone", "consent"]
+      },
+      "VerifyOtpRequest": {
+        "type": "object",
+        "properties": {
+          "tempId": { 
+            "type": "string",
+            "description": "Temporary ID from registration start"
+          },
+          "otp": { 
+            "type": "string",
+            "description": "6-digit OTP code",
+            "example": "123456"
+          }
+        },
+        "required": ["tempId", "otp"]
+      },
+      "VerifyOtpResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ApiResponse" },
+          {
+            "type": "object",
+            "properties": {
+              "riderId": { "type": "string" },
+              "phoneVerified": { "type": "boolean" }
+            }
+          }
+        ]
+      },
+      "ResendOtpRequest": {
+        "type": "object",
+        "properties": {
+          "tempId": { 
+            "type": "string",
+            "description": "Temporary ID from registration start"
+          }
+        },
+        "required": ["tempId"]
+      },
+      "StatusResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ApiResponse" },
+          {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "riderId": { "type": "string" }
+            }
+          }
+        ]
+      },
+      "ProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "dob": { "type": "string", "format": "date", "description": "Date of birth in YYYY-MM-DD or DD/MM/YYYY format" },
+          "address1": { "type": "string" },
+          "address2": { "type": "string" },
+          "city": { "type": "string" },
+          "state": { "type": "string" },
+          "pincode": { "type": "string" },
+          "emergencyName": { "type": "string" },
+          "emergencyPhone": { "type": "string" },
+          "emergencyRelation": { "type": "string" }
+        },
+        "required": ["name", "dob", "address1", "city", "state", "pincode"]
+      },
+      "EmergencyContactRequest": {
+        "type": "object",
+        "properties": {
+          "emergencyName": { "type": "string", "description": "Emergency contact name" },
+          "emergencyPhone": { "type": "string", "description": "Emergency contact phone number" },
+          "emergencyRelation": { "type": "string", "description": "Relationship to rider" }
+        },
+        "required": ["emergencyName", "emergencyPhone", "emergencyRelation"]
+      },
+      "RiderProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "phone": { "type": "string" },
+          "name": { "type": "string" },
+          "dob": { "type": "string" },
+          "address1": { "type": "string" },
+          "address2": { "type": "string" },
+          "city": { "type": "string" },
+          "state": { "type": "string" },
+          "pincode": { "type": "string" },
+          "emergencyName": { "type": "string" },
+          "emergencyPhone": { "type": "string" },
+          "emergencyRelation": { "type": "string" },
+          "registrationStatus": { 
+            "type": "string",
+            "enum": ["PENDING", "PHONE_VERIFIED", "PROFILE_COMPLETED", "EMERGENCY_CONTACT_COMPLETED", "KYC_COMPLETED"]
+          },
+          "kycStatus": { 
+            "type": "string",
+            "enum": ["pending", "approved", "rejected"]
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "service": { "type": "string" },
+          "database": { 
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "responseTime": { "type": "number" }
+            }
+          },
+          "twilio": {
+            "type": "object",
+            "properties": {
+              "configured": { "type": "boolean" },
+              "credentials": {
+                "type": "object",
+                "properties": {
+                  "accountSid": { "type": "boolean" },
+                  "authToken": { "type": "boolean" },
+                  "phoneNumber": { "type": "boolean" }
+                }
+              },
+              "issues": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "SimpleResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "timestamp": { "type": "string" }
+        }
+      },
+      "CorsResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "origin": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "corsHeaders": { "type": "object" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request - invalid parameters or missing required fields",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiResponse"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Registration",
+      "description": "Rider registration and profile management endpoints"
+    },
+    {
+      "name": "Health",
+      "description": "Service health and monitoring endpoints"
+    }
+  ]
+}

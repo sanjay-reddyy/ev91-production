@@ -1,0 +1,62 @@
+// Prisma schema for rider registration and KYC
+// Add more fields and relations as needed
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Rider {
+  id            String   @id @default(uuid())
+  phone         String   @unique
+  phoneVerified Boolean  @default(false)
+  registrationStatus String @default("PENDING") // PENDING, PHONE_VERIFIED, KYC_COMPLETED
+  
+  
+  // User data
+  name          String?
+  dob           String?
+  address1      String?
+  address2      String?
+  city          String?
+  state         String?
+  pincode       String?
+  emergencyName String?
+  emergencyPhone String?
+  emergencyRelation String?
+  
+  // KYC fields
+  kycStatus     String   @default("pending")
+  aadhaar       String?
+  pan           String?
+  dl            String?
+  selfie        String?
+  
+  // Compliance
+  consent       Boolean  @default(false)
+  consentLogs   String?
+  ip            String?
+  agreementSigned Boolean @default(false)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+}
+
+// Temporary OTP verification table for MSG91 flow
+model OtpVerification {
+  id        String   @id @default(uuid())
+  tempId    String   @unique
+  phone     String
+  otp       String
+  requestId String   @default("") // MSG91 request ID for verification
+  attempts  Int      @default(0)
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

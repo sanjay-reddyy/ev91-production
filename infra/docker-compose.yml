@@ -1,0 +1,131 @@
+version: '3.8'
+services:
+  # Database Services
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-ev91db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ev91db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ev91-network
+  
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ev91-network
+  
+  # Backend Services
+  api-gateway:
+    build:
+      context: ../services/api-gateway
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=development
+    depends_on:
+      - rider-service
+      - payment-service
+      - vehicle-service
+    networks:
+      - ev91-network
+
+  rider-service:
+    build:
+      context: ../services/rider-service
+    ports:
+      - "6000:6000"
+    environment:
+      - PORT=6000
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://user:password@postgres:5432/ev91db?schema=rider
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../services/rider-service:/app
+      - /app/node_modules
+    networks:
+      - ev91-network
+
+  payment-service:
+    build:
+      context: ../services/payment-service
+    ports:
+      - "4003:4003"
+    environment:
+      - PORT=4003
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://user:password@postgres:5432/ev91db?schema=payment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - ev91-network
+
+  vehicle-service:
+    build:
+      context: ../services/vehicle-service
+    ports:
+      - "4004:4004"
+    environment:
+      - PORT=4004
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://user:password@postgres:5432/ev91db?schema=vehicle
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../services/vehicle-service:/app
+      - /app/node_modules
+    networks:
+      - ev91-network
+  
+  # Frontend Services
+  admin-portal:
+    build:
+      context: ../apps/admin-portal
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../apps/admin-portal:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    depends_on:
+      - api-gateway
+    networks:
+      - ev91-network
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  ev91-network:
+    driver: bridge

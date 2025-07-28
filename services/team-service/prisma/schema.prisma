@@ -1,0 +1,272 @@
+// Prisma schema for Team Service - Teams & Departments Only
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Minimal User reference for team relationships
+// This is a reference table only - full user data comes from auth-service
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  firstName    String
+  lastName     String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Team relationships
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  teamId       String?
+  team         Team?       @relation(fields: [teamId], references: [id])
+
+  // Teams led by this user
+  teamsLed     Team[]      @relation("TeamLeader")
+  
+  // Clients managed by this user  
+  clientsManaged Client[] @relation("ClientAccountManager")
+
+  @@map("users")
+}
+
+// Department model
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  users       User[]
+  teams       Team[]
+  
+  // Optional hierarchy support for future use
+  parentId    String?
+  parent      Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children    Department[] @relation("DepartmentHierarchy")
+
+  @@map("departments")
+}
+
+// Team model
+model Team {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  isActive     Boolean  @default(true)
+  city         String?
+  country      String?
+  memberCount  Int      @default(0)
+  maxMembers   Int      @default(10)
+  skills       String?  // JSON string of skills array
+  status       String   @default("Active") // "Active" or "Inactive"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  users        User[]     // Team members
+  
+  // Team lead relationship
+  teamLeadId   String?
+  teamLead     User?      @relation("TeamLeader", fields: [teamLeadId], references: [id])
+
+  @@unique([name, departmentId])
+  @@map("teams")
+}
+
+// Client model - Business entities that have stores
+model Client {
+  id                    String   @id @default(cuid())
+  name                  String   @unique
+  clientCode            String   @unique
+  clientType            String   // B2B, B2C, Government, Enterprise
+  industrySector        String?  // Automotive OEM, Fleet Operator, Logistics
+  businessCategory      String?  // Manufacturer, Dealer, Service Provider, End Customer
+  
+  // Contact Information
+  primaryContactPerson  String?
+  designation          String?
+  email                String?
+  secondaryEmail       String?
+  phone                String?
+  secondaryPhone       String?
+  website              String?
+  
+  // Address & Location
+  headquartersAddress  String?
+  headquartersCity     String?
+  headquartersState    String?
+  headquartersCountry  String   @default("India")
+  pinCode              String?
+  geographicRegions    String?  // JSON array of regions served
+  
+  // Business Details
+  registrationNumber   String?
+  panNumber           String?
+  gstNumber           String?
+  businessSize        String?  // Startup, SME, Large Enterprise
+  annualRevenueRange  String?
+  employeeCountRange  String?
+  
+  // EV-Specific Fields
+  evPortfolio         String?  // JSON array: 2-Wheeler, 3-Wheeler, 4-Wheeler, Commercial
+  fleetSize           Int?
+  hasChargingInfra    Boolean  @default(false)
+  chargingInfraDetails String? // JSON details
+  batteryTechPreference String?
+  serviceRequirements String?  // JSON array: Maintenance, Charging, Financing
+  
+  // Commercial Details
+  creditLimit         Float?
+  paymentTerms        String?  // Net 30, Net 60, etc.
+  preferredPaymentMethod String?
+  taxCategory         String?
+  discountCategory    String?
+  
+  // Rider Earning Configuration
+  baseOrderRate       Float    @default(25.0) // ₹25 per order
+  rateEffectiveDate   DateTime @default(now())
+  rateType            String   @default("fixed") // fixed, variable, distance-based
+  minimumRate         Float    @default(15.0)
+  maximumRate         Float    @default(50.0)
+  
+  // Bulk Order Bonus Configuration
+  bulkBonusEnabled    Boolean  @default(false)
+  bulkOrdersThreshold Int      @default(10)
+  bulkBonusAmount     Float    @default(50.0)
+  bulkResetPeriod     String   @default("daily") // daily, weekly
+  
+  // Weekly Target Bonus
+  weeklyBonusEnabled  Boolean  @default(false)
+  weeklyOrderTarget   Int      @default(70)
+  weeklyBonusAmount   Float    @default(500.0)
+  
+  // Performance Multiplier
+  performanceMultiplierEnabled Boolean @default(false)
+  topPerformerRate    Float    @default(1.2)
+  performanceCriteria String   @default("rating") // rating, speed, volume
+  
+  // Payment Configuration
+  paymentCycle        String   @default("weekly") // daily, weekly, bi-weekly
+  paymentMethods      String?  // JSON array of payment methods
+  minimumPayout       Float    @default(100.0)
+  payoutDay          String   @default("Friday")
+  
+  // Relationship Management
+  clientStatus        String   @default("Active") // Active, Inactive, Prospect, Suspended
+  acquisitionDate     DateTime @default(now())
+  accountManagerId    String?
+  clientPriority      String   @default("Medium") // High, Medium, Low
+  relationshipType    String   @default("Direct") // Direct, Partner, Distributor
+  
+  // Timestamps
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relationships
+  stores              Store[]
+  accountManager      User?    @relation("ClientAccountManager", fields: [accountManagerId], references: [id])
+  
+  @@map("clients")
+}
+
+// Store model - Individual store locations for clients
+model Store {
+  id                    String   @id @default(cuid())
+  clientId              String
+  storeName            String
+  storeCode            String   @unique
+  storeType            String   // Showroom, Service Center, Charging Hub, Experience Center
+  brandFranchise       String?
+  
+  // Location Details
+  completeAddress      String
+  city                 String   // Key field for multi-city operations
+  state                String
+  country              String   @default("India")
+  pinCode              String
+  landmark             String?
+  gpsLatitude          Float?
+  gpsLongitude         Float?
+  zoneRegion           String?  // North, South, East, West
+  
+  // Contact Information
+  storeManagerName     String?
+  contactNumber        String?
+  emailAddress         String?
+  whatsappNumber       String?
+  
+  // Operational Details
+  weekdayOpeningHours  String?  // JSON format
+  weekendOpeningHours  String?
+  workingDays          String?  // JSON array of working days
+  storeSizeSquareFt    Int?
+  displayUnitsCount    Int?
+  staffCount           Int?
+  languagesSupported   String?  // JSON array
+  
+  // EV-Specific Store Features
+  vehicleTypesDisplayed String? // JSON array: 2W, 3W, 4W, Commercial
+  hasTestDriveFacility Boolean  @default(false)
+  chargingStationsCount Int     @default(0)
+  chargingStationTypes String?  // JSON array
+  serviceBaysCount     Int      @default(0)
+  hasSparePartsInventory Boolean @default(false)
+  hasBatterySwapping   Boolean  @default(false)
+  
+  // Business Operations
+  monthlySalesTarget   Float?
+  serviceCapacityPerDay Int?
+  inventoryCapacity    Int?
+  storeStatus          String   @default("Active") // Active, Inactive, Under Construction, Planned
+  openingDate          DateTime?
+  leaseOwnedStatus     String?  // Lease, Owned
+  
+  // Financial Details
+  monthlyRent          Float?
+  operationalCosts     Float?
+  revenueTarget        Float?
+  commissionStructure  String?  // JSON
+  
+  // Store-Specific Offers for Riders
+  currentOfferRate     Float    @default(0.0) // Extra ₹ per delivery
+  offerStartDate       DateTime?
+  offerEndDate         DateTime?
+  offerType            String   @default("none") // temporary, permanent, seasonal, none
+  offerReason          String?
+  isOfferActive        Boolean  @default(false)
+  
+  // Traffic & Performance Metrics
+  busyLevel            String   @default("medium") // low, medium, high, peak
+  averageOrdersPerDay  Int      @default(0)
+  peakHours            String?  // JSON array: ['12:00-14:00', '19:00-21:00']
+  busyDays             String?  // JSON array: ['friday', 'saturday', 'sunday']
+  orderDifficultyLevel String   @default("medium") // easy, medium, hard
+  averageDeliveryDistance Float @default(0.0) // in km
+  
+  // Performance Tracking
+  monthlyOrderVolume   Int      @default(0)
+  riderRating          Float    @default(0.0) // 1-5 rating from riders
+  averagePickupTime    Int      @default(0) // in minutes
+  storePriority        String   @default("standard") // vip, standard, low
+  
+  // Timestamps
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  // Relationships
+  client               Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  @@unique([clientId, storeCode])
+  @@map("stores")
+}

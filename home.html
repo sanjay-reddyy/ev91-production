@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV91 Rental App - Interactive UI Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Green Harmony (Forest Green, Lime Green, Neutrals) -->
+    <!-- Application Structure Plan: A tab-based Single Page Application (SPA) is chosen to clearly separate the two distinct platforms described in the report: the Mobile App and the Web Portal. This structure prevents cognitive overload from a long scroll and allows users to focus on one context at a time. Within the Mobile App tab, a sequential, JS-driven screen flow simulates the user journey, making the process tangible. The Web Portal tab uses a dashboard grid layout, a common and effective pattern for presenting key metrics and data tables, which is ideal for an admin interface. This dual-structure provides the best usability for exploring the distinct parts of the source report. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Admin Dashboard Metrics (Active Riders, Vehicles In Use, etc.). Goal: Compare operational stats. Viz/Method: Bar Chart (Chart.js/Canvas). Interaction: Tooltips on hover. Justification: A bar chart is excellent for comparing discrete counts across different categories, making it easy to see the operational state at a glance.
+        - Report Info: User Journeys (Onboarding, Booking, etc.). Goal: Organize and simulate a process. Viz/Method: Styled HTML/CSS cards representing screens. Interaction: Clickable buttons that trigger JS functions to show/hide the next screen in the sequence. Justification: This method directly simulates the user's path through the app, providing a realistic feel for the flow described in the report.
+        - Report Info: Data Tables (Rider Management). Goal: Organize detailed data. Viz/Method: HTML Table with Tailwind styling. Interaction: Placeholder sort/filter buttons. Justification: Tables are the standard and most effective way to display structured, row-based data for administrative purposes. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        :root {
+            --forest-green: #22543d;
+            --lime-green: #84cc16;
+            --light-grey: #f3f4f6;
+            --medium-grey: #9ca3af;
+            --dark-grey: #374151;
+        }
+        body {
+            background-color: var(--light-grey);
+        }
+        .bg-forest-green { background-color: var(--forest-green); }
+        .text-forest-green { color: var(--forest-green); }
+        .border-forest-green { border-color: var(--forest-green); }
+        .bg-lime-green { background-color: var(--lime-green); }
+        .text-lime-green { color: var(--lime-green); }
+        .border-lime-green { border-color: var(--lime-green); }
+        .btn-primary {
+            background-color: var(--forest-green);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #2f7a56;
+        }
+        .btn-secondary {
+            background-color: white;
+            color: var(--forest-green);
+            border: 1px solid var(--forest-green);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-secondary:hover {
+            background-color: #f0fdf4;
+        }
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .tab-btn.active {
+            background-color: var(--forest-green);
+            color: white;
+        }
+        .tab-btn:not(.active) {
+            background-color: white;
+            color: var(--dark-grey);
+        }
+        .phone-screen {
+            display: none;
+        }
+        .phone-screen.active {
+            display: block;
+        }
+        .chart-container {
+            position: relative; 
+            width: 100%; 
+            max-width: 900px; 
+            margin-left: auto; 
+            margin-right: auto; 
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+    </style>
+</head>
+<body class="font-sans">
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-forest-green">EV91 Rental App</h1>
+            <p class="text-lg text-dark-grey mt-2">Interactive UI Prototype</p>
+        </header>
+
+        <div class="tabs flex justify-center gap-4 mb-8">
+            <button id="tab-btn-mobile" class="tab-btn active" onclick="showTab('mobile')">📱 Mobile App Prototype</button>
+            <button id="tab-btn-web" class="tab-btn" onclick="showTab('web')">🖥️ Admin Web Portal</button>
+        </div>
+
+        <main id="main-content">
+            <!-- Mobile App Prototype Tab -->
+            <div id="tab-mobile" class="tab-content">
+                 <div class="bg-white p-4 rounded-xl shadow-lg max-w-4xl mx-auto">
+                    <p class="text-center text-dark-grey mb-4">This section provides an interactive walkthrough of the mobile app's user journeys. Click the buttons to navigate through the screens as a user would, from initial registration and KYC to booking a vehicle and managing a ride. It's a hands-on way to experience the app flow described in the design report.</p>
+                </div>
+                <div class="flex flex-col md:flex-row gap-8 mt-8 justify-center items-start">
+                    <!-- Navigation Sidebar -->
+                    <div class="w-full md:w-1/4 bg-white p-4 rounded-xl shadow-lg">
+                        <h3 class="text-lg font-bold text-forest-green mb-4 border-b pb-2">User Journeys</h3>
+                        <ul class="space-y-2">
+                            <li><button onclick="showPhoneScreen('screen-1-1')" class="w-full text-left p-2 rounded hover:bg-lime-green/20 transition">1. Onboarding & KYC</button></li>
+                            <li><button onclick="showPhoneScreen('screen-2-1')" class="w-full text-left p-2 rounded hover:bg-lime-green/20 transition">2. Booking & Payment</button></li>
+                            <li><button onclick="showPhoneScreen('screen-3-1')" class="w-full text-left p-2 rounded hover:bg-lime-green/20 transition">3. Vehicle Pickup</button></li>
+                            <li><button onclick="showPhoneScreen('screen-4-1')" class="w-full text-left p-2 rounded hover:bg-lime-green/20 transition">4. Active Ride</button></li>
+                             <li><button onclick="showPhoneScreen('screen-7-1')" class="w-full text-left p-2 rounded hover:bg-lime-green/20 transition">5. Return & Summary</button></li>
+                        </ul>
+                    </div>
+
+                    <!-- Phone Mockup -->
+                    <div class="w-full max-w-sm mx-auto bg-gray-800 border-8 border-gray-800 rounded-3xl shadow-2xl overflow-hidden">
+                        <div class="bg-white h-[650px] overflow-y-auto">
+                            <!-- Screen 1.1: Welcome -->
+                            <div id="screen-1-1" class="phone-screen active p-6 flex flex-col h-full">
+                                <header class="flex justify-between items-center mb-8">
+                                    <span class="text-xl font-bold text-forest-green">EV91</span>
+                                    <svg class="w-6 h-6 text-dark-grey" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                </header>
+                                <main class="flex-grow flex flex-col justify-center text-center">
+                                    <h2 class="text-2xl font-bold text-dark-grey mb-2">Let's get you rolling!</h2>
+                                    <p class="text-medium-grey mb-6">Welcome to EV91!</p>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-dark-grey">+91</span>
+                                        <input type="tel" placeholder="Enter your Mobile Number" class="w-full pl-12 p-3 border border-gray-300 rounded-lg focus:border-lime-green focus:ring-lime-green focus:outline-none">
+                                    </div>
+                                    <div class="text-xs text-medium-grey mt-4">By continuing, you agree to our <a href="#" class="text-lime-green underline">Terms of Use</a> & <a href="#" class="text-lime-green underline">Privacy Policy</a>.</div>
+                                    <div class="flex items-center justify-center mt-2">
+                                        <input type="checkbox" id="terms-agree" class="h-4 w-4 text-lime-green rounded focus:ring-lime-green">
+                                        <label for="terms-agree" class="ml-2 text-sm text-dark-grey">I agree to the Terms & Privacy Policy</label>
+                                    </div>
+                                </main>
+                                <footer class="mt-8">
+                                    <button class="btn-primary w-full" onclick="showPhoneScreen('screen-1-2')">Send OTP</button>
+                                </footer>
+                            </div>
+
+                            <!-- Screen 1.2: Verify OTP -->
+                            <div id="screen-1-2" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-2xl font-bold text-dark-grey text-center mb-4">Enter OTP</h2>
+                                <p class="text-medium-grey text-center mb-8">OTP sent to +91-XXXXX-XXXXX.<br>Expires in <span class="text-forest-green font-semibold">0:59</span>.</p>
+                                <div class="flex justify-center gap-2 mb-8">
+                                    <input type="text" maxlength="1" class="w-12 h-14 text-center text-2xl border border-gray-300 rounded-lg focus:border-lime-green focus:ring-lime-green">
+                                    <input type="text" maxlength="1" class="w-12 h-14 text-center text-2xl border border-gray-300 rounded-lg focus:border-lime-green focus:ring-lime-green">
+                                    <input type="text" maxlength="1" class="w-12 h-14 text-center text-2xl border border-gray-300 rounded-lg focus:border-lime-green focus:ring-lime-green">
+                                    <input type="text" maxlength="1" class="w-12 h-14 text-center text-2xl border border-gray-300 rounded-lg focus:border-lime-green focus:ring-lime-green">
+                                    <input type="text" maxlength="1" class="w-12 h-14 text-center text-2xl border border-gray-300 rounded-lg focus:border-lime-green focus:ring-lime-green">
+                                    <input type="text" maxlength="1" class="w-12 h-14 text-center text-2xl border border-gray-300 rounded-lg focus:border-lime-green focus:ring-lime-green">
+                                </div>
+                                <a href="#" class="text-lime-green underline text-center block">Resend OTP</a>
+                                <div class="flex-grow"></div>
+                                <button class="btn-primary w-full" onclick="showPhoneScreen('screen-1-3')">Verify & Continue</button>
+                            </div>
+
+                            <!-- Screen 1.3: KYC Upload -->
+                             <div id="screen-1-3" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-xl font-bold text-dark-grey mb-4">Complete Your KYC</h2>
+                                <p class="text-medium-grey mb-6">Upload your documents for verification.</p>
+                                <div class="space-y-4 flex-grow overflow-y-auto">
+                                    <div>
+                                        <h3 class="font-semibold text-dark-grey">Aadhaar Card</h3>
+                                        <p class="text-xs text-medium-grey mb-2">Upload front and back.</p>
+                                        <button class="btn-secondary w-full text-sm mb-2">📷 Upload Aadhaar Front</button>
+                                        <button class="btn-secondary w-full text-sm">📷 Upload Aadhaar Back</button>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-dark-grey">Driving License</h3>
+                                        <p class="text-xs text-medium-grey mb-2">Upload front and take a selfie with it.</p>
+                                        <button class="btn-secondary w-full text-sm mb-2">📷 Upload Driving License</button>
+                                        <button class="btn-secondary w-full text-sm">🤳 Take Selfie</button>
+                                    </div>
+                                </div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-1-4')">Submit for Verification</button>
+                            </div>
+                            
+                            <!-- Screen 1.4: KYC Status -->
+                            <div id="screen-1-4" class="phone-screen p-6 flex flex-col h-full justify-center items-center text-center">
+                                <h2 class="text-2xl font-bold text-dark-grey mb-2">Your KYC is being reviewed.</h2>
+                                <p class="text-medium-grey mb-6">This may take a few minutes. We will notify you once it's complete.</p>
+                                <div class="w-16 h-16 border-4 border-lime-green border-t-transparent rounded-full animate-spin mb-6"></div>
+                                <div class="bg-yellow-100 text-yellow-800 p-3 rounded-lg font-semibold">Status: Pending</div>
+                                <div class="mt-8 space-y-2">
+                                    <button class="btn-primary w-full" onclick="showPhoneScreen('screen-2-1')">Simulate Approval →</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Screen 2.1: Choose Plan -->
+                            <div id="screen-2-1" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-xl font-bold text-dark-grey mb-4">Select a Plan</h2>
+                                <div class="space-y-4 flex-grow overflow-y-auto">
+                                    <div class="border-2 border-lime-green p-4 rounded-lg">
+                                        <h3 class="font-bold text-lg text-forest-green">Daily Rental</h3>
+                                        <p class="font-semibold text-dark-grey">₹450 / day</p>
+                                        <p class="text-xs text-medium-grey mt-2">Includes: GST, Insurance, Maintenance<br>Excludes: Fuel<br>Swap Frequency: 1/day</p>
+                                    </div>
+                                    <div class="border border-gray-300 p-4 rounded-lg">
+                                        <h3 class="font-bold text-lg text-dark-grey">Weekly Rental</h3>
+                                        <p class="font-semibold text-dark-grey">₹2800 / week</p>
+                                    </div>
+                                    <div class="border border-gray-300 p-4 rounded-lg">
+                                        <h3 class="font-bold text-lg text-dark-grey">Monthly Rental</h3>
+                                        <p class="font-semibold text-dark-grey">₹10000 / month</p>
+                                    </div>
+                                </div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-2-2')">Next</button>
+                            </div>
+
+                             <!-- Screen 2.2: Select Vehicle -->
+                            <div id="screen-2-2" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-xl font-bold text-dark-grey mb-2">Choose Pickup Location</h2>
+                                <input type="text" placeholder="📍 Search Hub/Location" class="w-full p-3 border border-gray-300 rounded-lg mb-4">
+                                <h3 class="text-lg font-bold text-dark-grey mt-2 mb-2">Available Vehicles at <span class="text-forest-green">Koramangala Hub</span></h3>
+                                <div class="space-y-3 flex-grow overflow-y-auto">
+                                    <div class="border border-gray-200 p-3 rounded-lg flex gap-4">
+                                        <div class="w-16 h-16 bg-light-grey rounded-lg flex items-center justify-center text-3xl">🛵</div>
+                                        <div class="flex-grow">
+                                            <h4 class="font-bold text-dark-grey">Hero Electric Optima</h4>
+                                            <p class="text-xs text-medium-grey">Battery: 85%, Last Serviced: Today</p>
+                                            <p class="text-xs font-semibold text-yellow-500">⭐ 4.5 (120 reviews)</p>
+                                        </div>
+                                        <button class="btn-secondary px-3 py-1 text-sm self-center">Select</button>
+                                    </div>
+                                    <div class="border border-gray-200 p-3 rounded-lg flex gap-4 opacity-60">
+                                         <div class="w-16 h-16 bg-light-grey rounded-lg flex items-center justify-center text-3xl">🏍️</div>
+                                        <div class="flex-grow">
+                                            <h4 class="font-bold text-dark-grey">IC Bike Model</h4>
+                                            <p class="text-xs text-medium-grey">Tank: 70%, Last Serviced: 01/07/2025</p>
+                                             <p class="text-xs font-semibold text-yellow-500">⭐ 4.2 (88 reviews)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn-primary w-full mt-4" onclick="showPhoneScreen('screen-2-3')">Proceed to Payment</button>
+                            </div>
+
+                            <!-- Screen 2.3: Payment -->
+                            <div id="screen-2-3" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-xl font-bold text-dark-grey mb-4">Confirm Your Booking</h2>
+                                <div class="flex-grow space-y-4">
+                                    <div>
+                                        <h3 class="font-semibold">Rental Details</h3>
+                                        <p class="text-sm text-medium-grey">Plan: Daily<br>Vehicle: Hero Electric Optima</p>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold">Cost Breakdown</h3>
+                                        <p class="text-sm text-medium-grey">Rental Fee: ₹450<br>Security Deposit: ₹1000<br><span class="font-bold text-dark-grey">Total Amount: ₹1450</span></p>
+                                    </div>
+                                     <div>
+                                        <h3 class="font-semibold">Payment Method</h3>
+                                        <div class="flex gap-4 mt-2">
+                                            <button class="flex-1 p-2 border-2 border-lime-green rounded-lg text-forest-green font-semibold">UPI</button>
+                                            <button class="flex-1 p-2 border border-gray-300 rounded-lg">Card</button>
+                                            <button class="flex-1 p-2 border border-gray-300 rounded-lg">Wallet</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-2-4')">Pay ₹1450</button>
+                            </div>
+
+                            <!-- Screen 2.4: Booking Confirmed -->
+                            <div id="screen-2-4" class="phone-screen p-6 flex flex-col h-full text-center items-center justify-center">
+                                <div class="w-20 h-20 bg-lime-green rounded-full flex items-center justify-center mb-6">
+                                    <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                </div>
+                                <h2 class="text-2xl font-bold text-dark-grey">Your Ride is Ready!</h2>
+                                <p class="text-medium-grey mt-2 mb-6">Your booking for Hero Electric Optima is confirmed.</p>
+                                <div class="bg-light-grey w-32 h-32 flex items-center justify-center text-6xl rounded-lg shadow-inner">[QR]</div>
+                                <p class="text-xs text-medium-grey mt-4">Show this QR code at the hub.</p>
+                                <div class="flex-grow"></div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-3-1')">View My Bookings</button>
+                            </div>
+                            
+                             <!-- Screen 3.1: Pickup -->
+                            <div id="screen-3-1" class="phone-screen p-6 flex flex-col h-full text-center items-center justify-center">
+                                <h2 class="text-2xl font-bold text-dark-grey">At the Pickup Hub?</h2>
+                                <p class="text-medium-grey mt-2 mb-6">Please show your Legal ID and this QR code to the hub staff for verification.</p>
+                                <div class="bg-light-grey w-40 h-40 flex items-center justify-center text-8xl rounded-lg shadow-inner">[QR]</div>
+                                <div class="flex-grow"></div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-3-2')">Start Pre-Ride Inspection</button>
+                            </div>
+                            
+                            <!-- Screen 3.2: Pre-ride inspection -->
+                             <div id="screen-3-2" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-xl font-bold text-dark-grey mb-4">Pre-Ride Inspection</h2>
+                                 <p class="text-sm text-medium-grey mb-4">Capture photos of the vehicle, odometer, and battery.</p>
+                                <div class="flex-grow space-y-3 overflow-y-auto">
+                                    <button class="btn-secondary w-full text-sm">📷 Take Front Photo</button>
+                                    <button class="btn-secondary w-full text-sm">📷 Take Back Photo</button>
+                                    <input type="text" placeholder="Odometer Reading (km)" class="w-full p-3 border border-gray-300 rounded-lg">
+                                    <input type="text" placeholder="Battery Percentage (%)" class="w-full p-3 border border-gray-300 rounded-lg">
+                                    <label class="font-semibold text-dark-grey">Visual Check:</label>
+                                    <div class="flex items-center"><input type="checkbox" class="h-4 w-4 text-lime-green rounded"> <span class="ml-2">Tires OK</span></div>
+                                    <div class="flex items-center"><input type="checkbox" class="h-4 w-4 text-lime-green rounded"> <span class="ml-2">Brakes OK</span></div>
+                                </div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-4-1')">Submit Inspection</button>
+                            </div>
+
+                            <!-- Screen 4.1: Active Ride -->
+                            <div id="screen-4-1" class="phone-screen flex flex-col h-full">
+                                <div class="h-3/5 bg-gray-300 flex items-center justify-center text-dark-grey text-lg font-semibold">
+                                    [Live Map View]
+                                </div>
+                                <div class="p-4 bg-white flex-grow">
+                                    <h2 class="text-xl font-bold text-dark-grey">Enjoy Your Ride!</h2>
+                                    <div class="grid grid-cols-3 gap-4 text-center mt-4">
+                                        <div>
+                                            <p class="text-xs text-medium-grey">Speed</p>
+                                            <p class="font-bold text-lg text-dark-grey">45 <span class="text-sm font-normal">km/h</span></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-medium-grey">Battery</p>
+                                            <p class="font-bold text-lg text-forest-green">78%</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-medium-grey">Time Left</p>
+                                            <p class="font-bold text-lg text-dark-grey">22h 15m</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-6 bg-light-grey rounded-lg p-4">
+                                        <h3 class="text-lg font-bold text-dark-grey mb-2">Active Rider Menu</h3>
+                                        <div class="flex flex-col gap-2">
+                                            <button class="btn-secondary w-full text-left" onclick="showPhoneScreen('screen-profile')">👤 Profile</button>
+                                            <button class="btn-secondary w-full text-left" onclick="showPhoneScreen('screen-orders')">📦 Orders</button>
+                                            <button class="btn-secondary w-full text-left" onclick="showPhoneScreen('screen-rider')">🛵 Rider</button>
+                                            <button class="btn-secondary w-full text-left" onclick="showPhoneScreen('screen-payments')">💳 Payments</button>
+                                            <button class="btn-secondary w-full text-left" onclick="showPhoneScreen('screen-help')">❓ Help</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-4 mt-6">
+                                        <button class="btn-primary flex-grow" onclick="showPhoneScreen('screen-7-1')">End Ride</button>
+                                        <button class="bg-red-600 text-white p-3 rounded-lg font-bold">SOS</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Screen 7.1: Return -->
+                            <div id="screen-7-1" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-xl font-bold text-dark-grey mb-4">Return Your Vehicle</h2>
+                                <p class="text-sm text-medium-grey mb-4">Select the hub where you are returning the vehicle.</p>
+                                <div class="flex-grow">
+                                    <input type="text" placeholder="📍 Select Return Hub/Location" class="w-full p-3 border border-gray-300 rounded-lg">
+                                </div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-7-2')">Confirm Return & Inspect</button>
+                            </div>
+                            
+                            <!-- Screen 7.2: Ride Summary -->
+                            <div id="screen-7-2" class="phone-screen p-6 flex flex-col h-full">
+                                <h2 class="text-xl font-bold text-dark-grey mb-4 text-center">Ride Completed!</h2>
+                                <div class="flex-grow space-y-4">
+                                    <div>
+                                        <h3 class="font-semibold text-dark-grey">Ride Summary</h3>
+                                        <div class="text-sm text-medium-grey">
+                                            <div class="flex justify-between"><span>Total Ride Cost:</span> <span>₹450.00</span></div>
+                                            <div class="flex justify-between"><span>GST Component:</span> <span>₹81.00</span></div>
+                                        </div>
+                                    </div>
+                                     <div>
+                                        <h3 class="font-semibold text-dark-grey">Refund Details</h3>
+                                        <div class="text-sm text-medium-grey">
+                                            <div class="flex justify-between"><span>Security Deposit:</span> <span>₹1000.00</span></div>
+                                            <div class="flex justify-between text-forest-green font-bold"><span>Refund Amount:</span> <span>₹1000.00</span></div>
+                                            <p class="text-xs mt-1">Estimated refund within T+2 days.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn-primary w-full mt-6" onclick="showPhoneScreen('screen-1-1')">Back to Home</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Web Portal Tab -->
+            <div id="tab-web" class="tab-content hidden">
+                 <div class="bg-white p-4 rounded-xl shadow-lg max-w-6xl mx-auto">
+                    <p class="text-center text-dark-grey mb-4">This section presents a prototype of the administrative web portal. It showcases a dashboard with key operational metrics visualized in cards and an interactive chart. Below, you'll find a sample data table for rider management, illustrating how administrators would search, filter, and view user information. This provides a high-level overview of the powerful management tools available.</p>
+                </div>
+                <div class="bg-white p-4 md:p-8 rounded-xl shadow-lg mt-8">
+                    <!-- Web Portal Header -->
+                    <div class="flex flex-wrap justify-between items-center border-b pb-4 mb-6">
+                        <div class="flex items-center">
+                             <span class="text-2xl font-bold text-forest-green">EV91 Admin</span>
+                        </div>
+                        <div class="flex items-center gap-4 mt-4 sm:mt-0">
+                            <input type="search" placeholder="Search..." class="p-2 border rounded-lg">
+                            <button class="relative">
+                                <svg class="w-6 h-6 text-dark-grey" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                                <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">3</span>
+                            </button>
+                            <span class="font-semibold text-dark-grey">Admin User</span>
+                        </div>
+                    </div>
+
+                    <!-- Web Portal Content -->
+                    <div class="flex flex-col lg:flex-row gap-8">
+                        <!-- Sidebar -->
+                        <nav class="w-full lg:w-1/5">
+                            <ul class="space-y-2">
+                                <li><a href="#" class="flex items-center gap-2 p-2 rounded bg-lime-green/20 text-forest-green font-bold">📊 Dashboard</a></li>
+                                <li><a href="#" class="flex items-center gap-2 p-2 rounded hover:bg-light-grey">👤 Rider Management</a></li>
+                                <li><a href="#" class="flex items-center gap-2 p-2 rounded hover:bg-light-grey">🛵 Vehicle Management</a></li>
+                                <li><a href="#" class="flex items-center gap-2 p-2 rounded hover:bg-light-grey">🔋 Battery Management</a></li>
+                                <li><a href="#" class="flex items-center gap-2 p-2 rounded hover:bg-light-grey">✅ KYC Approvals</a></li>
+                                <li><a href="#" class="flex items-center gap-2 p-2 rounded hover:bg-light-grey">🎟️ Support Tickets</a></li>
+                            </ul>
+                        </nav>
+
+                        <!-- Main Content -->
+                        <div class="w-full lg:w-4/5">
+                            <!-- Stats Cards -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+                                <div class="bg-light-grey p-4 rounded-lg">
+                                    <h4 class="text-medium-grey font-semibold">Active Riders</h4>
+                                    <p class="text-3xl font-bold text-forest-green">1,204</p>
+                                </div>
+                                <div class="bg-light-grey p-4 rounded-lg">
+                                    <h4 class="text-medium-grey font-semibold">Vehicles In Use</h4>
+                                    <p class="text-3xl font-bold text-forest-green">876</p>
+                                </div>
+                                <div class="bg-light-grey p-4 rounded-lg">
+                                    <h4 class="text-medium-grey font-semibold">Available Batteries</h4>
+                                    <p class="text-3xl font-bold text-forest-green">3,500</p>
+                                </div>
+                                 <div class="bg-yellow-100 p-4 rounded-lg">
+                                    <h4 class="text-yellow-800 font-semibold">Pending KYC</h4>
+                                    <p class="text-3xl font-bold text-yellow-600">15</p>
+                                </div>
+                            </div>
+
+                            <!-- Chart -->
+                            <div class="mb-8">
+                                <h3 class="text-xl font-bold text-dark-grey mb-4">Operational Overview</h3>
+                                <div class="chart-container">
+                                    <canvas id="adminChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Rider Management Table -->
+                            <div>
+                                <h3 class="text-xl font-bold text-dark-grey mb-4">Rider Management</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left">
+                                        <thead>
+                                            <tr class="bg-light-grey">
+                                                <th class="p-3">Name</th>
+                                                <th class="p-3">Phone</th>
+                                                <th class="p-3">KYC Status</th>
+                                                <th class="p-3">Wallet Balance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b">
+                                                <td class="p-3">Aarav Patel</td>
+                                                <td class="p-3">+91 98765 43210</td>
+                                                <td class="p-3"><span class="bg-green-200 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Approved</span></td>
+                                                <td class="p-3">₹150.00</td>
+                                            </tr>
+                                            <tr class="border-b bg-gray-50">
+                                                <td class="p-3">Diya Sharma</td>
+                                                <td class="p-3">+91 87654 32109</td>
+                                                <td class="p-3"><span class="bg-yellow-200 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Pending</span></td>
+                                                <td class="p-3">₹0.00</td>
+                                            </tr>
+                                            <tr class="border-b">
+                                                <td class="p-3">Rohan Singh</td>
+                                                <td class="p-3">+91 76543 21098</td>
+                                                <td class="p-3"><span class="bg-green-200 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Approved</span></td>
+                                                <td class="p-3">₹500.50</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            showTab('mobile');
+            showPhoneScreen('screen-1-1');
+            createAdminChart();
+        });
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-btn-${tabId}`).classList.add('active');
+            
+            if (tabId === 'web') {
+                 if (window.adminChartInstance) {
+                    window.adminChartInstance.destroy();
+                }
+                createAdminChart();
+            }
+        }
+
+        function showPhoneScreen(screenId) {
+            document.querySelectorAll('.phone-screen').forEach(screen => screen.classList.remove('active'));
+            const targetScreen = document.getElementById(screenId);
+            if(targetScreen) {
+                targetScreen.classList.add('active');
+                targetScreen.parentNode.scrollTop = 0;
+            }
+        }
+
+        function createAdminChart() {
+            const ctx = document.getElementById('adminChart').getContext('2d');
+            const data = {
+                labels: ['Active Riders', 'Vehicles In Use', 'Available Batteries', 'Pending KYC', 'Open Tickets'],
+                datasets: [{
+                    label: 'Count',
+                    data: [1204, 876, 3500, 15, 8],
+                    backgroundColor: [
+                        '#22543d',
+                        '#2f7a56',
+                        '#84cc16',
+                        '#f59e0b',
+                        '#ef4444'
+                    ],
+                    borderColor: 'rgba(255, 255, 255, 0.5)',
+                    borderWidth: 1
+                }]
+            };
+
+            window.adminChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#374151',
+                            titleFont: { size: 14 },
+                            bodyFont: { size: 12 },
+                            padding: 10,
+                            cornerRadius: 4,
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#e5e7eb'
+                            }
+                        },
+                        x: {
+                             grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

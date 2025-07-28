@@ -1,0 +1,95 @@
+{
+  // File exclusions to improve performance
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.next": true,
+    "**/coverage": true,
+    "**/.nyc_output": true,
+    "**/prisma/migrations": true,
+    "**/.git/objects": true,
+    "**/.git/subtree-cache": true,
+    "**/dev.db": true,
+    "**/dev.db-journal": true,
+    "**/*.log": true
+  },
+  
+  // Search exclusions for faster search
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.next": true,
+    "**/coverage": true,
+    "**/.nyc_output": true,
+    "**/prisma/migrations": true,
+    "**/.git": true,
+    "**/dev.db": true,
+    "**/*.log": true
+  },
+  
+  // File watcher exclusions to reduce CPU usage
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/.next/**": true,
+    "**/coverage/**": true,
+    "**/.nyc_output/**": true,
+    "**/prisma/migrations/**": true,
+    "**/.git/**": true,
+    "**/dev.db": true,
+    "**/*.log": true
+  },
+  
+  // TypeScript performance optimizations
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "typescript.suggest.autoImports": false,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.updateImportsOnFileMove.enabled": "never",
+  
+  // Prisma optimizations
+  "prisma.showPrismaDataPlatformNotification": false,
+  "prisma.fileWatcher": false,
+  
+  // Git optimizations
+  "git.decorations.enabled": false,
+  "git.enableCommitSigning": false,
+  "git.fetchOnPull": false,
+  "git.autoRepositoryDetection": false,
+  
+  // Editor optimizations
+  "editor.minimap.enabled": false,
+  "editor.quickSuggestionsDelay": 100,
+  "editor.suggest.snippetsPreventQuickSuggestions": false,
+  "editor.codeLens": false,
+  "editor.hover.delay": 300,
+  
+  // Search optimizations
+  "search.useIgnoreFiles": true,
+  "search.useGlobalIgnoreFiles": true,
+  "search.smartCase": true,
+  
+  // Disable telemetry
+  "telemetry.telemetryLevel": "off",
+  
+  // Breadcrumbs (can disable for performance)
+  "breadcrumbs.enabled": false,
+  
+  // Extensions optimizations
+  "extensions.autoCheckUpdates": false,
+  "extensions.autoUpdate": false,
+  
+  // Emmet optimizations (disable if not needed)
+  "emmet.triggerExpansionOnTab": false,
+  
+  // Language-specific optimizations
+  "json.maxItemsComputed": 1000,
+  "html.suggest.html5": false,
+  "css.validate": false,
+  
+  // Terminal optimizations
+  "terminal.integrated.enablePersistentSessions": false,
+  "terminal.integrated.localEchoLatencyThreshold": -1
+}

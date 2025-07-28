@@ -1,0 +1,106 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Vehicle Inventory Management API",
+    "description": "Comprehensive 2-Wheeler EV Fleet Management System",
+    "version": "1.0.0",
+    "contact": {
+      "name": "EV91 Platform",
+      "email": "api@ev91.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4003",
+      "description": "Development server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Vehicle": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique vehicle identifier"
+          },
+          "oemType": {
+            "type": "string",
+            "description": "OEM manufacturer (Beguass, Hero, Bounce, etc.)",
+            "example": "Hero Electric"
+          },
+          "vehicleModel": {
+            "type": "string",
+            "description": "Vehicle model name",
+            "example": "Optima CX"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "description": "Vehicle registration number",
+            "example": "DL8CAE1234"
+          },
+          "operationalStatus": {
+            "type": "string",
+            "enum": ["Available", "Assigned", "Under Maintenance", "Retired", "Damaged"],
+            "description": "Current operational status"
+          },
+          "serviceStatus": {
+            "type": "string",
+            "enum": ["Active", "Inactive", "Scheduled for Service"],
+            "description": "Service status"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicles": {
+      "get": {
+        "summary": "Get all vehicles",
+        "tags": ["Vehicles"],
+        "responses": {
+          "200": {
+            "description": "List of vehicles"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new vehicle",
+        "tags": ["Vehicles"],
+        "responses": {
+          "201": {
+            "description": "Vehicle created successfully"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Health check endpoints"
+    },
+    {
+      "name": "Vehicles",
+      "description": "Vehicle inventory management"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "EV91 Mobile App",
+    "slug": "ev91-mobile-app",
+    "version": "1.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "sdkVersion": "53.0.0",
+    "plugins": [
+      "expo-asset"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "optimization": {
+      "web": {
+        "bundler": "metro"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.ev91.mobile",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses camera for document scanning",
+        "NSPhotoLibraryUsageDescription": "This app needs access to photo library for document uploads"
+      }
+    },
+    "android": {
+      "package": "com.ev91.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ev91-mobile-project"
+      }
+    }
+  }
+}

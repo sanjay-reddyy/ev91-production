@@ -1,0 +1,61 @@
+{
+  "folders": [
+    {
+      "name": "🏗️ Root",
+      "path": "."
+    },
+    {
+      "name": "🔐 Auth Service",
+      "path": "./services/auth-service"
+    },
+    {
+      "name": "🏪 Client Store Service", 
+      "path": "./services/client-store-service"
+    },
+    {
+      "name": "👥 Team Service",
+      "path": "./services/team-service"
+    },
+    {
+      "name": "🚚 Rider Service",
+      "path": "./services/rider-service"
+    },
+    {
+      "name": "⚙️ Admin Portal",
+      "path": "./apps/admin-portal"
+    },
+    {
+      "name": "📱 Mobile App",
+      "path": "./apps/mobile-app"
+    },
+    {
+      "name": "🎨 UI Components",
+      "path": "./apps/ui-components"
+    }
+  ],
+  "settings": {
+    "typescript.preferences.includePackageJsonAutoImports": "off",
+    "typescript.suggest.autoImports": false,
+    "search.useIgnoreFiles": true,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-next",
+      "prisma.prisma",
+      "ms-vscode.vscode-json"
+    ],
+    "unwantedRecommendations": [
+      "ms-vscode.vscode-json",
+      "hookyqr.beautify",
+      "ms-vscode.sublime-keybindings"
+    ]
+  }
+}
