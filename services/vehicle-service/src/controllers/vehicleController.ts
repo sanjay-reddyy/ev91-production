@@ -14,6 +14,8 @@ const calculateVehicleAge = (registrationDate: Date, purchaseDate?: Date): numbe
 
 // Create new vehicle
 export const createVehicle = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  console.log('🚀 Creating vehicle with data:', JSON.stringify(req.body, null, 2));
+  
   const {
     modelId,
     registrationNumber,
@@ -61,14 +63,18 @@ export const createVehicle = asyncHandler(async (req: AuthenticatedRequest, res:
   }
 
   // Validate that model exists
+  console.log('🔍 Looking for model with ID:', modelId);
   const vehicleModel = await prisma.vehicleModel.findUnique({
     where: { id: modelId },
     include: { oem: true }
   });
 
   if (!vehicleModel) {
+    console.log('❌ Model not found with ID:', modelId);
     throw createError('Invalid vehicle model ID', 400);
   }
+  
+  console.log('✅ Found model:', vehicleModel.name);
 
   // Calculate age
   const registrationDateToUse = registrationDate ? new Date(registrationDate) : new Date();

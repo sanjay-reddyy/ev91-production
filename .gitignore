@@ -49,6 +49,63 @@ logs/
 ehthumbs.db
 Thumbs.db
 
+# Test files and temporary scripts
+test-*.js
+test-*.ts
+test-*.ps1
+debug-*.js
+verify-*.js
+quick-test.js
+clear-form-cache.js
+create-admin-user.js
+get-token.js
+try-credentials.js
+start-*.bat
+start-*.js
+setup-*.ps1
+
+# Documentation files (except main README)
+*_COMPLETE.md
+*_FIX.md
+*_FIXES.md
+*_IMPLEMENTATION.md
+*_INTEGRATION.md
+*_RESOLVED.md
+*_STATUS.md
+*_CLEANUP.md
+API_*.md
+AUTH_*.md
+CLIENT_*.md
+CORS_*.md
+DATABASE_*.md
+DEPARTMENTS_*.md
+DYNAMIC_*.md
+EDIT_*.md
+FORM_*.md
+FRONTEND_*.md
+GIT_*.md
+HIERARCHICAL_*.md
+MOBILE_*.md
+MULTI_*.md
+NETWORK_*.md
+OEM_*.md
+PORT_*.md
+PROJECT_*.md
+PURCHASE_*.md
+RBAC_*.md
+RC_*.md
+TEAMS_*.md
+TEAM_*.md
+TIMESTAMP_*.md
+TYPESCRIPT_*.md
+VEHICLE_*.md
+VSCODE_*.md
+git-pull-commands.md
+
+# Upload directories
+uploads/
+**/uploads/
+
 # Coverage reports
 coverage/
 .nyc_output/
