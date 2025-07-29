@@ -314,14 +314,14 @@ export const vehicleService = {
   async uploadMedia(vehicleId: string, files: FileList, fileType: string, tags?: string) {
     const formData = new FormData();
     formData.append('vehicleId', vehicleId);
-    formData.append('fileType', fileType);
-    if (tags) formData.append('tags', tags);
+    formData.append('mediaType', fileType); // Changed from 'fileType' to 'mediaType' to match backend
+    if (tags) formData.append('description', tags); // Changed from 'tags' to 'description' to match backend
     
     Array.from(files).forEach((file) => {
       formData.append('files', file);
     });
 
-    const response = await vehicleApi.post('/media/upload', formData, {
+    const response = await vehicleApi.post('/media/upload-multiple', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
