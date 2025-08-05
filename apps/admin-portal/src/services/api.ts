@@ -18,7 +18,7 @@ class ApiService {
   constructor() {
     // Main API for general endpoints
     this.api = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || '',
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
@@ -27,7 +27,7 @@ class ApiService {
 
     // Separate API instance for auth endpoints
     this.authApi = axios.create({
-      baseURL: import.meta.env.VITE_AUTH_API_URL || 'http://localhost:4001/api/v1',
+      baseURL: import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8000/api/auth',
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
@@ -44,13 +44,31 @@ class ApiService {
     }
 
     const handleAuthError = (error: any) => {
+      // Track consecutive 401 errors
+      const unauthorizedCounter = parseInt(sessionStorage.getItem('api_401_count') || '0');
+      
       if (error.response?.status === 401) {
-        // Token expired or invalid
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('user')
-        window.location.href = '/login'
+        console.warn('Received 401 unauthorized response from API:', error.config?.url);
+        
+        // Increment the counter
+        sessionStorage.setItem('api_401_count', (unauthorizedCounter + 1).toString());
+        
+        // If we have multiple consecutive 401s, assume token expired
+        if (unauthorizedCounter >= 3) {
+          console.warn('Multiple 401 errors detected - logging out user');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          
+          // Show message before redirecting
+          alert('Your session has expired. You will be redirected to login.');
+          window.location.href = '/login';
+        }
+      } else {
+        // Reset counter for non-401 errors
+        sessionStorage.setItem('api_401_count', '0');
       }
-      return Promise.reject(error)
+      
+      return Promise.reject(error);
     }
 
     // Request interceptors
@@ -64,22 +82,22 @@ class ApiService {
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<AuthResponse> {
-    const response = await this.authApi.post<AuthResponse>('/auth/login', credentials)
+    const response = await this.authApi.post<AuthResponse>('/login', credentials)
     return response.data
   }
 
   async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await this.authApi.post<AuthResponse>('/auth/register', userData)
+    const response = await this.authApi.post<AuthResponse>('/register', userData)
     return response.data
   }
 
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
-    const response = await this.authApi.post<AuthResponse>('/auth/refresh', { refreshToken })
+    const response = await this.authApi.post<AuthResponse>('/refresh', { refreshToken })
     return response.data
   }
 
   async getProfile(): Promise<ApiResponse<{ user: User }>> {
-    const response = await this.authApi.get<ApiResponse<{ user: User }>>('/auth/profile')
+    const response = await this.authApi.get<ApiResponse<{ user: User }>>('/profile')
     return response.data
   }
 
@@ -121,14 +139,14 @@ class ApiService {
   }
 
   async assignRoles(userId: string, roleIds: string[]): Promise<ApiResponse> {
-    const response = await this.api.post<ApiResponse>('/auth/assign-roles', { userId, roleIds })
+    const response = await this.authApi.post<ApiResponse>('/assign-roles', { userId, roleIds })
     return response.data
   }
 
   // Department endpoints
   async getDepartments(): Promise<ApiResponse<Department[]>> {
     try {
-      const response = await this.api.get<{ success: boolean; departments: Department[] }>('/api/departments')
+      const response = await this.api.get<{ success: boolean; departments: Department[] }>('/departments')
       return {
         success: response.data.success,
         data: response.data.departments,
@@ -145,30 +163,30 @@ class ApiService {
   }
 
   async createDepartment(data: Omit<Department, 'id'>): Promise<ApiResponse<{ department: Department }>> {
-    const response = await this.api.post<ApiResponse<{ department: Department }>>('/api/departments', data)
+    const response = await this.api.post<ApiResponse<{ department: Department }>>('/departments', data)
     return response.data
   }
 
   async updateDepartment(id: string, data: Partial<Department>): Promise<ApiResponse<{ department: Department }>> {
-    const response = await this.api.put<ApiResponse<{ department: Department }>>(`/api/departments/${id}`, data)
+    const response = await this.api.put<ApiResponse<{ department: Department }>>(`/departments/${id}`, data)
     return response.data
   }
 
   async deleteDepartment(id: string): Promise<ApiResponse> {
-    const response = await this.api.delete<ApiResponse>(`/api/departments/${id}`)
+    const response = await this.api.delete<ApiResponse>(`/departments/${id}`)
     return response.data
   }
 
   // Team endpoints
   async getTeams(departmentId?: string): Promise<ApiResponse<{ teams: Team[] }>> {
     const params = departmentId ? { departmentId } : {}
-    const response = await this.api.get<ApiResponse<{ teams: Team[] }>>('/api/teams', { params })
+    const response = await this.api.get<ApiResponse<{ teams: Team[] }>>('/teams', { params })
     return response.data
   }
 
   async getTeam(id: string): Promise<ApiResponse<Team>> {
     try {
-      const response = await this.api.get<{ success: boolean; data: { team: Team } }>(`/api/teams/${id}`)
+      const response = await this.api.get<{ success: boolean; data: { team: Team } }>(`/teams/${id}`)
       return {
         success: response.data.success,
         data: response.data.data.team,
@@ -185,17 +203,17 @@ class ApiService {
   }
 
   async createTeam(data: Omit<Team, 'id'>): Promise<ApiResponse<{ team: Team }>> {
-    const response = await this.api.post<ApiResponse<{ team: Team }>>('/api/teams', data)
+    const response = await this.api.post<ApiResponse<{ team: Team }>>('/teams', data)
     return response.data
   }
 
   async updateTeam(id: string, data: Partial<Team>): Promise<ApiResponse<{ team: Team }>> {
-    const response = await this.api.put<ApiResponse<{ team: Team }>>(`/api/teams/${id}`, data)
+    const response = await this.api.put<ApiResponse<{ team: Team }>>(`/teams/${id}`, data)
     return response.data
   }
 
   async deleteTeam(id: string): Promise<ApiResponse> {
-    const response = await this.api.delete<ApiResponse>(`/api/teams/${id}`)
+    const response = await this.api.delete<ApiResponse>(`/teams/${id}`)
     return response.data
   }
 

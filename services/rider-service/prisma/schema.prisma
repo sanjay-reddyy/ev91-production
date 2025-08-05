@@ -2,12 +2,14 @@
 // Add more fields and relations as needed
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["rider"]
 }
 
 model Rider {
@@ -44,8 +46,9 @@ model Rider {
   
   // Timestamps
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  lastLoginAt   DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@schema("rider")
 }
 
 // Temporary OTP verification table for MSG91 flow
@@ -59,4 +62,6 @@ model OtpVerification {
   verified  Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@schema("rider")
 }

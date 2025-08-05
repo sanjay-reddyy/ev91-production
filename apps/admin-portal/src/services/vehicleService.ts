@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const VEHICLE_SERVICE_URL = 'http://localhost:4003/api/v1';
+const VEHICLE_SERVICE_URL = import.meta.env.VITE_VEHICLE_API_URL || 'http://localhost:8000/api/vehicles';
 
 // Configure axios instance
 const vehicleApi = axios.create({
@@ -13,9 +13,15 @@ const vehicleApi = axios.create({
 // Request interceptor to add auth token
 vehicleApi.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken');
-  if (token) {
+  
+  // Debug token existence
+  if (!token) {
+    console.warn('No auth token found in localStorage when making vehicle API request');
+  } else {
+    console.log('Auth token found and will be used for vehicle API request');
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
   return config;
 });
 
@@ -23,7 +29,42 @@ vehicleApi.interceptors.request.use((config) => {
 vehicleApi.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('Vehicle API Error:', error);
+    // Get the full request URL for better debugging
+    const requestUrl = error.config?.url || 'unknown endpoint';
+    console.error(`Vehicle API Error (${requestUrl}):`, error);
+    
+    // Track consecutive 401 errors to detect persistent auth issues
+    const unauthorizedCounter = parseInt(sessionStorage.getItem('vehicle_api_401_count') || '0');
+    
+    // Handle 401 Unauthorized errors
+    if (error.response && error.response.status === 401) {
+      // Check if token exists
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        console.warn(`Auth token exists but request to ${requestUrl} was unauthorized. Token may be invalid or expired.`);
+        
+        // Increment the 401 counter
+        sessionStorage.setItem('vehicle_api_401_count', (unauthorizedCounter + 1).toString());
+        
+        // If we get many consecutive 401s, clear token and redirect (possible session expiration)
+        if (unauthorizedCounter >= 5) {
+          console.warn('Multiple consecutive 401 errors detected. Session likely expired.');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          
+          // Show alert before redirecting
+          alert('Your session has expired. You will be redirected to login.');
+          window.location.href = '/login';
+          return Promise.reject(new Error('Session expired'));
+        }
+      } else {
+        console.warn(`Auth token missing for request to ${requestUrl}. User may not be logged in.`);
+      }
+    } else {
+      // Reset counter for non-401 errors
+      sessionStorage.setItem('vehicle_api_401_count', '0');
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -216,33 +257,59 @@ export interface PaginationParams {
 export const vehicleService = {
   // Vehicle CRUD operations
   async getVehicles(filters: VehicleFilters = {}, pagination: PaginationParams = {}) {
-    const params = { ...filters, ...pagination };
-    const response = await vehicleApi.get('/vehicles', { params });
-    return response.data;
+    try {
+      // Double-check token before making request
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.warn('No auth token available for getVehicles');
+        return { 
+          data: [], 
+          pagination: { totalItems: 0, totalPages: 0, currentPage: pagination.page || 1 },
+          message: 'Authentication required' 
+        };
+      }
+      
+      const params = { ...filters, ...pagination };
+      const response = await vehicleApi.get('/', { params });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('Authentication required for vehicle list - returning empty list');
+        // Return empty but structured data instead of throwing
+        return { 
+          data: [], 
+          pagination: { totalItems: 0, totalPages: 0, currentPage: pagination.page || 1 },
+          message: 'Authentication required' 
+        };
+      }
+      // For other errors, log and rethrow
+      console.error('Error in getVehicles:', error);
+      throw error;
+    }
   },
 
   async getVehicle(id: string) {
-    const response = await vehicleApi.get(`/vehicles/${id}`);
+    const response = await vehicleApi.get(`/${id}`);
     return response.data;
   },
 
   async createVehicle(vehicleData: Partial<Vehicle>) {
-    const response = await vehicleApi.post('/vehicles', vehicleData);
+    const response = await vehicleApi.post('/', vehicleData);
     return response.data;
   },
 
   async updateVehicle(id: string, vehicleData: Partial<Vehicle>) {
-    const response = await vehicleApi.put(`/vehicles/${id}`, vehicleData);
+    const response = await vehicleApi.put(`/${id}`, vehicleData);
     return response.data;
   },
 
   async deleteVehicle(id: string) {
-    const response = await vehicleApi.delete(`/vehicles/${id}`);
+    const response = await vehicleApi.delete(`/${id}`);
     return response.data;
   },
 
   async updateVehicleStatus(id: string, status: string, reason?: string) {
-    const response = await vehicleApi.patch(`/vehicles/${id}/status`, { status, reason });
+    const response = await vehicleApi.patch(`/${id}/status`, { status, reason });
     return response.data;
   },
 
@@ -342,19 +409,83 @@ export const vehicleService = {
 
   // Analytics and stats
   async getVehicleStats() {
-    const response = await vehicleApi.get('/vehicles/stats');
+    try {
+      // Double-check token before making request
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.warn('No auth token available for getVehicleStats');
+        return { 
+          data: {
+            totalVehicles: 0,
+            vehiclesByStatus: {},
+            vehiclesByServiceStatus: {},
+            topModels: [],
+            ageDistribution: { new: 0, moderate: 0, old: 0, vintage: 0 },
+            mileageStats: { average: 0, maximum: 0, minimum: 0 }
+          }, 
+          message: 'Authentication required' 
+        };
+      }
+
+      const response = await vehicleApi.get('/analytics');
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('Authentication required for vehicle statistics - returning empty stats');
+        // Return empty but structured data instead of throwing
+        return { 
+          data: {
+            totalVehicles: 0,
+            vehiclesByStatus: {},
+            vehiclesByServiceStatus: {},
+            topModels: [],
+            ageDistribution: { new: 0, moderate: 0, old: 0, vintage: 0 },
+            mileageStats: { average: 0, maximum: 0, minimum: 0 }
+          }, 
+          message: 'Authentication required' 
+        };
+      }
+      // For other errors, still return a safe default
+      console.error('Error in getVehicleStats:', error);
+      return { 
+        data: null, 
+        message: error.message || 'Error fetching statistics' 
+      };
+    }
+  },
+
+  async getIndividualVehicleStats(vehicleId: string) {
+    const response = await vehicleApi.get(`/${vehicleId}/stats`);
     return response.data;
   },
 
   async getVehicleAnalytics(period: string = 'month') {
-    const response = await vehicleApi.get(`/vehicles/analytics?period=${period}`);
+    const response = await vehicleApi.get(`/analytics?period=${period}`);
     return response.data;
   },
 
   // OEM operations
   async getOEMs(filters: { active?: boolean; preferred?: boolean } = {}) {
-    const response = await vehicleApi.get('/oems', { params: filters });
-    return response.data;
+    try {
+      // Double-check token before making request
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.warn('No auth token available for getOEMs');
+        return { data: [], message: 'Authentication required' };
+      }
+      
+      const response = await vehicleApi.get('/oems', { params: filters });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('Authentication required for OEMs data');
+        // Return empty data structure to prevent UI errors
+        return { data: [], message: 'Authentication required' };
+      }
+      // For other errors, still return a safe default
+      console.error('Error in getOEMs:', error);
+      return { data: [], message: error.message || 'Error fetching OEMs' };
+    }
   },
 
   async getOEM(id: string) {

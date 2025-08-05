@@ -11,7 +11,8 @@ import {
   assignVehicle,
   unassignVehicle,
   getVehicleHistory,
-  getVehicleStats
+  getVehicleStats,
+  getAnalytics
 } from '../controllers/vehicleController';
 import { authMiddleware, optionalAuth, requireRole } from '../middleware/auth';
 import { validateRequest } from '../middleware/validation';
@@ -108,15 +109,21 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/vehicles/stats:
+ * /api/v1/vehicles/{id}/stats:
  *   get:
- *     summary: Get vehicle statistics
+ *     summary: Get individual vehicle statistics
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Vehicle statistics including counts by status, model distribution, etc.
+ *         description: Individual vehicle statistics including service and damage history
  *         content:
  *           application/json:
  *             schema:
@@ -127,22 +134,20 @@ router.get(
  *                 data:
  *                   type: object
  *                   properties:
- *                     totalVehicles:
- *                       type: number
- *                     vehiclesByStatus:
+ *                     vehicle:
  *                       type: object
- *                     vehiclesByServiceStatus:
+ *                     services:
  *                       type: object
- *                     topModels:
- *                       type: array
- *                     ageDistribution:
+ *                     damages:
  *                       type: object
- *                     mileageStats:
+ *                     handovers:
  *                       type: object
  */
 router.get(
-  '/stats',
+  '/:id/stats',
   optionalAuth,
+  [param('id').notEmpty().withMessage('Vehicle ID is required')],
+  validateRequest,
   getVehicleStats
 );
 
@@ -406,6 +411,24 @@ router.get(
   [param('id').notEmpty().withMessage('Vehicle ID is required')],
   validateRequest,
   getVehicleHistory
+);
+
+/**
+ * @swagger
+ * /api/v1/vehicles/analytics:
+ *   get:
+ *     summary: Get vehicle analytics/stats
+ *     tags: [Vehicles]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Vehicle analytics data
+ */
+router.get(
+  '/analytics',
+  authMiddleware,
+  getAnalytics
 );
 
 export default router;

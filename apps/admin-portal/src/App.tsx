@@ -6,6 +6,14 @@ import { Box, CircularProgress } from '@mui/material'
 // Import pages
 import Login from './pages/Login'
 import Layout from './components/layout/Layout'
+
+// Import auth components
+import SignUpForm from './components/auth/SignUpForm'
+import ForgotPasswordForm from './components/auth/ForgotPasswordForm'
+import ResetPasswordForm from './components/auth/ResetPasswordForm'
+import EmailVerificationPage from './components/auth/EmailVerificationPage'
+import ResendVerificationForm from './components/auth/ResendVerificationForm'
+
 import Dashboard from './pages/Dashboard'
 import Teams from './pages/Teams'
 import CreateTeam from './pages/CreateTeam'
@@ -26,6 +34,10 @@ import OEMManagement from './pages/OEMManagement'
 import OEMForm from './pages/OEMForm'
 import VehicleModelManagement from './pages/VehicleModelManagement'
 import VehicleModelForm from './pages/VehicleModelForm'
+
+// Hub Management Pages
+import HubManagement from './pages/HubManagement'
+import HubForm from './pages/HubForm'
 
 // Placeholder components - replace with actual components later
 const Users = () => <div>Users Management</div>
@@ -72,6 +84,46 @@ const App: React.FC = () => {
           </PublicRoute>
         }
       />
+      <Route
+        path="/signup"
+        element={
+          <PublicRoute>
+            <SignUpForm />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordForm />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password/:token"
+        element={
+          <PublicRoute>
+            <ResetPasswordForm />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/verify-email/:token"
+        element={
+          <PublicRoute>
+            <EmailVerificationPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/resend-verification"
+        element={
+          <PublicRoute>
+            <ResendVerificationForm />
+          </PublicRoute>
+        }
+      />
 
       {/* Protected routes */}
       <Route
@@ -98,6 +150,11 @@ const App: React.FC = () => {
                 <Route path="/damage" element={<DamageManagement />} />
                 <Route path="/damage/new" element={<DamageForm />} />
                 <Route path="/damage/:id/edit" element={<DamageForm />} />
+                
+                {/* Hub Management Routes */}
+                <Route path="/hubs" element={<HubManagement />} />
+                <Route path="/hubs/new" element={<HubForm />} />
+                <Route path="/hubs/:id/edit" element={<HubForm />} />
                 
                 {/* OEM Management Routes */}
                 <Route path="/oems" element={<OEMManagement />} />

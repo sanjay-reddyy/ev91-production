@@ -15,6 +15,8 @@ import mediaRoutes from './routes/media';
 import analyticsRoutes from './routes/analytics';
 import oemRoutes from './routes/oems';
 import vehicleModelRoutes from './routes/vehicle-models';
+import cityRoutes from './routes/cities';
+import hubRoutes from './routes/hubs';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -39,17 +41,23 @@ export const prisma = new PrismaClient({
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:3003',
+  'http://localhost:5173'
+];
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-    'http://localhost:3000',
-    'http://localhost:3003',
-    'http://localhost:4002',
-    'http://localhost:8081'
-  ],
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-Id'],
-  optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
+  optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
@@ -83,15 +91,17 @@ app.get('/health', (req: Request, res: Response) => {
 // API Documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
-// API Routes
-app.use('/api/v1/vehicles', vehicleRoutes);
-app.use('/api/v1/service', serviceRoutes);
-app.use('/api/v1/damage', damageRoutes);
-app.use('/api/v1/handover', handoverRoutes);
-app.use('/api/v1/media', mediaRoutes);
-app.use('/api/v1/analytics', analyticsRoutes);
-app.use('/api/v1/oems', oemRoutes);
-app.use('/api/v1/vehicle-models', vehicleModelRoutes);
+// API Routes - protected with auth middleware
+app.use('/api/v1/vehicles', authMiddleware, vehicleRoutes);
+app.use('/api/v1/service', authMiddleware, serviceRoutes);
+app.use('/api/v1/damage', authMiddleware, damageRoutes);
+app.use('/api/v1/handover', authMiddleware, handoverRoutes);
+app.use('/api/v1/media', authMiddleware, mediaRoutes);
+app.use('/api/v1/analytics', authMiddleware, analyticsRoutes);
+app.use('/api/v1/oems', authMiddleware, oemRoutes);
+app.use('/api/v1/vehicle-models', authMiddleware, vehicleModelRoutes);
+app.use('/api/v1/cities', authMiddleware, cityRoutes);
+app.use('/api/v1/hubs', authMiddleware, hubRoutes);
 
 // Legacy compatibility
 app.use('/vehicles', handoverRoutes); // Keep existing handover route
@@ -110,14 +120,13 @@ app.get('/', (req: Request, res: Response) => {
 app.use(errorHandler);
 
 // Start server
-const PORT = process.env.PORT || 4003;
+const PORT = process.env.PORT || 4004;
 
 const startServer = async () => {
   try {
     // Connect to database
     await prisma.$connect();
     console.log('✅ Database connected successfully');
-    
     // Start HTTP server
     app.listen(PORT, () => {
       console.log(`🚀 Vehicle Service listening on port ${PORT}`);
@@ -145,5 +154,4 @@ process.on('SIGTERM', async () => {
 });
 
 startServer();
-
 export default app;

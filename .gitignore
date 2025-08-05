@@ -128,3 +128,35 @@ test-auth-endpoints.js
 
 # Removed applications
 apps/auth-dashboard/
+
+# VS Code performance optimization - exclude large directories
+**/uploads/
+**/temp/
+**/tmp/
+**/.cache/
+**/coverage/
+**/.nyc_output/
+**/.turbo/
+**/.rush/
+**/.pnpm-store/
+
+# Large media files that can slow down VS Code
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.webm
+*.mkv
+*.m4v
+*.3gp
+*.zip
+*.rar
+*.tar.gz
+*.7z
+
+# OS and editor cache files
+.vscode/settings.json.bak
+.vscode/*.log
+**/.DS_Store
+**/Thumbs.db

@@ -1,12 +1,116 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+
+// Import routes
+const authRoutes = require('./routes/auth');
+const teamRoutes = require('./routes/teams');
+const vehicleRoutes = require('./routes/vehicles');
+const clientStoreRoutes = require('./routes/client-store');
+const riderRoutes = require('./routes/riders');
+
+// Import middleware
+const { authMiddleware } = require('./middleware/auth');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-app.get('/', (req, res) => res.send('API Gateway Running'));
+// CORS configuration
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || ['http://localhost:3001', 'http://localhost:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-const PORT = process.env.PORT || 6000;
-app.listen(PORT, () => console.log(`API Gateway listening on port ${PORT}`));
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
+  message: {
+    success: false,
+    message: 'Too many requests from this IP, please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/', limiter);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'API Gateway is running',
+    timestamp: new Date().toISOString(),
+    service: 'api-gateway',
+    version: '1.0.0'
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'EV91 Platform API Gateway',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      auth: '/api/auth/*',
+      teams: '/api/teams/*',
+      departments: '/api/departments/*',
+      vehicles: '/api/vehicles/*',
+      clients: '/api/clients/*',
+      stores: '/api/stores/*',
+      riders: '/api/riders/*',
+      riderEarnings: '/api/rider-earnings/*'
+    }
+  });
+});
+
+// Apply authentication middleware to protected routes
+app.use('/api/teams', authMiddleware);
+app.use('/api/departments', authMiddleware);
+app.use('/api/vehicles', authMiddleware);
+app.use('/api/clients', authMiddleware);
+app.use('/api/stores', authMiddleware);
+app.use('/api/riders', authMiddleware);
+app.use('/api/rider-earnings', authMiddleware);
+
+// Route configuration
+app.use('/api/auth', authRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/departments', teamRoutes); // Departments are handled by team service
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api', clientStoreRoutes); // Handles /clients, /stores, /rider-earnings
+app.use('/api/riders', riderRoutes);
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    path: req.originalUrl,
+    method: req.method
+  });
+});
+
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error('Gateway error:', error);
+  res.status(500).json({
+    success: false,
+    message: 'Internal gateway error',
+    error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+  });
+});
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`🚀 EV91 Platform API Gateway listening on port ${PORT}`);
+  console.log(`📡 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔗 Gateway endpoints: http://localhost:${PORT}/api/*`);
+});

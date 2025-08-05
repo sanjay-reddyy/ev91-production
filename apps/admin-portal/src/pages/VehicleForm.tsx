@@ -377,6 +377,9 @@ const VehicleFormPage: React.FC = () => {
     try {
       setLoading(true);
       
+      // Debug: Log raw form data first
+      console.log('🚀 Raw form data received in onSubmit:', JSON.stringify(data, null, 2));
+      
       // Prepare vehicle data for API with explicit type safety
       const vehicleData = {
         modelId: String(data.modelId),
@@ -457,12 +460,23 @@ const VehicleFormPage: React.FC = () => {
 
     } catch (error: any) {
       console.error('Error submitting vehicle:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        stack: error.stack
+      });
       
       let errorMessage = `Failed to ${isEdit ? 'update' : 'create'} vehicle. Please try again.`;
       
       // Handle specific error cases
       if (error.response?.status === 409) {
         errorMessage = 'A vehicle with this registration number already exists. Please use a different registration number.';
+      } else if (error.response?.status === 400) {
+        errorMessage = `Validation error: ${error.response?.data?.error || error.response?.data?.message || 'Invalid data provided'}`;
+      } else if (error.response?.status === 500) {
+        errorMessage = `Server error: ${error.response?.data?.error || error.response?.data?.message || 'Internal server error'}`;
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.message) {
@@ -482,13 +496,72 @@ const VehicleFormPage: React.FC = () => {
   const handleNext = async () => {
     console.log('🔍 handleNext called, current step:', activeStep);
     
+    // Get current form values for debugging
+    const currentValues = watch();
+    console.log('📋 Current form values before validation:', {
+      step: activeStep,
+      values: {
+        // Step 0 fields
+        registrationNumber: currentValues.registrationNumber,
+        year: currentValues.year,
+        chassisNumber: currentValues.chassisNumber,
+        engineNumber: currentValues.engineNumber,
+        // Step 1 fields  
+        rcNumber: currentValues.rcNumber,
+        ownerName: currentValues.ownerName,
+        ownerAddress: currentValues.ownerAddress,
+        insuranceNumber: currentValues.insuranceNumber
+      }
+    });
+    
     // Validate current step before proceeding
     const currentStepFields = getStepFields(activeStep);
+    console.log('✅ Validating fields for step', activeStep, ':', currentStepFields);
+    
     const isStepValid = await trigger(currentStepFields);
     
     if (isStepValid) {
       console.log('✅ Step validation passed, moving to next step');
+      
+      // Log form values after validation but before step change
+      const valuesAfterValidation = watch();
+      console.log('📋 Form values after validation:', {
+        step: activeStep,
+        values: {
+          // Step 0 fields
+          registrationNumber: valuesAfterValidation.registrationNumber,
+          year: valuesAfterValidation.year,
+          chassisNumber: valuesAfterValidation.chassisNumber,
+          engineNumber: valuesAfterValidation.engineNumber,
+          // Step 1 fields  
+          rcNumber: valuesAfterValidation.rcNumber,
+          ownerName: valuesAfterValidation.ownerName,
+          ownerAddress: valuesAfterValidation.ownerAddress,
+          insuranceNumber: valuesAfterValidation.insuranceNumber
+        }
+      });
+      
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      
+      // Log form values after step change
+      setTimeout(() => {
+        const valuesAfterStepChange = watch();
+        console.log('📋 Form values after step change to', activeStep + 1, ':', {
+          values: {
+            // Step 0 fields
+            registrationNumber: valuesAfterStepChange.registrationNumber,
+            year: valuesAfterStepChange.year,
+            chassisNumber: valuesAfterStepChange.chassisNumber,
+            engineNumber: valuesAfterStepChange.engineNumber,
+            // Step 1 fields  
+            rcNumber: valuesAfterStepChange.rcNumber,
+            ownerName: valuesAfterStepChange.ownerName,
+            ownerAddress: valuesAfterStepChange.ownerAddress,
+            insuranceNumber: valuesAfterStepChange.insuranceNumber
+          }
+        });
+      }, 100);
+      
     } else {
       console.log('❌ Step validation failed');
       setSnackbar({
@@ -508,9 +581,18 @@ const VehicleFormPage: React.FC = () => {
   const getStepFields = (step: number): (keyof VehicleFormData)[] => {
     switch (step) {
       case 0: // Vehicle Information & Specifications (Combined)
-        return ['registrationNumber', 'oemId', 'modelId', 'color', 'year', 'chassisNumber', 'engineNumber', 'variant', 'batteryCapacity', 'maxRange', 'maxSpeed'];
+        return [
+          'registrationNumber', 'oemId', 'modelId', 'color', 'year', 
+          'chassisNumber', 'engineNumber', 'variant', 'batteryCapacity', 
+          'maxRange', 'maxSpeed'
+        ];
       case 1: // Registration & Insurance (Comprehensive)
-        return ['purchaseDate', 'registrationDate', 'purchasePrice', 'currentValue', 'rcNumber', 'rcExpiryDate', 'insuranceNumber', 'insuranceExpiryDate', 'insuranceProvider', 'location', 'mileage'];
+        return [
+          'purchaseDate', 'registrationDate', 'purchasePrice', 'currentValue', 
+          'rcNumber', 'rcExpiryDate', 'ownerName', 'ownerAddress', 'seatingCapacity',
+          'insuranceNumber', 'insuranceExpiryDate', 'insuranceProvider', 
+          'insuranceType', 'premiumAmount', 'coverageAmount', 'location', 'mileage'
+        ];
       case 2: // Photos & Documents (no form validation needed for file uploads)
         return [];
       case 3: // Review & Submit (no validation needed)
@@ -1573,13 +1655,13 @@ const VehicleFormPage: React.FC = () => {
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Purchase Date</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('purchaseDate') ? new Date(watch('purchaseDate')).toLocaleDateString() : <em>Not specified</em>}
+                          {watch('purchaseDate') ? new Date(watch('purchaseDate') as string | number | Date).toLocaleDateString() : <em>Not specified</em>}
                         </Typography>
                       </Box>
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Registration Date</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('registrationDate') ? new Date(watch('registrationDate')).toLocaleDateString() : <em>Not specified</em>}
+                          {watch('registrationDate') ? new Date(watch('registrationDate') as string | number | Date).toLocaleDateString() : <em>Not specified</em>}
                         </Typography>
                       </Box>
                     </Grid>
@@ -1587,13 +1669,13 @@ const VehicleFormPage: React.FC = () => {
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Purchase Price</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('purchasePrice') ? `₹${watch('purchasePrice').toLocaleString()}` : <em>Not specified</em>}
+                          {watch('purchasePrice') ? `₹${(watch('purchasePrice') as number).toLocaleString()}` : <em>Not specified</em>}
                         </Typography>
                       </Box>
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Current Value</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('currentValue') ? `₹${watch('currentValue').toLocaleString()}` : <em>Not specified</em>}
+                          {watch('currentValue') ? `₹${(watch('currentValue') as number).toLocaleString()}` : <em>Not specified</em>}
                         </Typography>
                       </Box>
                     </Grid>
@@ -1636,7 +1718,7 @@ const VehicleFormPage: React.FC = () => {
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">RC Expiry Date</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('rcExpiryDate') ? new Date(watch('rcExpiryDate')).toLocaleDateString() : <em>Not specified</em>}
+                          {watch('rcExpiryDate') ? new Date(watch('rcExpiryDate') as string | number | Date).toLocaleDateString() : <em>Not specified</em>}
                         </Typography>
                       </Box>
                       <Box sx={{ mb: 2 }}>
@@ -1713,19 +1795,19 @@ const VehicleFormPage: React.FC = () => {
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Expiry Date</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('insuranceExpiryDate') ? new Date(watch('insuranceExpiryDate')).toLocaleDateString() : <em>Not specified</em>}
+                          {watch('insuranceExpiryDate') ? new Date(watch('insuranceExpiryDate') as string | number | Date).toLocaleDateString() : <em>Not specified</em>}
                         </Typography>
                       </Box>
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Premium Amount</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('premiumAmount') ? `₹${watch('premiumAmount').toLocaleString()}` : <em>Not specified</em>}
+                          {watch('premiumAmount') ? `₹${(watch('premiumAmount') as number).toLocaleString()}` : <em>Not specified</em>}
                         </Typography>
                       </Box>
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Coverage Amount</Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {watch('coverageAmount') ? `₹${watch('coverageAmount').toLocaleString()}` : <em>Not specified</em>}
+                          {watch('coverageAmount') ? `₹${(watch('coverageAmount') as number).toLocaleString()}` : <em>Not specified</em>}
                         </Typography>
                       </Box>
                     </Grid>

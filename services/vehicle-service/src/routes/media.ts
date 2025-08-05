@@ -182,7 +182,7 @@ router.get('/file/:id', (req: Request, res: Response): void => {
 
   prisma.vehicleMedia.findUnique({
     where: { id }
-  }).then((mediaRecord) => {
+  }).then((mediaRecord: any) => {
     if (!mediaRecord) {
       res.status(404).json({
         success: false,
@@ -208,7 +208,7 @@ router.get('/file/:id', (req: Request, res: Response): void => {
     const fileStream = fs.createReadStream(mediaRecord.fileUrl);
     fileStream.pipe(res);
 
-  }).catch((error) => {
+  }).catch((error: any) => {
     console.error('❌ File retrieval error:', error);
     res.status(500).json({
       success: false,
@@ -233,7 +233,7 @@ router.get('/vehicle/:vehicleId', async (req: Request, res: Response) => {
       }
     });
 
-    const mediaList = mediaRecords.map(record => ({
+    const mediaList = mediaRecords.map((record: any) => ({
       id: record.id,
       fileName: record.fileName,
       fileType: record.fileType,

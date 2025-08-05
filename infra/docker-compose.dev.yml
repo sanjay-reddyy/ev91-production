@@ -1,0 +1,188 @@
+version: '3.8'
+services:
+  # Essential Database Services Only
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ev91db
+      # These will be created by init script
+      EV91_USER: ev91user
+      EV91_PASSWORD: ev91pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database-init:/docker-entrypoint-initdb.d
+      - ./database-backup:/docker-entrypoint-initdb.d/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ev91db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ev91-network
+  
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - ev91-network
+
+  # Core Services Only (for reduced load)
+  api-gateway:
+    build:
+      context: ../apps/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=development
+      - JWT_SECRET=super-secret-jwt-key-for-ev91-auth-service-change-in-production
+      - CORS_ORIGIN=http://localhost:3001,http://localhost:5173,http://localhost:8000
+      - AUTH_SERVICE_URL=http://auth-service:4001
+      - TEAM_SERVICE_URL=http://team-service:3002
+      - VEHICLE_SERVICE_URL=http://vehicle-service:4004
+      - CLIENT_STORE_SERVICE_URL=http://host.docker.internal:3004
+      - RIDER_SERVICE_URL=http://host.docker.internal:4004
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=100
+    depends_on:
+      - postgres
+      - redis
+      - auth-service
+      - team-service
+      - vehicle-service
+    networks:
+      - ev91-network
+
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://ev91user:ev91pass@postgres:5432/ev91db
+      - JWT_SECRET=super-secret-jwt-key-for-ev91-auth-service-change-in-production
+      - JWT_EXPIRES_IN=24h
+      - JWT_REFRESH_SECRET=super-secret-refresh-key-for-ev91-auth-service-change-in-production
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - BCRYPT_SALT_ROUNDS=12
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:5173
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=1000
+      - FROM_EMAIL=noreply@ev91.com
+      - FRONTEND_URL=http://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  team-service:
+    build:
+      context: ../services/team-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://ev91user:ev91pass@postgres:5432/ev91db
+      - JWT_SECRET=super-secret-jwt-key-for-ev91-auth-service-change-in-production
+      - CORS_ORIGIN=http://localhost:3001,http://localhost:5173,http://localhost:8000
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=100
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  vehicle-service:
+    build:
+      context: ../services/vehicle-service
+      dockerfile: Dockerfile
+    ports:
+      - "4003:4004"
+    environment:
+      - PORT=4004
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://ev91user:ev91pass@postgres:5432/ev91db
+      - JWT_SECRET=super-secret-jwt-key-for-ev91-auth-service-change-in-production
+      - ALLOWED_ORIGINS=http://localhost:3001,http://localhost:5173,http://localhost:8000
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=100
+      - MAX_FILE_SIZE=10485760
+      - ALLOWED_FILE_TYPES=image/jpeg,image/png,image/jpg,application/pdf
+      - UPLOAD_PATH=/app/uploads
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - RIDER_SERVICE_URL=http://rider-service:4004
+      - CLIENT_SERVICE_URL=http://client-store-service:3004
+    volumes:
+      - vehicle_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  admin-portal:
+    build:
+      context: ../apps/admin-portal
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000/api
+        - VITE_AUTH_SERVICE_URL=http://localhost:8000/api/auth
+        - VITE_AUTH_API_URL=http://localhost:8000/api/auth
+        - VITE_TEAM_API_URL=http://localhost:8000/api
+        - VITE_VEHICLE_API_URL=http://localhost:8000/api/vehicles
+        - VITE_CLIENT_STORE_API_URL=http://localhost:8000/api
+    ports:
+      - "3001:4173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+      - VITE_AUTH_SERVICE_URL=http://localhost:8000/api/auth
+      - VITE_AUTH_API_URL=http://localhost:8000/api/auth
+      - VITE_TEAM_API_URL=http://localhost:8000/api
+      - VITE_VEHICLE_API_URL=http://localhost:8000/api/vehicles
+      - VITE_CLIENT_STORE_API_URL=http://localhost:8000/api
+    depends_on:
+      - api-gateway
+    networks:
+      - ev91-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  vehicle_uploads:
+    driver: local
+
+networks:
+  ev91-network:
+    driver: bridge

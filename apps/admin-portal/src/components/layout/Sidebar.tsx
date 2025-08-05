@@ -33,6 +33,7 @@ import {
   ExpandLess,
   ExpandMore,
   Inventory as InventoryIcon,
+  LocationCity as HubIcon,
 } from '@mui/icons-material'
 
 const drawerWidth = 240
@@ -88,6 +89,11 @@ const menuItems: MenuItem[] = [
         text: 'Vehicle Inventory',
         icon: <InventoryIcon />,
         path: '/vehicles',
+      },
+      {
+        text: 'Hub Management',
+        icon: <HubIcon />,
+        path: '/hubs',
       },
       {
         text: 'OEM Management',

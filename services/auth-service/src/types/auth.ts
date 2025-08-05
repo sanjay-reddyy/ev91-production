@@ -8,6 +8,7 @@ export interface AuthUser {
   lastName: string;
   phone?: string;
   isActive: boolean;
+  emailVerified?: boolean;
   roles: Array<{
     id: string;
     name: string;
@@ -33,6 +34,51 @@ export interface RegisterUserData {
   lastName: string;
   phone?: string;
   roleIds?: string[];
+}
+
+// Password reset types
+export interface ForgotPasswordData {
+  email: string;
+}
+
+export interface ResetPasswordData {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirm {
+  token: string;
+  newPassword: string;
+}
+
+export interface EmailVerificationRequest {
+  email: string;
+}
+
+export interface ChangePasswordData {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+// Enhanced sign-up with email verification
+export interface SignUpData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  acceptTerms: boolean;
+}
+
+export interface EmailVerificationData {
+  token: string;
 }
 
 // Role types

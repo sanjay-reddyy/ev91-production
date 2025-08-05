@@ -1,6 +1,21 @@
 FROM node:20-alpine
+
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
+
+# Copy source code
 COPY . .
-CMD ["npm", "run", "dev"]
+
+# Generate Prisma client if prisma exists
+RUN if [ -f "prisma/schema.prisma" ]; then npx prisma generate; fi
+
+# Expose port
+EXPOSE 4003
+
+# Run migrations and start the application
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run dev"]

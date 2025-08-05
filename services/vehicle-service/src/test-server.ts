@@ -26,9 +26,18 @@ export const prisma = new PrismaClient({
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
+// CORS configuration (dynamic origin)
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'), false);
+    }
+  },
   credentials: true
 }));
 
@@ -70,7 +79,7 @@ app.use('/api/v1/service', serviceRoutes);
 app.use(errorHandler);
 
 // Start server
-const PORT = process.env.PORT || 4003;
+const PORT = process.env.PORT || 4004;
 
 const startServer = async () => {
   try {

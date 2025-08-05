@@ -1,531 +1,667 @@
 // Prisma schema for Vehicle Inventory Management Service
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["vehicle"]
 }
 
 // Vehicle model - Core vehicle information
 // OEM Master Data (Honda, Bajaj, TVS, etc.)
 model OEM {
-  id                    String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Basic Information
-  name                  String   @unique // Honda, Bajaj, TVS, etc.
-  displayName           String   // Display name for UI
-  code                  String   @unique // Short code like HON, BAJ, TVS
-  
+  name        String @unique // Honda, Bajaj, TVS, etc.
+  displayName String // Display name for UI
+  code        String @unique // Short code like HON, BAJ, TVS
+
   // OEM Details
-  country               String?  // India, Japan, etc.
-  website               String?
-  supportEmail          String?
-  supportPhone          String?
-  
+  country      String? // India, Japan, etc.
+  website      String?
+  supportEmail String?
+  supportPhone String?
+
   // Business Information
-  gstin                 String?
-  panNumber             String?
-  registeredAddress     String?
-  
+  gstin             String?
+  panNumber         String?
+  registeredAddress String?
+
   // Brand Information
-  logoUrl               String?  // S3 URL for brand logo
-  brandColor            String?  // Hex color code
-  description           String?
-  
+  logoUrl     String? // S3 URL for brand logo
+  brandColor  String? // Hex color code
+  description String?
+
   // Status
-  isActive              Boolean  @default(true)
-  isPreferred           Boolean  @default(false) // For prioritizing in UI
-  
+  isActive    Boolean @default(true)
+  isPreferred Boolean @default(false) // For prioritizing in UI
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  models                VehicleModel[]
-  
+  models VehicleModel[]
+
   @@map("oems")
+  @@schema("vehicle")
 }
 
 // Vehicle Model Master Data (Activa, Pulsar, Jupiter, etc.)
 model VehicleModel {
-  id                    String   @id @default(cuid())
-  oemId                 String
-  
+  id    String @id @default(cuid())
+  oemId String
+
   // Basic Information
-  name                  String   // Activa, Pulsar, Jupiter, etc.
-  displayName           String   // Display name for UI
-  modelCode             String   // ACT125, PUL150, etc.
-  
+  name        String // Activa, Pulsar, Jupiter, etc.
+  displayName String // Display name for UI
+  modelCode   String // ACT125, PUL150, etc.
+
   // Model Details
-  category              String   // Scooter, Motorcycle, E-Vehicle
-  segment               String   // Entry, Premium, Luxury
-  launchYear            Int?
-  discontinuedYear      Int?
-  
+  category         String // Scooter, Motorcycle, E-Vehicle
+  segment          String // Entry, Premium, Luxury
+  launchYear       Int?
+  discontinuedYear Int?
+
   // Technical Specifications (Default values for this model)
-  vehicleType           String   @default("2-Wheeler") // 2-Wheeler, 3-Wheeler, etc.
-  fuelType              String   // Electric, Petrol, Hybrid
-  engineCapacity        String?  // "125cc", "150cc", etc.
-  batteryType           String?  // Li-ion, Lead-acid, LFP, NMC, etc.
-  batteryCapacity       String?  // "3.2kWh", "5.0kWh", etc.
-  maxSpeed              Int?     // km/h
-  range                 Int?     // km on full charge/tank
-  chargingTime          String?  // "4 hours", "6 hours", etc.
-  seatingCapacity       Int      @default(2)
-  weight                Float?   // kg
-  dimensions            String?  // JSON with length, width, height
-  
+  vehicleType     String  @default("2-Wheeler") // 2-Wheeler, 3-Wheeler, etc.
+  fuelType        String // Electric, Petrol, Hybrid
+  engineCapacity  String? // "125cc", "150cc", etc.
+  batteryType     String? // Li-ion, Lead-acid, LFP, NMC, etc.
+  batteryCapacity String? // "3.2kWh", "5.0kWh", etc.
+  maxSpeed        Int? // km/h
+  range           Int? // km on full charge/tank
+  chargingTime    String? // "4 hours", "6 hours", etc.
+  seatingCapacity Int     @default(2)
+  weight          Float? // kg
+  dimensions      String? // JSON with length, width, height
+
   // Variants and Options
-  availableVariants     String?  // JSON array of variants like DLX, Standard
-  availableColors       String?  // JSON array of available colors
-  standardFeatures      String?  // JSON array of standard features
-  optionalFeatures      String?  // JSON array of optional features
-  
+  availableVariants String? // JSON array of variants like DLX, Standard
+  availableColors   String? // JSON array of available colors
+  standardFeatures  String? // JSON array of standard features
+  optionalFeatures  String? // JSON array of optional features
+
   // Pricing Information
-  basePrice             Float?   // Ex-showroom price
-  priceRange            String?  // "1.2L - 1.5L"
-  
+  basePrice  Float? // Ex-showroom price
+  priceRange String? // "1.2L - 1.5L"
+
   // Service Information
-  serviceInterval       Int?     // months or km
-  warrantyPeriod        Int?     // months
-  spareParts            String?  // JSON with common spare parts info
-  
+  serviceInterval Int? // months or km
+  warrantyPeriod  Int? // months
+  spareParts      String? // JSON with common spare parts info
+
   // Media
-  imageUrl              String?  // S3 URL for model image
-  brochureUrl           String?  // S3 URL for brochure
-  
+  imageUrl    String? // S3 URL for model image
+  brochureUrl String? // S3 URL for brochure
+
   // Status
-  isActive              Boolean  @default(true)
-  isPopular             Boolean  @default(false) // For prioritizing in UI
-  
+  isActive  Boolean @default(true)
+  isPopular Boolean @default(false) // For prioritizing in UI
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  oem                   OEM      @relation(fields: [oemId], references: [id], onDelete: Cascade)
-  vehicles              Vehicle[]
-  
+  oem      OEM       @relation(fields: [oemId], references: [id], onDelete: Cascade)
+  vehicles Vehicle[]
+
   @@unique([oemId, modelCode])
   @@map("vehicle_models")
+  @@schema("vehicle")
+}
+
+// City Master Data
+model City {
+  id String @id @default(cuid())
+
+  // Basic Information
+  name        String @unique // Mumbai, Delhi, Bangalore, etc.
+  displayName String // Mumbai, New Delhi, Bengaluru, etc.
+  code        String @unique // MUM, DEL, BLR, etc.
+
+  // Location Details
+  state    String // Maharashtra, Delhi, Karnataka, etc.
+  country  String @default("India")
+  timezone String @default("Asia/Kolkata")
+
+  // Geographic Coordinates (City Center)
+  latitude  Float
+  longitude Float
+
+  // Administrative Details
+  pinCodeRange String? // JSON array of pin codes served
+  regionCode   String? // North, South, East, West
+
+  // Operational Details
+  isActive      Boolean   @default(true)
+  isOperational Boolean   @default(true) // City operational for services
+  launchDate    DateTime?
+
+  // Business Information
+  estimatedPopulation Int?
+  marketPotential     String? // High, Medium, Low
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  hubs Hub[]
+
+  @@map("cities")
+  @@schema("vehicle")
+}
+
+// Hub Master Data - Physical locations where vehicles are stored
+model Hub {
+  id String @id @default(cuid())
+
+  // Basic Information
+  name   String
+  code   String @unique // MUM_01, DEL_CP, BLR_KR, etc.
+  cityId String
+
+  // Location Details (Mandatory)
+  address   String
+  pinCode   String
+  landmark  String?
+
+  // Geographic Coordinates (Mandatory)
+  latitude  Float
+  longitude Float
+
+  // Hub Type & Classification
+  hubType     String @default("Storage") // Storage, Service, Charging, Mixed
+  hubCategory String @default("Primary") // Primary, Secondary, Service Point
+
+  // Capacity & Operations
+  vehicleCapacity Int? // Maximum vehicles that can be stored
+  chargingPoints  Int  @default(0)
+  serviceCapacity Int  @default(0) // Vehicles that can be serviced per day
+
+  // Operational Hours
+  operatingHours String? // JSON object with hours for each day
+  is24x7         Boolean @default(false)
+
+  // Contact Information
+  managerName      String?
+  contactNumber    String?
+  emailAddress     String?
+  alternateContact String?
+
+  // Facilities
+  hasParking         Boolean @default(true)
+  hasSecurity        Boolean @default(false)
+  hasCCTV            Boolean @default(false)
+  hasWashFacility    Boolean @default(false)
+  hasChargingStation Boolean @default(false)
+  hasServiceCenter   Boolean @default(false)
+
+  // Status & Operations
+  status         String  @default("Active") // Active, Inactive, Under Construction, Maintenance
+  isPublicAccess Boolean @default(false)
+
+  // Business Information
+  monthlyRent     Float?
+  setupCost       Float?
+  operationalCost Float?
+
+  // Audit Fields
+  createdBy String? // User ID who created the hub
+  updatedBy String? // User ID who last updated
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  city     City      @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  vehicles Vehicle[]
+
+  @@unique([cityId, code])
+  @@map("hubs")
+  @@schema("vehicle")
 }
 
 model Vehicle {
-  id                    String   @id @default(cuid())
-  modelId               String
-  
+  id      String @id @default(cuid())
+  modelId String
+
+  // Mandatory Hub Assignment - Every vehicle MUST be assigned to a hub
+  hubId String
+
   // Basic Vehicle Information
-  registrationNumber    String   @unique
-  chassisNumber         String?  @unique
-  engineNumber          String?  @unique
-  
+  registrationNumber String  @unique
+  chassisNumber      String? @unique
+  engineNumber       String? @unique
+
   // Vehicle Specific Details (can override model defaults)
-  variant               String?  // DLX, Standard, etc.
-  color                 String
-  year                  Int?     // Manufacturing year
-  
+  variant String? // DLX, Standard, etc.
+  color   String
+  year    Int? // Manufacturing year
+
   // Vehicle Classification (inherited from model, can be overridden)
-  vehicleType           String?  // 2-wheeler, 3-wheeler, etc.
-  batteryType           String?  // Li-ion, Lead-acid, etc.
-  batteryCapacity       Float?   // in kWh
-  maxRange              Int?     // in km
-  maxSpeed              Int?     // in km/h
-  
+  vehicleType     String? // 2-wheeler, 3-wheeler, etc.
+  batteryType     String? // Li-ion, Lead-acid, etc.
+  batteryCapacity Float? // in kWh
+  maxRange        Int? // in km
+  maxSpeed        Int? // in km/h
+
   // Purchase/Registration Details
-  purchaseDate          DateTime?
-  registrationDate      DateTime
-  purchasePrice         Float?
-  currentValue          Float?
-  
+  purchaseDate     DateTime?
+  registrationDate DateTime
+  purchasePrice    Float?
+  currentValue     Float?
+
   // Calculated Fields
-  ageInMonths           Int?     // Auto-calculated from registration/purchase date
-  
+  ageInMonths Int? // Auto-calculated from registration/purchase date
+
   // Ownership & Assignment
-  fleetOperatorId       String?  // Reference to client/fleet operator
-  currentRiderId        String?  // Currently assigned rider
-  assignmentDate        DateTime?
-  
+  fleetOperatorId String? // Reference to client/fleet operator
+  currentRiderId  String? // Currently assigned rider
+  assignmentDate  DateTime?
+
   // Current Status
-  operationalStatus     String   @default("Available") // Available, Assigned, Under Maintenance, Retired, Damaged
-  serviceStatus         String   @default("Active")    // Active, Inactive, Scheduled for Service
-  location              String?  // Current location/hub
-  mileage               Int      @default(0) // in km
-  
+  operationalStatus String  @default("Available") // Available, Assigned, Under Maintenance, Retired, Damaged
+  serviceStatus     String  @default("Active") // Active, Inactive, Scheduled for Service
+  location          String? // Current location/hub
+  mileage           Int     @default(0) // in km
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  model                 VehicleModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
-  rcDetails             RCDetails?
-  insuranceDetails      InsuranceDetails[]
-  serviceHistory        ServiceRecord[]
-  damageRecords         DamageRecord[]
-  mediaFiles            VehicleMedia[]
-  handoverRecords       HandoverRecord[]
-  statusHistory         VehicleStatusHistory[]
-  
+  model            VehicleModel           @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  hub              Hub                    @relation(fields: [hubId], references: [id], onDelete: Restrict)
+  rcDetails        RCDetails?
+  insuranceDetails InsuranceDetails[]
+  serviceHistory   ServiceRecord[]
+  damageRecords    DamageRecord[]
+  mediaFiles       VehicleMedia[]
+  handoverRecords  HandoverRecord[]
+  statusHistory    VehicleStatusHistory[]
+
   @@map("vehicles")
+  @@schema("vehicle")
 }
 
 // RC (Registration Certificate) Details
 model RCDetails {
-  id                    String   @id @default(cuid())
-  vehicleId             String   @unique
-  
+  id        String @id @default(cuid())
+  vehicleId String @unique
+
   // RC Information
-  rcNumber              String   @unique
-  ownerName             String
-  ownerAddress          String
-  registrationDate      DateTime
-  validUpto             DateTime?
-  fuelType              String   @default("Electric")
-  seatingCapacity       Int?
-  
+  rcNumber         String    @unique
+  ownerName        String
+  ownerAddress     String
+  registrationDate DateTime
+  validUpto        DateTime?
+  fuelType         String    @default("Electric")
+  seatingCapacity  Int?
+
   // Document Management
-  rcPhotoUrl            String?  // S3 URL for RC document
-  rcUploadDate          DateTime?
-  rcVerificationStatus  String   @default("Pending") // Pending, Verified, Rejected
-  
+  rcPhotoUrl           String? // S3 URL for RC document
+  rcUploadDate         DateTime?
+  rcVerificationStatus String    @default("Pending") // Pending, Verified, Rejected
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  vehicle               Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
   @@map("rc_details")
+  @@schema("vehicle")
 }
 
 // Insurance Details
 model InsuranceDetails {
-  id                    String   @id @default(cuid())
-  vehicleId             String
-  
+  id        String @id @default(cuid())
+  vehicleId String
+
   // Insurance Information
-  insuranceType         String   // Comprehensive, Third Party, etc.
-  providerName          String   // Insurance company name
-  policyNumber          String   @unique
-  policyStartDate       DateTime
-  policyEndDate         DateTime
-  premiumAmount         Float
-  coverageAmount        Float
-  
+  insuranceType   String // Comprehensive, Third Party, etc.
+  providerName    String // Insurance company name
+  policyNumber    String   @unique
+  policyStartDate DateTime
+  policyEndDate   DateTime
+  premiumAmount   Float
+  coverageAmount  Float
+
   // Status
-  isActive              Boolean  @default(true)
-  renewalReminder       Boolean  @default(true)
-  
+  isActive        Boolean @default(true)
+  renewalReminder Boolean @default(true)
+
   // Document Management
-  policyPhotoUrl        String?  // S3 URL for policy document
-  policyUploadDate      DateTime?
-  verificationStatus    String   @default("Pending") // Pending, Verified, Rejected, Expired
-  
+  policyPhotoUrl     String? // S3 URL for policy document
+  policyUploadDate   DateTime?
+  verificationStatus String    @default("Pending") // Pending, Verified, Rejected, Expired
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  vehicle               Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
   @@map("insurance_details")
+  @@schema("vehicle")
 }
 
 // Service History Records
 model ServiceRecord {
-  id                    String   @id @default(cuid())
-  vehicleId             String
-  
+  id        String @id @default(cuid())
+  vehicleId String
+
   // Service Information
-  serviceType           String   // Preventive, Corrective, Emergency
-  serviceDate           DateTime
-  description           String
-  issueReported         String?
-  workPerformed         String
-  
+  serviceType   String // Preventive, Corrective, Emergency
+  serviceDate   DateTime
+  description   String
+  issueReported String?
+  workPerformed String
+
   // Service Provider
-  mechanicName          String?
-  serviceCenter         String?
-  
+  mechanicName  String?
+  serviceCenter String?
+
   // Cost Information
-  laborCost             Float    @default(0.0)
-  partsCost             Float    @default(0.0)
-  totalCost             Float    @default(0.0)
-  
+  laborCost Float @default(0.0)
+  partsCost Float @default(0.0)
+  totalCost Float @default(0.0)
+
   // Parts Information (JSON)
-  partsReplaced         String?  // JSON array of parts
-  
+  partsReplaced String? // JSON array of parts
+
   // Status
-  serviceStatus         String   @default("Completed") // Scheduled, In Progress, Completed, Cancelled
-  nextServiceDue        DateTime?
-  mileageAtService      Int?
-  
+  serviceStatus    String    @default("Completed") // Scheduled, In Progress, Completed, Cancelled
+  nextServiceDue   DateTime?
+  mileageAtService Int?
+
   // Quality Control
-  qualityRating         Int?     // 1-5 rating
-  serviceNotes          String?
-  
+  qualityRating Int? // 1-5 rating
+  serviceNotes  String?
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  vehicle               Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  mediaFiles            ServiceMedia[]
-  
+  vehicle    Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  mediaFiles ServiceMedia[]
+
   @@map("service_records")
+  @@schema("vehicle")
 }
 
 // Damage Records
 model DamageRecord {
-  id                    String   @id @default(cuid())
-  vehicleId             String
-  
+  id        String @id @default(cuid())
+  vehicleId String
+
   // Damage Information
-  damageType            String   // Accident, Wear & Tear, Vandalism, etc.
-  severity              String   // Minor, Moderate, Major, Total Loss
-  description           String
-  damageDate            DateTime
-  reportedDate          DateTime @default(now())
-  
+  damageType   String // Accident, Wear & Tear, Vandalism, etc.
+  severity     String // Minor, Moderate, Major, Total Loss
+  description  String
+  damageDate   DateTime
+  reportedDate DateTime @default(now())
+
   // Location & Context
-  damageLocation        String?  // Where on vehicle
-  incidentLocation      String?  // Where incident occurred
-  weatherConditions     String?
-  
+  damageLocation    String? // Where on vehicle
+  incidentLocation  String? // Where incident occurred
+  weatherConditions String?
+
   // Reporting
-  reportedBy            String   // Rider ID or staff member
-  witnessDetails        String?
-  policeReport          Boolean  @default(false)
-  policeReportNumber    String?
-  
+  reportedBy         String // Rider ID or staff member
+  witnessDetails     String?
+  policeReport       Boolean @default(false)
+  policeReportNumber String?
+
   // Resolution
-  resolutionStatus      String   @default("Reported") // Reported, Under Review, Approved, Repaired, Rejected
-  estimatedCost         Float?
-  actualCost            Float?
-  repairDate            DateTime?
-  repairDetails         String?
-  
+  resolutionStatus String    @default("Reported") // Reported, Under Review, Approved, Repaired, Rejected
+  estimatedCost    Float?
+  actualCost       Float?
+  repairDate       DateTime?
+  repairDetails    String?
+
   // Insurance Claim
-  insuranceClaim        Boolean  @default(false)
-  claimNumber           String?
-  claimStatus           String?  // Submitted, Approved, Rejected, Settled
-  claimAmount           Float?
-  
+  insuranceClaim Boolean @default(false)
+  claimNumber    String?
+  claimStatus    String? // Submitted, Approved, Rejected, Settled
+  claimAmount    Float?
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  vehicle               Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  mediaFiles            DamageMedia[]
-  
+  vehicle    Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  mediaFiles DamageMedia[]
+
   @@map("damage_records")
+  @@schema("vehicle")
 }
 
 // Vehicle Media Files (Photos, Documents)
 model VehicleMedia {
-  id                    String   @id @default(cuid())
-  vehicleId             String
-  
+  id        String @id @default(cuid())
+  vehicleId String
+
   // File Information
-  fileName              String
-  fileUrl               String   // S3 URL or local path
-  fileType              String   // image/jpeg, image/png, application/pdf
-  fileSize              Int      // in bytes
-  
+  fileName String
+  fileUrl  String // S3 URL or local path
+  fileType String // image/jpeg, image/png, application/pdf
+  fileSize Int // in bytes
+
   // Media Classification
-  mediaType             String   // RC, Insurance, Vehicle Photo, etc.
-  mediaCategory         String   // Document, Photo, Video
-  description           String?
-  
+  mediaType     String // RC, Insurance, Vehicle Photo, etc.
+  mediaCategory String // Document, Photo, Video
+  description   String?
+
   // Upload Information
-  uploadedBy            String   // User/Rider ID
-  uploadDate            DateTime @default(now())
-  source                String   // mobile_app, web_admin, api
-  
+  uploadedBy String // User/Rider ID
+  uploadDate DateTime @default(now())
+  source     String // mobile_app, web_admin, api
+
   // Metadata
-  isActive              Boolean  @default(true)
-  tags                  String?  // JSON array of tags
-  
+  isActive Boolean @default(true)
+  tags     String? // JSON array of tags
+
   // Relationships
-  vehicle               Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
   @@map("vehicle_media")
+  @@schema("vehicle")
 }
 
 // Service-related Media
 model ServiceMedia {
-  id                    String   @id @default(cuid())
-  serviceRecordId       String
-  
+  id              String @id @default(cuid())
+  serviceRecordId String
+
   // File Information
-  fileName              String
-  fileUrl               String
-  fileType              String
-  fileSize              Int
-  
+  fileName String
+  fileUrl  String
+  fileType String
+  fileSize Int
+
   // Media Context
-  mediaType             String   // Before, After, Parts, Receipt
-  description           String?
-  uploadDate            DateTime @default(now())
-  
+  mediaType   String // Before, After, Parts, Receipt
+  description String?
+  uploadDate  DateTime @default(now())
+
   // Relationships
-  serviceRecord         ServiceRecord @relation(fields: [serviceRecordId], references: [id], onDelete: Cascade)
-  
+  serviceRecord ServiceRecord @relation(fields: [serviceRecordId], references: [id], onDelete: Cascade)
+
   @@map("service_media")
+  @@schema("vehicle")
 }
 
 // Damage-related Media
 model DamageMedia {
-  id                    String   @id @default(cuid())
-  damageRecordId        String
-  
+  id             String @id @default(cuid())
+  damageRecordId String
+
   // File Information
-  fileName              String
-  fileUrl               String
-  fileType              String
-  fileSize              Int
-  
+  fileName String
+  fileUrl  String
+  fileType String
+  fileSize Int
+
   // Media Context
-  mediaType             String   // Damage Photo, Police Report, Repair Receipt
-  description           String?
-  uploadDate            DateTime @default(now())
-  
+  mediaType   String // Damage Photo, Police Report, Repair Receipt
+  description String?
+  uploadDate  DateTime @default(now())
+
   // Relationships
-  damageRecord          DamageRecord @relation(fields: [damageRecordId], references: [id], onDelete: Cascade)
-  
+  damageRecord DamageRecord @relation(fields: [damageRecordId], references: [id], onDelete: Cascade)
+
   @@map("damage_media")
+  @@schema("vehicle")
 }
 
 // Vehicle Handover Records (Pickup/Drop by Riders)
 model HandoverRecord {
-  id                    String   @id @default(cuid())
-  vehicleId             String
-  
+  id        String @id @default(cuid())
+  vehicleId String
+
   // Handover Information
-  handoverType          String   // Pickup, Drop
-  riderId               String   // Rider taking/returning vehicle
-  handoverDate          DateTime @default(now())
-  
+  handoverType String // Pickup, Drop
+  riderId      String // Rider taking/returning vehicle
+  handoverDate DateTime @default(now())
+
   // Vehicle Condition
-  mileageReading        Int?
-  batteryPercentage     Int?
-  fuelLevel             Int?     // For hybrid vehicles
-  
+  mileageReading    Int?
+  batteryPercentage Int?
+  fuelLevel         Int? // For hybrid vehicles
+
   // Condition Assessment
-  overallCondition      String   // Excellent, Good, Fair, Poor
-  exteriorCondition     String
-  interiorCondition     String
-  mechanicalCondition   String
-  
+  overallCondition    String // Excellent, Good, Fair, Poor
+  exteriorCondition   String
+  interiorCondition   String
+  mechanicalCondition String
+
   // Issues Reported
-  issuesReported        String?  // JSON array of issues
-  photosUploaded        Boolean  @default(false)
-  
+  issuesReported String? // JSON array of issues
+  photosUploaded Boolean @default(false)
+
   // Location
-  handoverLocation      String?
-  gpsLatitude           Float?
-  gpsLongitude          Float?
-  
+  handoverLocation String?
+  gpsLatitude      Float?
+  gpsLongitude     Float?
+
   // Verification
-  verifiedBy            String?  // Staff member who verified
-  verificationDate      DateTime?
-  
+  verifiedBy       String? // Staff member who verified
+  verificationDate DateTime?
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relationships
-  vehicle               Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  handoverMedia         HandoverMedia[]
-  
+  vehicle       Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  handoverMedia HandoverMedia[]
+
   @@map("handover_records")
+  @@schema("vehicle")
 }
 
 // Handover Media (Photos taken during pickup/drop)
 model HandoverMedia {
-  id                    String   @id @default(cuid())
-  handoverRecordId      String
-  
+  id               String @id @default(cuid())
+  handoverRecordId String
+
   // File Information
-  fileName              String
-  fileUrl               String
-  fileType              String
-  fileSize              Int
-  
+  fileName String
+  fileUrl  String
+  fileType String
+  fileSize Int
+
   // Photo Context
-  photoType             String   // Front, Back, Left, Right, Dashboard, Damage
-  description           String?
-  gpsLatitude           Float?
-  gpsLongitude          Float?
-  
+  photoType    String // Front, Back, Left, Right, Dashboard, Damage
+  description  String?
+  gpsLatitude  Float?
+  gpsLongitude Float?
+
   // Upload Information
-  uploadDate            DateTime @default(now())
-  
+  uploadDate DateTime @default(now())
+
   // Relationships
-  handoverRecord        HandoverRecord @relation(fields: [handoverRecordId], references: [id], onDelete: Cascade)
-  
+  handoverRecord HandoverRecord @relation(fields: [handoverRecordId], references: [id], onDelete: Cascade)
+
   @@map("handover_media")
+  @@schema("vehicle")
 }
 
 // Vehicle Status History (Audit Trail)
 model VehicleStatusHistory {
-  id                    String   @id @default(cuid())
-  vehicleId             String
-  
+  id        String @id @default(cuid())
+  vehicleId String
+
   // Status Change Information
-  previousStatus        String?
-  newStatus            String
-  changeReason         String?
-  changedBy            String   // User ID
-  changeDate           DateTime @default(now())
-  
+  previousStatus String?
+  newStatus      String
+  changeReason   String?
+  changedBy      String // User ID
+  changeDate     DateTime @default(now())
+
   // Additional Context
-  notes                String?
-  relatedRecordType    String?  // service, damage, handover
-  relatedRecordId      String?
-  
+  notes             String?
+  relatedRecordType String? // service, damage, handover
+  relatedRecordId   String?
+
   // Relationships
-  vehicle              Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
   @@map("vehicle_status_history")
+  @@schema("vehicle")
 }
 
 // Fleet Performance Analytics (for reporting)
 model FleetAnalytics {
-  id                    String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Time Period
-  periodType            String   // daily, weekly, monthly
-  periodDate            DateTime
-  
+  periodType String // daily, weekly, monthly
+  periodDate DateTime
+
   // Fleet Metrics
-  totalVehicles         Int      @default(0)
-  activeVehicles        Int      @default(0)
-  vehiclesUnderService  Int      @default(0)
-  damagedVehicles       Int      @default(0)
-  
+  totalVehicles        Int @default(0)
+  activeVehicles       Int @default(0)
+  vehiclesUnderService Int @default(0)
+  damagedVehicles      Int @default(0)
+
   // Utilization Metrics
-  utilizationRate       Float    @default(0.0) // percentage
-  averageMileage        Float    @default(0.0)
-  totalRevenue          Float    @default(0.0)
-  
+  utilizationRate Float @default(0.0) // percentage
+  averageMileage  Float @default(0.0)
+  totalRevenue    Float @default(0.0)
+
   // Cost Metrics
-  maintenanceCosts      Float    @default(0.0)
-  damageCosts           Float    @default(0.0)
-  insuranceCosts        Float    @default(0.0)
-  
+  maintenanceCosts Float @default(0.0)
+  damageCosts      Float @default(0.0)
+  insuranceCosts   Float @default(0.0)
+
   // Performance Indicators
-  averageServiceTime    Float    @default(0.0) // hours
-  averageRepairTime     Float    @default(0.0) // hours
-  customerSatisfaction  Float    @default(0.0) // rating
-  
+  averageServiceTime   Float @default(0.0) // hours
+  averageRepairTime    Float @default(0.0) // hours
+  customerSatisfaction Float @default(0.0) // rating
+
   // Timestamps
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([periodType, periodDate])
   @@map("fleet_analytics")
+  @@schema("vehicle")
 }
+
+

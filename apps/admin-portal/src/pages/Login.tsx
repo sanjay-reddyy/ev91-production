@@ -160,11 +160,26 @@ export default function Login() {
               )}
             </Button>
 
+            <Box sx={{ textAlign: 'center', mb: 2 }}>
+              <Link component={RouterLink} to="/forgot-password">
+                Forgot your password?
+              </Link>
+            </Box>
+
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2">
                 Don't have an account?{' '}
-                <Link component={RouterLink} to="/register">
+                <Link component={RouterLink} to="/signup">
                   Sign up
+                </Link>
+              </Typography>
+            </Box>
+
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Need to verify your email?{' '}
+                <Link component={RouterLink} to="/resend-verification">
+                  Resend verification
                 </Link>
               </Typography>
             </Box>

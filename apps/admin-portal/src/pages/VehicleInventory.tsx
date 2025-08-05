@@ -44,6 +44,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { vehicleService, Vehicle, VehicleStats, VehicleFilters } from '../services/vehicleService';
+import { useAuth } from '../contexts/AuthContext';
 
   const statusColors = {
     'Available': 'success',
@@ -62,6 +63,7 @@ import { vehicleService, Vehicle, VehicleStats, VehicleFilters } from '../servic
 
 const VehicleInventoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [stats, setStats] = useState<VehicleStats | null>(null);
   const [oems, setOems] = useState<Array<{id: string, name: string, displayName: string}>>([]);
@@ -100,7 +102,8 @@ const VehicleInventoryPage: React.FC = () => {
   const loadVehicles = async () => {
     try {
       setLoading(true);
-      const [vehiclesResponse, statsResponse, oemsResponse] = await Promise.all([
+      // Using Promise.allSettled instead of Promise.all to prevent one failure from canceling others
+      const [vehiclesResponse, statsResponse, oemsResponse] = await Promise.allSettled([
         vehicleService.getVehicles(
           { ...filters, search: searchQuery },
           { page: page + 1, limit: rowsPerPage, sortBy, sortOrder }
@@ -109,12 +112,58 @@ const VehicleInventoryPage: React.FC = () => {
         vehicleService.getOEMs()
       ]);
 
-      setVehicles(vehiclesResponse.data);
-      setTotalCount(vehiclesResponse.pagination?.totalItems || 0);
-      setStats(statsResponse.data);
-      setOems(oemsResponse.data || []);
+      // Handle vehicle data
+      if (vehiclesResponse.status === 'fulfilled') {
+        setVehicles(vehiclesResponse.value.data || []);
+        setTotalCount(vehiclesResponse.value.pagination?.totalItems || 0);
+        
+        // Check if auth error occurred
+        if (vehiclesResponse.value.message === 'Authentication required') {
+          console.warn('Authentication required for vehicle data - user may need to log in');
+        }
+      } else {
+        console.error('Failed to load vehicles:', vehiclesResponse.reason);
+        setVehicles([]);
+        setTotalCount(0);
+      }
+
+      // Handle stats data
+      if (statsResponse.status === 'fulfilled') {
+        setStats(statsResponse.value.data || null);
+      } else {
+        console.error('Failed to load vehicle stats:', statsResponse.reason);
+        setStats(null);
+      }
+
+      // Handle OEM data
+      if (oemsResponse.status === 'fulfilled') {
+        setOems(oemsResponse.value.data || []);
+      } else {
+        console.error('Failed to load OEMs:', oemsResponse.reason);
+        setOems([]);
+      }
+
+      // Show an auth error message only if all requests failed with auth errors
+      if (
+        (vehiclesResponse.status === 'fulfilled' && vehiclesResponse.value.message === 'Authentication required') &&
+        (statsResponse.status === 'fulfilled' && statsResponse.value.message === 'Authentication required') &&
+        (oemsResponse.status === 'fulfilled' && oemsResponse.value.message === 'Authentication required')
+      ) {
+        console.warn('All vehicle service requests require authentication - handling session expiration');
+        setSnackbar({
+          open: true,
+          message: 'Your session has expired. Please log in again.',
+          severity: 'warning',
+        });
+        
+        // Auto-logout and redirect after a delay
+        setTimeout(() => {
+          logout();
+          navigate('/login');
+        }, 3000);
+      }
     } catch (error) {
-      console.error('Error loading vehicles:', error);
+      console.error('Unexpected error loading vehicles data:', error);
       setSnackbar({
         open: true,
         message: 'Failed to load vehicles. Please try again.',
