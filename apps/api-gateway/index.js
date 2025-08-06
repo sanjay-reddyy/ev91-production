@@ -8,6 +8,7 @@ const teamRoutes = require('./routes/teams');
 const vehicleRoutes = require('./routes/vehicles');
 const clientStoreRoutes = require('./routes/client-store');
 const riderRoutes = require('./routes/riders');
+const sparePartsRoutes = require('./routes/spare-parts');
 
 // Import middleware
 const { authMiddleware } = require('./middleware/auth');
@@ -66,7 +67,8 @@ app.get('/', (req, res) => {
       clients: '/api/clients/*',
       stores: '/api/stores/*',
       riders: '/api/riders/*',
-      riderEarnings: '/api/rider-earnings/*'
+      riderEarnings: '/api/rider-earnings/*',
+      spareParts: '/api/spare-parts/*'
     }
   });
 });
@@ -79,6 +81,7 @@ app.use('/api/clients', authMiddleware);
 app.use('/api/stores', authMiddleware);
 app.use('/api/riders', authMiddleware);
 app.use('/api/rider-earnings', authMiddleware);
+app.use('/api/spare-parts', authMiddleware);
 
 // Route configuration
 app.use('/api/auth', authRoutes);
@@ -87,6 +90,7 @@ app.use('/api/departments', teamRoutes); // Departments are handled by team serv
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api', clientStoreRoutes); // Handles /clients, /stores, /rider-earnings
 app.use('/api/riders', riderRoutes);
+app.use('/api/spare-parts', sparePartsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

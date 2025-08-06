@@ -1,0 +1,1953 @@
+openapi: 3.0.3
+info:
+  title: EV91 Platform - Spare Parts Inventory API
+  description: |
+    Comprehensive REST API for managing vehicle spare parts inventory, suppliers, purchase orders, and analytics.
+    
+    This service provides complete lifecycle management for spare parts including:
+    - Spare parts catalog management
+    - Real-time inventory tracking
+    - Supplier and vendor management
+    - Purchase order processing
+    - Analytics and reporting
+    - Service integration
+    
+    ## Authentication
+    All endpoints require JWT authentication via the API Gateway. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+    
+    ## Rate Limiting
+    API requests are rate-limited to 100 requests per 15-minute window per IP address.
+    
+    ## Pagination
+    List endpoints support pagination with the following parameters:
+    - `page`: Page number (default: 1)
+    - `limit`: Items per page (default: 20, max: 100)
+    - `sortBy`: Field to sort by
+    - `sortOrder`: 'asc' or 'desc' (default: 'asc')
+    
+    ## Filtering
+    List endpoints support various filters specific to each resource type.
+    
+  version: 1.0.0
+  contact:
+    name: EV91 Platform Development Team
+    email: dev@ev91platform.com
+  license:
+    name: Proprietary
+    url: https://ev91platform.com/license
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development server (API Gateway - Primary)
+  - url: https://api.ev91platform.com/api
+    description: Production server (API Gateway)
+  - url: http://localhost:4006
+    description: Development server (Direct - Internal only)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+    description: Service health and monitoring endpoints
+  - name: Spare Parts
+    description: Spare parts catalog management
+  - name: Inventory
+    description: Stock levels and inventory management
+  - name: Suppliers
+    description: Supplier and vendor management
+  - name: Purchase Orders
+    description: Purchase order lifecycle management
+  - name: Analytics
+    description: Business intelligence and reporting
+  - name: Dashboard
+    description: Dashboard data and summaries
+
+paths:
+  # Health endpoints
+  /health:
+    get:
+      tags: [Health]
+      summary: Basic health check
+      description: Returns basic service health status
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+                service: spare-parts-service
+                timestamp: '2025-08-06T10:30:00.000Z'
+                version: '1.0.0'
+
+  /health/detailed:
+    get:
+      tags: [Health]
+      summary: Detailed health check
+      description: Returns detailed health status including database and cache connectivity
+      security: []
+      responses:
+        '200':
+          description: Detailed health information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealthResponse'
+
+  # Spare Parts endpoints
+  /api/spare-parts:
+    get:
+      tags: [Spare Parts]
+      summary: Get all spare parts
+      description: Retrieve a paginated list of spare parts with optional filtering
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortOrderParam'
+        - name: search
+          in: query
+          description: Search term for part name or number
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          description: Filter by category ID
+          schema:
+            type: string
+        - name: supplierId
+          in: query
+          description: Filter by supplier ID
+          schema:
+            type: string
+        - name: isActive
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+        - name: minPrice
+          in: query
+          description: Minimum price filter
+          schema:
+            type: number
+            format: float
+        - name: maxPrice
+          in: query
+          description: Maximum price filter
+          schema:
+            type: number
+            format: float
+        - name: compatibility
+          in: query
+          description: Vehicle model ID for compatibility
+          schema:
+            type: string
+        - name: inStock
+          in: query
+          description: Filter parts that are in stock
+          schema:
+            type: boolean
+        - name: lowStock
+          in: query
+          description: Filter parts with low stock
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of spare parts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SparePartsListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [Spare Parts]
+      summary: Create new spare part
+      description: Create a new spare part in the catalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SparePartCreateRequest'
+      responses:
+        '201':
+          description: Spare part created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SparePartResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spare-parts/{id}:
+    get:
+      tags: [Spare Parts]
+      summary: Get spare part by ID
+      description: Retrieve detailed information about a specific spare part
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Spare part ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Spare part details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SparePartResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags: [Spare Parts]
+      summary: Update spare part
+      description: Update an existing spare part
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Spare part ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SparePartUpdateRequest'
+      responses:
+        '200':
+          description: Spare part updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SparePartResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [Spare Parts]
+      summary: Delete spare part
+      description: Delete a spare part from the catalog (soft delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Spare part ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Spare part deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spare-parts/vehicle-model/{modelId}:
+    get:
+      tags: [Spare Parts]
+      summary: Get spare parts by vehicle model
+      description: Retrieve spare parts compatible with a specific vehicle model
+      parameters:
+        - name: modelId
+          in: path
+          required: true
+          description: Vehicle model ID
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Compatible spare parts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SparePartsListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spare-parts/{id}/pricing:
+    patch:
+      tags: [Spare Parts]
+      summary: Update spare part pricing
+      description: Update pricing information for a spare part with audit trail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Spare part ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingUpdateRequest'
+      responses:
+        '200':
+          description: Pricing updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SparePartResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spare-parts/bulk-update:
+    post:
+      tags: [Spare Parts]
+      summary: Bulk update spare parts
+      description: Update multiple spare parts in a single operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUpdateRequest'
+      responses:
+        '200':
+          description: Bulk update completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkUpdateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spare-parts/{id}/price-history:
+    get:
+      tags: [Spare Parts]
+      summary: Get price history
+      description: Retrieve historical pricing data for a spare part
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Spare part ID
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of records to return
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Price history retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceHistoryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/spare-parts/{id}/usage-analytics:
+    get:
+      tags: [Spare Parts]
+      summary: Get usage analytics
+      description: Retrieve usage analytics and performance metrics for a spare part
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Spare part ID
+          schema:
+            type: string
+        - name: period
+          in: query
+          description: Period in days for analytics
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+      responses:
+        '200':
+          description: Usage analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageAnalyticsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Inventory endpoints
+  /api/inventory/stock-levels:
+    get:
+      tags: [Inventory]
+      summary: Get all stock levels
+      description: Retrieve stock levels across all stores and parts
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: storeId
+          in: query
+          description: Filter by store ID
+          schema:
+            type: string
+        - name: sparePartId
+          in: query
+          description: Filter by spare part ID
+          schema:
+            type: string
+        - name: lowStock
+          in: query
+          description: Filter low stock items
+          schema:
+            type: boolean
+        - name: outOfStock
+          in: query
+          description: Filter out of stock items
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Stock levels retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLevelsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/inventory/stock-levels/{storeId}/{sparePartId}:
+    get:
+      tags: [Inventory]
+      summary: Get specific stock level
+      description: Retrieve stock level for a specific part at a specific store
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          description: Store ID
+          schema:
+            type: string
+        - name: sparePartId
+          in: path
+          required: true
+          description: Spare part ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stock level retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLevelResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/inventory/initialize-stock:
+    post:
+      tags: [Inventory]
+      summary: Initialize stock
+      description: Initialize stock level for a new spare part at a store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitializeStockRequest'
+      responses:
+        '201':
+          description: Stock initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLevelResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/inventory/stock-movement:
+    post:
+      tags: [Inventory]
+      summary: Create stock movement
+      description: Record a stock movement transaction (IN, OUT, TRANSFER, etc.)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockMovementRequest'
+      responses:
+        '201':
+          description: Stock movement recorded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovementResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/inventory/reserve-stock:
+    post:
+      tags: [Inventory]
+      summary: Reserve stock
+      description: Reserve stock for pending orders or services
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReserveStockRequest'
+      responses:
+        '200':
+          description: Stock reserved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLevelResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/inventory/release-stock:
+    post:
+      tags: [Inventory]
+      summary: Release reserved stock
+      description: Release previously reserved stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseStockRequest'
+      responses:
+        '200':
+          description: Stock released successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLevelResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/inventory/low-stock-alerts:
+    get:
+      tags: [Inventory]
+      summary: Get low stock alerts
+      description: Retrieve list of parts with low stock levels
+      parameters:
+        - name: storeId
+          in: query
+          description: Filter by store ID
+          schema:
+            type: string
+        - name: urgency
+          in: query
+          description: Filter by urgency level
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+      responses:
+        '200':
+          description: Low stock alerts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LowStockAlertsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/inventory/stock-count:
+    post:
+      tags: [Inventory]
+      summary: Perform stock count
+      description: Record a physical stock count and adjust inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockCountRequest'
+      responses:
+        '200':
+          description: Stock count performed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockCountResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Suppliers endpoints
+  /api/suppliers:
+    get:
+      tags: [Suppliers]
+      summary: Get all suppliers
+      description: Retrieve a list of suppliers with optional filtering (To be implemented)
+      responses:
+        '200':
+          description: Placeholder response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceholderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Purchase Orders endpoints
+  /api/purchase-orders:
+    get:
+      tags: [Purchase Orders]
+      summary: Get all purchase orders
+      description: Retrieve a list of purchase orders with optional filtering (To be implemented)
+      responses:
+        '200':
+          description: Placeholder response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceholderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Analytics endpoints
+  /api/analytics:
+    get:
+      tags: [Analytics]
+      summary: Get analytics overview
+      description: Retrieve analytics overview data (To be implemented)
+      responses:
+        '200':
+          description: Placeholder response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceholderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Dashboard endpoints
+  /api/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard data
+      description: Retrieve dashboard summary data (To be implemented)
+      responses:
+        '200':
+          description: Placeholder response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceholderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the authentication service
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SortByParam:
+      name: sortBy
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+
+    SortOrderParam:
+      name: sortOrder
+      in: query
+      description: Sort order
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+
+  schemas:
+    # Base response schemas
+    BaseResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the operation was successful
+        message:
+          type: string
+          description: Human-readable message
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+
+    ApiResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              description: Response data
+            error:
+              type: string
+              description: Error message if operation failed
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+              description: Validation errors by field
+
+    PaginationInfo:
+      type: object
+      properties:
+        totalItems:
+          type: integer
+          description: Total number of items
+        totalPages:
+          type: integer
+          description: Total number of pages
+        currentPage:
+          type: integer
+          description: Current page number
+        pageSize:
+          type: integer
+          description: Number of items per page
+        hasNext:
+          type: boolean
+          description: Whether there is a next page
+        hasPrev:
+          type: boolean
+          description: Whether there is a previous page
+
+    PaginatedResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            pagination:
+              $ref: '#/components/schemas/PaginationInfo'
+
+    SuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+
+    PlaceholderResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "Endpoint - to be implemented"
+
+    # Health schemas
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          example: healthy
+        service:
+          type: string
+          example: spare-parts-service
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: 1.0.0
+
+    DetailedHealthResponse:
+      allOf:
+        - $ref: '#/components/schemas/HealthResponse'
+        - type: object
+          properties:
+            database:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [connected, disconnected]
+                latency:
+                  type: number
+                  description: Database connection latency in ms
+            cache:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [connected, disconnected]
+                latency:
+                  type: number
+                  description: Cache connection latency in ms
+            memory:
+              type: object
+              properties:
+                usage:
+                  type: number
+                  description: Memory usage percentage
+                total:
+                  type: number
+                  description: Total memory in MB
+
+    # Spare Parts schemas
+    SparePart:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        name:
+          type: string
+          description: Part name
+          example: "Brake Pad Set - Front"
+        displayName:
+          type: string
+          description: Display name
+          example: "Front Brake Pad Set - Premium"
+        partNumber:
+          type: string
+          description: Manufacturer part number
+          example: "BP-FRONT-001"
+        oemPartNumber:
+          type: string
+          description: Original OEM part number
+          example: "OEM-BP-F-001"
+        internalCode:
+          type: string
+          description: Internal system code
+          example: "EV91-BP-001"
+        description:
+          type: string
+          description: Part description
+        categoryId:
+          type: string
+          description: Category ID
+        supplierId:
+          type: string
+          description: Primary supplier ID
+        compatibility:
+          type: string
+          description: JSON array of compatible vehicle model IDs
+          example: '["model1", "model2"]'
+        specifications:
+          type: string
+          description: JSON object with technical specifications
+        dimensions:
+          type: string
+          description: Dimensions (L x W x H)
+          example: "120mm x 80mm x 15mm"
+        weight:
+          type: number
+          format: float
+          description: Weight in kg
+          example: 0.8
+        material:
+          type: string
+          example: "Ceramic Composite"
+        color:
+          type: string
+          example: "Black"
+        warranty:
+          type: integer
+          description: Warranty period in months
+          example: 12
+        costPrice:
+          type: number
+          format: float
+          description: Purchase cost from supplier
+          example: 450.00
+        sellingPrice:
+          type: number
+          format: float
+          description: Selling price to service centers
+          example: 540.00
+        mrp:
+          type: number
+          format: float
+          description: Maximum retail price
+          example: 650.00
+        markupPercent:
+          type: number
+          format: float
+          description: Markup percentage
+          example: 20.0
+        unitOfMeasure:
+          type: string
+          description: Unit of measure
+          example: "PCS"
+        minimumStock:
+          type: integer
+          description: Minimum stock level
+          example: 10
+        maximumStock:
+          type: integer
+          description: Maximum stock level
+          example: 100
+        reorderLevel:
+          type: integer
+          description: Reorder level
+          example: 20
+        reorderQuantity:
+          type: integer
+          description: Reorder quantity
+          example: 50
+        leadTimeDays:
+          type: integer
+          description: Lead time in days
+          example: 7
+        qualityGrade:
+          type: string
+          enum: [A, B, C]
+          example: "A"
+        isOemApproved:
+          type: boolean
+          example: true
+        certifications:
+          type: string
+          description: JSON array of certifications
+        imageUrls:
+          type: string
+          description: JSON array of image URLs
+        documentUrls:
+          type: string
+          description: JSON array of document URLs
+        isActive:
+          type: boolean
+          example: true
+        isDiscontinued:
+          type: boolean
+          example: false
+        isHazardous:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        category:
+          $ref: '#/components/schemas/Category'
+        supplier:
+          $ref: '#/components/schemas/Supplier'
+
+    SparePartCreateRequest:
+      type: object
+      required:
+        - name
+        - partNumber
+        - internalCode
+        - categoryId
+        - supplierId
+        - costPrice
+        - sellingPrice
+        - mrp
+      properties:
+        name:
+          type: string
+          example: "Brake Pad Set - Front"
+        displayName:
+          type: string
+          example: "Front Brake Pad Set - Premium"
+        partNumber:
+          type: string
+          example: "BP-FRONT-001"
+        oemPartNumber:
+          type: string
+          example: "OEM-BP-F-001"
+        internalCode:
+          type: string
+          example: "EV91-BP-001"
+        description:
+          type: string
+        categoryId:
+          type: string
+        supplierId:
+          type: string
+        compatibility:
+          type: array
+          items:
+            type: string
+          description: Array of compatible vehicle model IDs
+        specifications:
+          type: object
+          description: Technical specifications
+        dimensions:
+          type: string
+          example: "120mm x 80mm x 15mm"
+        weight:
+          type: number
+          format: float
+          example: 0.8
+        material:
+          type: string
+          example: "Ceramic Composite"
+        color:
+          type: string
+          example: "Black"
+        warranty:
+          type: integer
+          example: 12
+        costPrice:
+          type: number
+          format: float
+          example: 450.00
+        sellingPrice:
+          type: number
+          format: float
+          example: 540.00
+        mrp:
+          type: number
+          format: float
+          example: 650.00
+        markupPercent:
+          type: number
+          format: float
+          example: 20.0
+        unitOfMeasure:
+          type: string
+          example: "PCS"
+        minimumStock:
+          type: integer
+          example: 10
+        maximumStock:
+          type: integer
+          example: 100
+        reorderLevel:
+          type: integer
+          example: 20
+        reorderQuantity:
+          type: integer
+          example: 50
+        leadTimeDays:
+          type: integer
+          example: 7
+        qualityGrade:
+          type: string
+          enum: [A, B, C]
+          example: "A"
+        isOemApproved:
+          type: boolean
+          example: true
+        certifications:
+          type: array
+          items:
+            type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+        documentUrls:
+          type: array
+          items:
+            type: string
+
+    SparePartUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        compatibility:
+          type: array
+          items:
+            type: string
+        specifications:
+          type: object
+        dimensions:
+          type: string
+        weight:
+          type: number
+          format: float
+        material:
+          type: string
+        color:
+          type: string
+        warranty:
+          type: integer
+        unitOfMeasure:
+          type: string
+        minimumStock:
+          type: integer
+        maximumStock:
+          type: integer
+        reorderLevel:
+          type: integer
+        reorderQuantity:
+          type: integer
+        leadTimeDays:
+          type: integer
+        qualityGrade:
+          type: string
+          enum: [A, B, C]
+        isOemApproved:
+          type: boolean
+        certifications:
+          type: array
+          items:
+            type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+        documentUrls:
+          type: array
+          items:
+            type: string
+        isActive:
+          type: boolean
+        isDiscontinued:
+          type: boolean
+
+    SparePartResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/SparePart'
+
+    SparePartsListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SparePart'
+
+    PricingUpdateRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        costPrice:
+          type: number
+          format: float
+          example: 450.00
+        sellingPrice:
+          type: number
+          format: float
+          example: 540.00
+        mrp:
+          type: number
+          format: float
+          example: 650.00
+        markupPercent:
+          type: number
+          format: float
+          example: 20.0
+        reason:
+          type: string
+          description: Reason for price change
+          example: "Supplier price increase"
+
+    BulkUpdateRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Spare part ID
+              data:
+                $ref: '#/components/schemas/SparePartUpdateRequest'
+
+    BulkUpdateResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total:
+                  type: integer
+                  description: Total number of updates attempted
+                successful:
+                  type: integer
+                  description: Number of successful updates
+                failed:
+                  type: integer
+                  description: Number of failed updates
+                errors:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      index:
+                        type: integer
+                      id:
+                        type: string
+                      error:
+                        type: string
+
+    PriceHistory:
+      type: object
+      properties:
+        id:
+          type: string
+        sparePartId:
+          type: string
+        costPrice:
+          type: number
+          format: float
+        sellingPrice:
+          type: number
+          format: float
+        mrp:
+          type: number
+          format: float
+        markupPercent:
+          type: number
+          format: float
+        changeReason:
+          type: string
+        effectiveDate:
+          type: string
+          format: date-time
+        changedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PriceHistoryResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/PriceHistory'
+
+    UsageAnalytics:
+      type: object
+      properties:
+        period:
+          type: string
+          example: "30 days"
+        totalUsage:
+          type: integer
+          description: Total quantity used
+        totalRevenue:
+          type: number
+          format: float
+          description: Total revenue generated
+        totalCost:
+          type: number
+          format: float
+          description: Total cost
+        totalMargin:
+          type: number
+          format: float
+          description: Total margin
+        averageMargin:
+          type: number
+          format: float
+          description: Average margin percentage
+        usageCount:
+          type: integer
+          description: Number of usage transactions
+        recentUsages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceUsage'
+
+    UsageAnalyticsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/UsageAnalytics'
+
+    # Inventory schemas
+    InventoryLevel:
+      type: object
+      properties:
+        id:
+          type: string
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        storeName:
+          type: string
+        currentStock:
+          type: integer
+          example: 45
+        reservedStock:
+          type: integer
+          example: 5
+        availableStock:
+          type: integer
+          example: 40
+        damagedStock:
+          type: integer
+          example: 2
+        minimumStock:
+          type: integer
+          example: 10
+        maximumStock:
+          type: integer
+          example: 100
+        reorderLevel:
+          type: integer
+          example: 20
+        reorderQuantity:
+          type: integer
+          example: 50
+        rackNumber:
+          type: string
+          example: "R-A-01"
+        shelfNumber:
+          type: string
+          example: "S-3"
+        binLocation:
+          type: string
+          example: "B-12"
+        lastCountDate:
+          type: string
+          format: date-time
+        lastMovementDate:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        sparePart:
+          $ref: '#/components/schemas/SparePart'
+
+    StockLevelResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/InventoryLevel'
+
+    StockLevelsResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/InventoryLevel'
+
+    InitializeStockRequest:
+      type: object
+      required:
+        - sparePartId
+        - storeId
+        - storeName
+        - initialStock
+      properties:
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        storeName:
+          type: string
+        initialStock:
+          type: integer
+          example: 50
+        minimumStock:
+          type: integer
+          example: 10
+        maximumStock:
+          type: integer
+          example: 100
+        reorderLevel:
+          type: integer
+          example: 20
+        reorderQuantity:
+          type: integer
+          example: 50
+        rackNumber:
+          type: string
+          example: "R-A-01"
+        shelfNumber:
+          type: string
+          example: "S-3"
+        binLocation:
+          type: string
+          example: "B-12"
+
+    StockMovementRequest:
+      type: object
+      required:
+        - sparePartId
+        - storeId
+        - movementType
+        - quantity
+      properties:
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        movementType:
+          type: string
+          enum: [IN, OUT, TRANSFER, ADJUSTMENT, DAMAGED, RETURN]
+          example: "IN"
+        quantity:
+          type: integer
+          example: 10
+        unitCost:
+          type: number
+          format: float
+          example: 450.00
+        reason:
+          type: string
+          example: "Purchase order receipt"
+        notes:
+          type: string
+        referenceType:
+          type: string
+          example: "PURCHASE"
+        referenceId:
+          type: string
+
+    StockMovement:
+      type: object
+      properties:
+        id:
+          type: string
+        stockLevelId:
+          type: string
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        movementType:
+          type: string
+          enum: [IN, OUT, TRANSFER, ADJUSTMENT, DAMAGED, RETURN]
+        quantity:
+          type: integer
+        previousStock:
+          type: integer
+        newStock:
+          type: integer
+        unitCost:
+          type: number
+          format: float
+        totalValue:
+          type: number
+          format: float
+        referenceType:
+          type: string
+        referenceId:
+          type: string
+        reason:
+          type: string
+        notes:
+          type: string
+        createdBy:
+          type: string
+        approvedBy:
+          type: string
+        movementDate:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    StockMovementResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/StockMovement'
+
+    ReserveStockRequest:
+      type: object
+      required:
+        - sparePartId
+        - storeId
+        - quantity
+        - referenceId
+      properties:
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        quantity:
+          type: integer
+          example: 2
+        referenceId:
+          type: string
+          description: Reference to order or service request
+        referenceType:
+          type: string
+          example: "SERVICE_ORDER"
+        notes:
+          type: string
+
+    ReleaseStockRequest:
+      type: object
+      required:
+        - sparePartId
+        - storeId
+        - quantity
+        - referenceId
+      properties:
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        quantity:
+          type: integer
+          example: 2
+        referenceId:
+          type: string
+        notes:
+          type: string
+
+    StockAlert:
+      type: object
+      properties:
+        sparePartId:
+          type: string
+        partName:
+          type: string
+        partNumber:
+          type: string
+        storeId:
+          type: string
+        storeName:
+          type: string
+        currentStock:
+          type: integer
+        minimumStock:
+          type: integer
+        alertType:
+          type: string
+          enum: [LOW_STOCK, OUT_OF_STOCK, EXCESS_STOCK]
+        urgency:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+
+    LowStockAlertsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/StockAlert'
+
+    StockCountRequest:
+      type: object
+      required:
+        - sparePartId
+        - storeId
+        - countedQuantity
+      properties:
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        countedQuantity:
+          type: integer
+          example: 48
+        notes:
+          type: string
+          example: "Monthly stock count"
+        countedBy:
+          type: string
+
+    StockCountResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                previousStock:
+                  type: integer
+                countedStock:
+                  type: integer
+                adjustment:
+                  type: integer
+                  description: Difference (counted - previous)
+                stockMovement:
+                  $ref: '#/components/schemas/StockMovement'
+                updatedLevel:
+                  $ref: '#/components/schemas/InventoryLevel'
+
+    # Supporting schemas
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: "Brake System"
+        displayName:
+          type: string
+          example: "Brake System Components"
+        code:
+          type: string
+          example: "BRAKE"
+        description:
+          type: string
+        level:
+          type: integer
+          example: 1
+        path:
+          type: string
+          example: "Brake System/Brake Pads"
+        isActive:
+          type: boolean
+          example: true
+
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: "Premium Auto Parts Ltd"
+        displayName:
+          type: string
+          example: "Premium Auto Parts"
+        code:
+          type: string
+          example: "PAP001"
+        supplierType:
+          type: string
+          enum: [OEM, Aftermarket, Authorized, Local]
+          example: "OEM"
+        contactPerson:
+          type: string
+          example: "John Smith"
+        email:
+          type: string
+          format: email
+          example: "john@premiumauto.com"
+        phone:
+          type: string
+          example: "+91-9876543210"
+        address:
+          type: string
+        city:
+          type: string
+          example: "Mumbai"
+        state:
+          type: string
+          example: "Maharashtra"
+        country:
+          type: string
+          example: "India"
+        gstNumber:
+          type: string
+          example: "27AABCR1234N1Z5"
+        rating:
+          type: number
+          format: float
+          example: 4.2
+        isActive:
+          type: boolean
+          example: true
+
+    ServiceUsage:
+      type: object
+      properties:
+        id:
+          type: string
+        serviceRecordId:
+          type: string
+        vehicleId:
+          type: string
+        sparePartId:
+          type: string
+        storeId:
+          type: string
+        quantityUsed:
+          type: integer
+        unitCost:
+          type: number
+          format: float
+        sellingPrice:
+          type: number
+          format: float
+        totalCost:
+          type: number
+          format: float
+        totalRevenue:
+          type: number
+          format: float
+        marginAmount:
+          type: number
+          format: float
+        marginPercent:
+          type: number
+          format: float
+        usageReason:
+          type: string
+        isWarranty:
+          type: boolean
+        usageDate:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters or data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            success: false
+            message: "Invalid request data"
+            errors:
+              partNumber: ["Part number is required"]
+              costPrice: ["Cost price must be greater than 0"]
+
+    Unauthorized:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            success: false
+            message: "Authentication required"
+            error: "Invalid or missing authorization token"
+
+    Forbidden:
+      description: Insufficient permissions for the requested operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            success: false
+            message: "Insufficient permissions"
+            error: "User does not have required permissions: spare_parts:create"
+
+    NotFound:
+      description: Requested resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            success: false
+            message: "Resource not found"
+            error: "Spare part with ID 'xyz123' not found"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            success: false
+            message: "Internal server error"
+            error: "An unexpected error occurred"
+
+  examples:
+    SparePartExample:
+      value:
+        id: "clp1234567890"
+        name: "Brake Pad Set - Front"
+        displayName: "Front Brake Pad Set - Premium"
+        partNumber: "BP-FRONT-001"
+        oemPartNumber: "OEM-BP-F-001"
+        internalCode: "EV91-BP-001"
+        description: "High-performance ceramic brake pads for front wheels"
+        categoryId: "cat123"
+        supplierId: "sup456"
+        compatibility: '["model1", "model2", "model3"]'
+        specifications: '{"friction_coefficient": 0.45, "operating_temp": "300-600°C"}'
+        dimensions: "120mm x 80mm x 15mm"
+        weight: 0.8
+        material: "Ceramic Composite"
+        color: "Black"
+        warranty: 12
+        costPrice: 450.00
+        sellingPrice: 540.00
+        mrp: 650.00
+        markupPercent: 20.0
+        unitOfMeasure: "PCS"
+        minimumStock: 10
+        maximumStock: 100
+        reorderLevel: 20
+        reorderQuantity: 50
+        leadTimeDays: 7
+        qualityGrade: "A"
+        isOemApproved: true
+        isActive: true
+        isDiscontinued: false
+        isHazardous: false
+        createdAt: "2025-08-06T10:30:00.000Z"
+        updatedAt: "2025-08-06T10:30:00.000Z"

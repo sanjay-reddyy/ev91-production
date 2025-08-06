@@ -34,6 +34,12 @@ import {
   ExpandMore,
   Inventory as InventoryIcon,
   LocationCity as HubIcon,
+  Build as ServiceIcon,
+  Inventory2 as SparePartsIcon,
+  Assessment as AnalyticsIcon,
+  LocalShipping as SuppliersIcon,
+  Receipt as PurchaseOrderIcon,
+  TrendingUp as TrendsIcon,
 } from '@mui/icons-material'
 
 const drawerWidth = 240
@@ -86,6 +92,11 @@ const menuItems: MenuItem[] = [
     icon: <VehicleIcon />,
     children: [
       {
+        text: 'Dashboard',
+        icon: <DashboardIcon />,
+        path: '/vehicle-dashboard',
+      },
+      {
         text: 'Vehicle Inventory',
         icon: <InventoryIcon />,
         path: '/vehicles',
@@ -109,6 +120,47 @@ const menuItems: MenuItem[] = [
         text: 'Damage Management',
         icon: <DamageIcon />,
         path: '/damage',
+      },
+      {
+        text: 'Service Management',
+        icon: <ServiceIcon />,
+        path: '/services',
+      },
+    ],
+  },
+  {
+    text: 'Spare Parts Management',
+    icon: <SparePartsIcon />,
+    children: [
+      {
+        text: 'Parts Inventory',
+        icon: <SparePartsIcon />,
+        path: '/spare-parts',
+      },
+      {
+        text: 'Stock Management',
+        icon: <InventoryIcon />,
+        path: '/spare-parts/stock',
+      },
+      {
+        text: 'Suppliers',
+        icon: <SuppliersIcon />,
+        path: '/spare-parts/suppliers',
+      },
+      {
+        text: 'Purchase Orders',
+        icon: <PurchaseOrderIcon />,
+        path: '/spare-parts/purchase-orders',
+      },
+      {
+        text: 'Analytics',
+        icon: <AnalyticsIcon />,
+        path: '/spare-parts/analytics',
+      },
+      {
+        text: 'Dashboard',
+        icon: <TrendsIcon />,
+        path: '/spare-parts/dashboard',
       },
     ],
   },
@@ -138,7 +190,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'))
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Vehicle Management'])
+  const [expandedItems, setExpandedItems] = useState<string[]>(['Vehicle Management', 'Spare Parts Management'])
 
   const handleToggleExpand = (itemText: string) => {
     setExpandedItems(prev => 

@@ -7,7 +7,14 @@ const VEHICLE_SERVICE_URL = process.env.VEHICLE_SERVICE_URL || 'http://host.dock
 // Proxy all vehicle requests to vehicle service
 router.all('/*', async (req, res) => {
   try {
-    const targetUrl = `${VEHICLE_SERVICE_URL}/api/v1/vehicles${req.path}`;
+    let targetUrl;
+    
+    // Handle analytics routes specially
+    if (req.path.startsWith('/analytics/')) {
+      targetUrl = `${VEHICLE_SERVICE_URL}/api/v1${req.path}`;
+    } else {
+      targetUrl = `${VEHICLE_SERVICE_URL}/api/v1/vehicles${req.path}`;
+    }
     
     const response = await axios({
       method: req.method,

@@ -1,10 +1,19 @@
 import axios from 'axios';
 
 const VEHICLE_SERVICE_URL = import.meta.env.VITE_VEHICLE_API_URL || 'http://localhost:8000/api/vehicles';
+const VEHICLE_ANALYTICS_URL = import.meta.env.VITE_VEHICLE_ANALYTICS_URL || 'http://localhost:4004/api/v1/analytics';
 
-// Configure axios instance
+// Configure axios instance for general vehicle service
 const vehicleApi = axios.create({
   baseURL: VEHICLE_SERVICE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Configure axios instance for analytics
+const analyticsApi = axios.create({
+  baseURL: VEHICLE_ANALYTICS_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -19,6 +28,20 @@ vehicleApi.interceptors.request.use((config) => {
     console.warn('No auth token found in localStorage when making vehicle API request');
   } else {
     console.log('Auth token found and will be used for vehicle API request');
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+});
+
+// Request interceptor for analytics API
+analyticsApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  
+  if (!token) {
+    console.warn('No auth token found in localStorage when making analytics API request');
+  } else {
+    console.log('Auth token found and will be used for analytics API request');
     config.headers.Authorization = `Bearer ${token}`;
   }
   
@@ -346,7 +369,7 @@ export const vehicleService = {
   },
 
   async getServiceAnalytics(period: string = 'month') {
-    const response = await vehicleApi.get(`/service/analytics?period=${period}`);
+    const response = await analyticsApi.get(`/services?period=${period}`);
     return response.data;
   },
 
@@ -459,8 +482,20 @@ export const vehicleService = {
     return response.data;
   },
 
-  async getVehicleAnalytics(period: string = 'month') {
-    const response = await vehicleApi.get(`/analytics?period=${period}`);
+  async getVehicleAnalytics(period: string = 'month', hubId?: string) {
+    const params: any = { period };
+    if (hubId) params.hubId = hubId;
+    const response = await analyticsApi.get('/vehicles', { params });
+    return response.data;
+  },
+
+  async getDamageAnalytics(period: string = 'month') {
+    const response = await analyticsApi.get(`/damages?period=${period}`);
+    return response.data;
+  },
+
+  async getFleetPerformance(period: string = 'month') {
+    const response = await analyticsApi.get(`/fleet-performance?period=${period}`);
     return response.data;
   },
 
@@ -551,6 +586,43 @@ export const vehicleService = {
 
   async getModelMetadata() {
     const response = await vehicleApi.get('/vehicle-models/metadata');
+    return response.data;
+  },
+
+  // Additional Analytics methods
+  async getMileageAnalytics(period: string = 'month') {
+    // Mileage data is included in getVehicleAnalytics
+    const response = await analyticsApi.get(`/vehicles?period=${period}`);
+    return response.data;
+  },
+
+  async getMaintenanceAnalytics(period: string = 'month') {
+    // Service analytics covers maintenance data
+    const response = await analyticsApi.get(`/services?period=${period}`);
+    return response.data;
+  },
+
+  async getUtilizationAnalytics(period: string = 'month') {
+    // Utilization data is included in getVehicleAnalytics
+    const response = await analyticsApi.get(`/vehicles?period=${period}`);
+    return response.data;
+  },
+
+  async getEfficiencyAnalytics(period: string = 'month') {
+    // Fleet performance covers efficiency
+    const response = await analyticsApi.get(`/fleet-performance?period=${period}`);
+    return response.data;
+  },
+
+  async getCostAnalytics(period: string = 'month') {
+    // Cost data is included in damage analytics
+    const response = await analyticsApi.get(`/damages?period=${period}`);
+    return response.data;
+  },
+
+  async getAssignmentAnalytics(period: string = 'month') {
+    // Assignment data is included in getVehicleAnalytics
+    const response = await analyticsApi.get(`/vehicles?period=${period}`);
     return response.data;
   },
 };
