@@ -8,7 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["team"]
+  schemas  = ["auth", "team", "vehicle", "client_store", "rider", "api_gateway"]
 }
 
 // Minimal User reference for team relationships

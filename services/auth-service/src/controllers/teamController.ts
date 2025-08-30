@@ -1,421 +1,266 @@
-import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { z } from 'zod';
-
-const prisma = new PrismaClient();
-
-// Validation schemas
-const createTeamSchema = z.object({
-  name: z.string().min(2).max(100),
-  description: z.string().max(500).optional(),
-  departmentId: z.string(),
-  teamLeadId: z.string().optional(),
-  city: z.string().min(2).optional(), // Made optional
-  country: z.string().min(2).optional(), // Made optional
-  maxMembers: z.number().min(1).max(1000),
-  skills: z.array(z.string()).optional(),
-  isActive: z.boolean().optional(),
-});
-
-const updateTeamSchema = createTeamSchema.partial();
-
-// Helper function to format team response
-const formatTeamResponse = (team: any) => {
-  return {
-    ...team,
-    skills: team.skills ? JSON.parse(team.skills) : [],
-    // Add virtual fields from relationships
-    department: team.department?.name,
-    teamLead: team.teamLeadId ? `${team.department?.users?.find((u: any) => u.id === team.teamLeadId)?.firstName || ''} ${team.department?.users?.find((u: any) => u.id === team.teamLeadId)?.lastName || ''}`.trim() : undefined,
-  };
-};
+import { Request, Response } from "express";
+import { body, validationResult } from "express-validator";
+import { TeamService } from "../services/teamService";
+import { CreateTeamDto, UpdateTeamDto } from "../types/employee";
+import { ApiResponse } from "../types/auth";
 
 export class TeamController {
-  // Get all teams
-  static async getAllTeams(req: Request, res: Response) {
-    try {
-      const { departmentId } = req.query;
-      
-      const teams = await prisma.team.findMany({
-        where: departmentId ? { departmentId: String(departmentId) } : {},
-        include: {
-          department: {
-            include: {
-              users: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                }
-              }
-            }
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+  private teamService: TeamService;
 
-      const formattedTeams = teams.map(formatTeamResponse);
-
-      res.json({
-        success: true,
-        data: { teams: formattedTeams },
-      });
-    } catch (error) {
-      console.error('Error fetching teams:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch teams',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+  constructor() {
+    this.teamService = new TeamService();
   }
 
-  // Get team by ID
-  static async getTeamById(req: Request, res: Response) {
+  /**
+   * Create team validation rules
+   */
+  static createTeamValidation = [
+    body("name").notEmpty().withMessage("Team name is required"),
+    body("departmentId").notEmpty().withMessage("Department ID is required"),
+    body("description").optional().isString(),
+    body("managerId").optional().isString(),
+  ];
+
+  /**
+   * Update team validation rules
+   */
+  static updateTeamValidation = [
+    body("name").optional().notEmpty().withMessage("Team name cannot be empty"),
+    body("description").optional().isString(),
+    body("managerId").optional().isString(),
+    body("isActive").optional().isBoolean(),
+  ];
+
+  /**
+   * Create a new team
+   */
+  async createTeam(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-
-      const team = await prisma.team.findUnique({
-        where: { id },
-        include: {
-          department: {
-            include: {
-              users: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                }
-              }
-            }
-          },
-          users: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            }
-          },
-        },
-      });
-
-      if (!team) {
-        return res.status(404).json({
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({
           success: false,
-          message: 'Team not found',
-        });
+          error: "Validation failed",
+          details: errors.array(),
+        } as ApiResponse);
+        return;
       }
 
-      const formattedTeam = formatTeamResponse(team);
-
-      res.json({
-        success: true,
-        data: { team: formattedTeam },
-      });
-    } catch (error) {
-      console.error('Error fetching team:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch team',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }
-
-  // Create new team
-  static async createTeam(req: Request, res: Response) {
-    try {
-      const validatedData = createTeamSchema.parse(req.body);
-      
-      // Check if department exists
-      const department = await prisma.department.findUnique({
-        where: { id: validatedData.departmentId },
-      });
-
-      if (!department) {
-        return res.status(400).json({
-          success: false,
-          message: 'Department not found',
-        });
-      }
-
-      // Check if team name already exists in the department
-      const existingTeam = await prisma.team.findFirst({
-        where: {
-          name: validatedData.name,
-          departmentId: validatedData.departmentId,
-        },
-      });
-
-      if (existingTeam) {
-        return res.status(400).json({
-          success: false,
-          message: 'Team name already exists in this department',
-        });
-      }
-
-      // Validate team lead if provided
-      if (validatedData.teamLeadId) {
-        const teamLead = await prisma.user.findUnique({
-          where: { id: validatedData.teamLeadId },
-        });
-
-        if (!teamLead) {
-          return res.status(400).json({
-            success: false,
-            message: 'Team lead not found',
-          });
-        }
-      }
-
-      const team = await prisma.team.create({
-        data: {
-          name: validatedData.name,
-          description: validatedData.description,
-          departmentId: validatedData.departmentId!,
-          teamLeadId: validatedData.teamLeadId,
-          city: validatedData.city || 'Unknown',
-          country: validatedData.country || 'Unknown',
-          maxMembers: validatedData.maxMembers,
-          skills: validatedData.skills ? JSON.stringify(validatedData.skills) : '[]',
-          isActive: validatedData.isActive ?? true,
-          status: validatedData.isActive !== false ? 'Active' : 'Inactive',
-          memberCount: 0,
-        },
-        include: {
-          department: true,
-        },
-      });
-
-      const formattedTeam = formatTeamResponse(team);
+      const teamData: CreateTeamDto = req.body;
+      const team = await this.teamService.createTeam(teamData);
 
       res.status(201).json({
         success: true,
-        message: 'Team created successfully',
-        data: { team: formattedTeam },
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation error',
-          errors: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message,
-          })),
-        });
-      }
-
-      console.error('Error creating team:', error);
-      res.status(500).json({
+        message: "Team created successfully",
+        data: { team },
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Create team error:", error);
+      res.status(400).json({
         success: false,
-        message: 'Failed to create team',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+        error: error.message || "Failed to create team",
+      } as ApiResponse);
     }
   }
 
-  // Update team
-  static async updateTeam(req: Request, res: Response) {
+  /**
+   * Get all teams with optional filtering
+   */
+  async getAllTeams(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-      const validatedData = updateTeamSchema.parse(req.body);
+      const { departmentId, includeInactive } = req.query;
 
-      // Check if team exists
-      const existingTeam = await prisma.team.findUnique({
-        where: { id },
-      });
-
-      if (!existingTeam) {
-        return res.status(404).json({
-          success: false,
-          message: 'Team not found',
-        });
-      }
-
-      // Check department if being updated
-      if (validatedData.departmentId) {
-        const department = await prisma.department.findUnique({
-          where: { id: validatedData.departmentId },
-        });
-
-        if (!department) {
-          return res.status(400).json({
-            success: false,
-            message: 'Department not found',
-          });
-        }
-      }
-
-      // Validate team lead if provided
-      if (validatedData.teamLeadId) {
-        const teamLead = await prisma.user.findUnique({
-          where: { id: validatedData.teamLeadId },
-        });
-
-        if (!teamLead) {
-          return res.status(400).json({
-            success: false,
-            message: 'Team lead not found',
-          });
-        }
-      }
-
-      // Update member count if needed
-      const memberCount = await prisma.user.count({
-        where: { teamId: id },
-      });
-
-      const updateData: any = {
-        ...validatedData,
-        memberCount,
-      };
-
-      if (validatedData.skills) {
-        updateData.skills = JSON.stringify(validatedData.skills);
-      }
-
-      if (validatedData.isActive !== undefined) {
-        updateData.status = validatedData.isActive ? 'Active' : 'Inactive';
-      }
-
-      const team = await prisma.team.update({
-        where: { id },
-        data: updateData,
-        include: {
-          department: true,
-        },
-      });
-
-      const formattedTeam = formatTeamResponse(team);
+      const teams = await this.teamService.getAllTeams(
+        departmentId as string,
+        includeInactive === "true"
+      );
 
       res.json({
         success: true,
-        message: 'Team updated successfully',
-        data: { team: formattedTeam },
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation error',
-          errors: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message,
-          })),
-        });
-      }
-
-      console.error('Error updating team:', error);
+        message: "Teams retrieved successfully",
+        data: { teams, count: teams.length },
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Get teams error:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to update team',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+        error: error.message || "Failed to retrieve teams",
+      } as ApiResponse);
     }
   }
 
-  // Delete team
-  static async deleteTeam(req: Request, res: Response) {
+  /**
+   * Get team by ID
+   */
+  async getTeamById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-
-      // Check if team exists
-      const team = await prisma.team.findUnique({
-        where: { id },
-        include: {
-          users: true,
-        },
-      });
+      const team = await this.teamService.getTeamById(id);
 
       if (!team) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
-          message: 'Team not found',
-        });
+          error: "Team not found",
+        } as ApiResponse);
+        return;
       }
-
-      // Check if team has members
-      if (team.users.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Cannot delete team with active members. Please reassign or remove team members first.',
-        });
-      }
-
-      await prisma.team.delete({
-        where: { id },
-      });
 
       res.json({
         success: true,
-        message: 'Team deleted successfully',
-      });
-    } catch (error) {
-      console.error('Error deleting team:', error);
+        message: "Team retrieved successfully",
+        data: { team },
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Get team error:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to delete team',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+        error: error.message || "Failed to retrieve team",
+      } as ApiResponse);
     }
   }
 
-  // Get team statistics
-  static async getTeamStats(req: Request, res: Response) {
+  /**
+   * Update team
+   */
+  async updateTeam(req: Request, res: Response): Promise<void> {
     try {
-      const totalTeams = await prisma.team.count();
-      const activeTeams = await prisma.team.count({
-        where: { isActive: true },
-      });
-      const inactiveTeams = totalTeams - activeTeams;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({
+          success: false,
+          error: "Validation failed",
+          details: errors.array(),
+        } as ApiResponse);
+        return;
+      }
 
-      const teamsByDepartment = await prisma.team.groupBy({
-        by: ['departmentId'],
-        _count: {
-          id: true,
-        },
-      });
+      const { id } = req.params;
+      const updateData: UpdateTeamDto = req.body;
 
-      // Get department names separately
-      const departmentIds = teamsByDepartment.map(t => t.departmentId);
-      const departments = await prisma.department.findMany({
-        where: {
-          id: { in: departmentIds },
-        },
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-
-      const departmentMap = new Map(departments.map(d => [d.id, d.name]));
-      
-      const teamsByDepartmentWithNames = teamsByDepartment.map(item => ({
-        departmentId: item.departmentId,
-        departmentName: departmentMap.get(item.departmentId) || 'Unknown',
-        teamCount: item._count.id,
-      }));
+      const team = await this.teamService.updateTeam(id, updateData);
 
       res.json({
         success: true,
-        data: {
-          stats: {
-            totalTeams,
-            activeTeams,
-            inactiveTeams,
-            teamsByDepartment: teamsByDepartmentWithNames,
-          },
-        },
-      });
-    } catch (error) {
-      console.error('Error fetching team stats:', error);
+        message: "Team updated successfully",
+        data: { team },
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Update team error:", error);
+      res.status(400).json({
+        success: false,
+        error: error.message || "Failed to update team",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Delete team
+   */
+  async deleteTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      await this.teamService.deleteTeam(id);
+
+      res.json({
+        success: true,
+        message: "Team deleted successfully",
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Delete team error:", error);
+      res.status(400).json({
+        success: false,
+        error: error.message || "Failed to delete team",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Add employee to team
+   */
+  async addEmployeeToTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const { teamId, employeeId } = req.params;
+      await this.teamService.addEmployeeToTeam(teamId, employeeId);
+
+      res.json({
+        success: true,
+        message: "Employee added to team successfully",
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Add employee to team error:", error);
+      res.status(400).json({
+        success: false,
+        error: error.message || "Failed to add employee to team",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Remove employee from team
+   */
+  async removeEmployeeFromTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const { employeeId } = req.params;
+      await this.teamService.removeEmployeeFromTeam(employeeId);
+
+      res.json({
+        success: true,
+        message: "Employee removed from team successfully",
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Remove employee from team error:", error);
+      res.status(400).json({
+        success: false,
+        error: error.message || "Failed to remove employee from team",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Get teams by department
+   */
+  async getTeamsByDepartment(req: Request, res: Response): Promise<void> {
+    try {
+      const { departmentId } = req.params;
+      const { includeInactive } = req.query;
+
+      const teams = await this.teamService.getTeamsByDepartment(
+        departmentId,
+        includeInactive === "true"
+      );
+
+      res.json({
+        success: true,
+        message: "Department teams retrieved successfully",
+        data: { teams, count: teams.length },
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Get department teams error:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch team statistics',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+        error: error.message || "Failed to retrieve department teams",
+      } as ApiResponse);
+    }
+  }
+
+  /**
+   * Get team statistics
+   */
+  async getTeamStats(req: Request, res: Response): Promise<void> {
+    try {
+      const stats = await this.teamService.getTeamStats();
+
+      res.json({
+        success: true,
+        message: "Team statistics retrieved successfully",
+        data: stats,
+      } as ApiResponse);
+    } catch (error: any) {
+      console.error("Get team stats error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to retrieve team statistics",
+      } as ApiResponse);
     }
   }
 }

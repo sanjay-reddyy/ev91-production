@@ -459,6 +459,7 @@ model VehicleMedia {
   // File Information
   fileName String
   fileUrl  String // S3 URL or local path
+  s3Key    String? // S3 object key for AWS operations
   fileType String // image/jpeg, image/png, application/pdf
   fileSize Int // in bytes
 

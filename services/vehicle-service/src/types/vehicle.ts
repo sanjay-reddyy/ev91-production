@@ -1,5 +1,5 @@
-import { QueryParams } from './common';
-import { Hub } from './hub';
+import { QueryParams } from "./common";
+import { Hub } from "./hub";
 
 // Vehicle related types based on actual Prisma schema
 export interface Vehicle {
@@ -56,17 +56,17 @@ export interface VehicleWithHubInfo {
 }
 
 export enum VehicleStatus {
-  AVAILABLE = 'Available',
-  ASSIGNED = 'Assigned',
-  UNDER_MAINTENANCE = 'Under Maintenance',
-  RETIRED = 'Retired',
-  DAMAGED = 'Damaged'
+  AVAILABLE = "Available",
+  ASSIGNED = "Assigned",
+  UNDER_MAINTENANCE = "Under Maintenance",
+  RETIRED = "Retired",
+  DAMAGED = "Damaged",
 }
 
 export enum ServiceStatus {
-  ACTIVE = 'Active',
-  INACTIVE = 'Inactive',
-  SCHEDULED_FOR_SERVICE = 'Scheduled for Service'
+  ACTIVE = "Active",
+  INACTIVE = "Inactive",
+  SCHEDULED_FOR_SERVICE = "Scheduled for Service",
 }
 
 export interface VehicleCreateData {

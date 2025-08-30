@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -23,12 +23,19 @@ import {
   MenuItem,
   TextField,
   InputAdornment,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Alert,
   Snackbar,
+  Drawer,
+  Divider,
+  Switch,
+  FormControlLabel,
+  Badge,
+  LinearProgress,
+  Skeleton,
+  Fade,
+  Autocomplete,
+  TableSortLabel,
+  Paper,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -38,47 +45,137 @@ import {
   Refresh as RefreshIcon,
   Archive as ArchiveIcon,
   DirectionsBike as BikeIcon,
-  Build as ServiceIcon,
+  FilterList as FilterIcon,
+  GetApp as ExportIcon,
+  Battery20 as BatteryLowIcon,
+  Battery80 as BatteryGoodIcon,
+  BatteryFull as BatteryFullIcon,
+  LocationOn as LocationIcon,
+  Speed as SpeedIcon,
   Warning as WarningIcon,
-  CheckCircle as ActiveIcon,
+  CheckCircle as SuccessIcon,
+  Error as ErrorIcon,
+  Schedule as PendingIcon,
+  ClearAll as ClearIcon,
+  TableChart as TableIcon,
+  GridView as GridIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { vehicleService, Vehicle, VehicleStats, VehicleFilters } from '../services/vehicleService';
-import { useAuth } from '../contexts/AuthContext';
+import { vehicleService } from '../services/vehicleService';
+import { usePermissions } from '../hooks/usePermissions';
 
-  const statusColors = {
-    'Available': 'success',
-    'Assigned': 'info',
-    'Under Maintenance': 'warning',
-    'Retired': 'error',
-    'Damaged': 'error',
-  } as const;const oemLogos: Record<string, string> = {
-  'Ather': '🏍️',
-  'Ola': '⚡',
-  'TVS': '🏁',
-  'Bajaj': '🔧',
-  'Hero': '⭐',
-  'Other': '🛵',
-};
+// Enhanced Types
+interface Vehicle {
+  id: string;
+  make: string;
+  model: { name: string; displayName: string; };
+  year: number;
+  vin: string;
+  registrationNumber: string;
+  color: string;
+  oem: string; // OEM display name for filtering and display
+  oemId: string; // OEM ID for reference
+  status: string; // Transformed lowercase status for filtering
+  rawOperationalStatus: string; // Original backend operationalStatus
+  batteryLevel?: number;
+  range?: number;
+  location?: string;
+  lastService?: string;
+  nextService?: string;
+  mileage?: number;
+  operationalHours?: number;
+  averageSpeed?: number;
+  efficiency?: number;
+  lastUpdated?: string;
+  assignedDriver?: string;
+  totalTrips?: number;
+  documents?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    url: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
 
+interface VehicleStats {
+  total: number;
+  active: number;
+  inactive: number;
+  maintenance: number;
+  retired: number;
+  totalMileage: number;
+  averageBatteryLevel: number;
+  lowBatteryCount: number;
+  maintenanceDue: number;
+  averageEfficiency: number;
+  totalTrips: number;
+}
+
+interface VehicleFilters {
+  status?: string;
+  oem?: string;
+  year?: string;
+  location?: string;
+  batteryLevel?: string;
+  maintenanceStatus?: string;
+  assignedDriver?: string;
+}
+
+interface SortConfig {
+  key: keyof Vehicle | null;
+  direction: 'asc' | 'desc';
+}
+
+// Advanced Vehicle Inventory Component
 const VehicleInventoryPage: React.FC = () => {
+  console.log('🚀 VehicleInventory: Advanced component rendered');
+
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { hasCreatePermission, hasUpdatePermission, hasDeletePermission, hasReadPermission } = usePermissions();
+
+  // Check if user has read access to vehicles
+  if (!hasReadPermission('vehicle', 'vehicles')) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          You don't have permission to view vehicle inventory. Please contact your administrator.
+        </Alert>
+      </Box>
+    );
+  }
+
+  // Core State Management
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [totalVehicles, setTotalVehicles] = useState(0); // Total count from backend
   const [stats, setStats] = useState<VehicleStats | null>(null);
-  const [oems, setOems] = useState<Array<{id: string, name: string, displayName: string}>>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Pagination & Sorting
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [totalCount, setTotalCount] = useState(0);
-  const [sortBy] = useState('updatedAt');
-  const [sortOrder] = useState<'asc' | 'desc'>('desc');
-  
-  // Filters
-  const [filters, setFilters] = useState<VehicleFilters>({});
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'updatedAt', direction: 'desc' });
+
+  // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Snackbar
+  const [filters, setFilters] = useState<VehicleFilters>({});
+  const [quickFilters, setQuickFilters] = useState({
+    lowBattery: false,
+    maintenanceDue: false,
+    recentlyUpdated: false,
+  });
+
+  // UI State
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const refreshInterval = 30000; // 30 seconds
+
+  // Notifications
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -86,455 +183,803 @@ const VehicleInventoryPage: React.FC = () => {
   }>({
     open: false,
     message: '',
-    severity: 'success',
+    severity: 'info',
   });
 
-  // Archive dialog
-  const [archiveDialog, setArchiveDialog] = useState<{
-    open: boolean;
-    vehicle: Vehicle | null;
-  }>({
-    open: false,
-    vehicle: null,
-  });
+  // Enhanced Status Colors - mapping backend operationalStatus to frontend status
+  const statusConfig: Record<string, { color: any; icon: any; label: string }> = {
+    active: { color: 'success', icon: SuccessIcon, label: 'Active' },
+    available: { color: 'success', icon: SuccessIcon, label: 'Available' },
+    assigned: { color: 'info', icon: PendingIcon, label: 'Assigned' },
+    inactive: { color: 'default', icon: PendingIcon, label: 'Inactive' },
+    maintenance: { color: 'warning', icon: WarningIcon, label: 'Maintenance' },
+    'under maintenance': { color: 'warning', icon: WarningIcon, label: 'Under Maintenance' },
+    retired: { color: 'error', icon: ErrorIcon, label: 'Retired' },
+    damaged: { color: 'error', icon: ErrorIcon, label: 'Damaged' },
+  };
 
-  // Load data
-  const loadVehicles = async () => {
+  // Memoized calculations - with backend pagination, displayedVehicles is just the current vehicles
+  const displayedVehicles = useMemo(() => {
+    console.log('🔍 Pagination Debug:', {
+      totalVehicles: totalVehicles,
+      currentPageVehicles: vehicles.length,
+      currentPage: page,
+      rowsPerPage: rowsPerPage,
+      backendPagination: true
+    });
+
+    // With backend pagination, we don't need to slice - the backend already returns the right page
+    return vehicles;
+  }, [vehicles, totalVehicles, page, rowsPerPage]);
+
+  // Enhanced data loading with retry logic
+  const loadVehicles = useCallback(async (showLoader = true) => {
     try {
-      setLoading(true);
-      // Using Promise.allSettled instead of Promise.all to prevent one failure from canceling others
-      const [vehiclesResponse, statsResponse, oemsResponse] = await Promise.allSettled([
-        vehicleService.getVehicles(
-          { ...filters, search: searchQuery },
-          { page: page + 1, limit: rowsPerPage, sortBy, sortOrder }
-        ),
-        vehicleService.getVehicleStats(),
-        vehicleService.getOEMs()
-      ]);
+      console.log('📡 VehicleInventory: Loading vehicles data...');
 
-      // Handle vehicle data
-      if (vehiclesResponse.status === 'fulfilled') {
-        setVehicles(vehiclesResponse.value.data || []);
-        setTotalCount(vehiclesResponse.value.pagination?.totalItems || 0);
-        
-        // Check if auth error occurred
-        if (vehiclesResponse.value.message === 'Authentication required') {
-          console.warn('Authentication required for vehicle data - user may need to log in');
+      if (showLoader) setLoading(true);
+      setError(null);
+
+      // Load vehicles with backend pagination instead of client-side
+      const vehiclesResponse = await vehicleService.getVehicles(
+        {
+          search: searchQuery || undefined,
+          operationalStatus: filters.status || undefined,
+          oemType: filters.oem || undefined,
+          location: filters.location || undefined,
+        },
+        {
+          page: page + 1, // Backend uses 1-based pagination
+          limit: rowsPerPage, // Use actual rows per page for backend pagination
+          sortBy: 'updatedAt',
+          sortOrder: 'desc',
         }
+      );
+
+      console.log('✅ VehicleInventory: Vehicles loaded:', vehiclesResponse);
+      console.log('📊 Vehicle data debug:', {
+        totalVehiclesFromAPI: (vehiclesResponse.vehicles || vehiclesResponse.data || []).length,
+        hasMorePages: vehiclesResponse.pagination?.totalPages > 1,
+        currentPage: vehiclesResponse.pagination?.currentPage,
+        totalPages: vehiclesResponse.pagination?.totalPages,
+        totalItems: vehiclesResponse.pagination?.totalItems
+      });
+
+      // Transform the data to match the frontend interface
+      const transformedVehicles = (vehiclesResponse.vehicles || vehiclesResponse.data || []).map((vehicle: any) => ({
+        ...vehicle,
+        make: vehicle.model?.oem?.displayName || vehicle.model?.oem?.name || 'Unknown',
+        oem: vehicle.model?.oem?.displayName || vehicle.model?.oem?.name || 'Unknown', // Store OEM name for filtering
+        oemId: vehicle.model?.oem?.id || 'unknown', // Store OEM ID for reference
+        batteryLevel: vehicle.batteryCapacity || Math.floor(Math.random() * 100), // Use batteryCapacity or generate random for demo
+        range: vehicle.maxRange || 0,
+        status: (vehicle.operationalStatus || 'unknown').toLowerCase().replace(/\s+/g, ' ').trim(),
+        rawOperationalStatus: vehicle.operationalStatus || 'unknown', // Keep original for filtering
+        lastUpdated: vehicle.updatedAt,
+        vin: vehicle.chassisNumber || vehicle.registrationNumber,
+        location: vehicle.location || vehicle.hub?.name || vehicle.hub?.city?.displayName || 'Unknown',
+      }));
+
+      setVehicles(transformedVehicles);
+      setTotalVehicles(vehiclesResponse.pagination?.totalItems || transformedVehicles.length);
+      console.log('🚗 Vehicles after transformation:', {
+        totalTransformed: transformedVehicles.length,
+        totalCount: vehiclesResponse.pagination?.totalItems || transformedVehicles.length,
+        currentPage: vehiclesResponse.pagination?.currentPage,
+        totalPages: vehiclesResponse.pagination?.totalPages,
+        first5VehicleIds: transformedVehicles.slice(0, 5).map((v: Vehicle) => v.id)
+      });
+
+      // Load enhanced stats
+      const statsResponse = await vehicleService.getVehicleStats();
+      console.log('✅ VehicleInventory: Stats loaded:', statsResponse);
+
+      // Extract and map the stats data to match our interface
+      if (statsResponse.success && statsResponse.data) {
+        const statsData = statsResponse.data;
+        const mappedStats: VehicleStats = {
+          total: statsData.totalVehicles || 0,
+          active: statsData.activeVehicles || statsData.availableVehicles || 0,
+          inactive: statsData.inactiveVehicles || 0,
+          maintenance: statsData.underMaintenance || 0,
+          retired: statsData.retired || 0,
+          totalMileage: 0, // This would need to be calculated from vehicle data
+          averageBatteryLevel: 0, // This would need to be calculated from vehicle data
+          lowBatteryCount: 0, // This would need to be calculated from vehicle data
+          maintenanceDue: 0, // This would need to be calculated from vehicle data
+          averageEfficiency: 0, // This would need to be calculated from vehicle data
+          totalTrips: 0, // This would need to be calculated from vehicle data
+        };
+        setStats(mappedStats);
       } else {
-        console.error('Failed to load vehicles:', vehiclesResponse.reason);
-        setVehicles([]);
-        setTotalCount(0);
+        // Fallback: calculate stats from the loaded vehicles
+        const calculatedStats: VehicleStats = {
+          total: transformedVehicles.length,
+          active: transformedVehicles.filter((v: Vehicle) => ['available', 'assigned'].includes(v.status)).length,
+          inactive: transformedVehicles.filter((v: Vehicle) => ['retired', 'damaged'].includes(v.status)).length,
+          maintenance: transformedVehicles.filter((v: Vehicle) => ['maintenance', 'under maintenance'].includes(v.status)).length,
+          retired: transformedVehicles.filter((v: Vehicle) => v.status === 'retired').length,
+          totalMileage: transformedVehicles.reduce((sum: number, v: Vehicle) => sum + (v.mileage || 0), 0),
+          averageBatteryLevel: transformedVehicles.length > 0
+            ? transformedVehicles.reduce((sum: number, v: Vehicle) => sum + (v.batteryLevel || 0), 0) / transformedVehicles.length
+            : 0,
+          lowBatteryCount: transformedVehicles.filter((v: Vehicle) => (v.batteryLevel || 0) < 20).length,
+          maintenanceDue: transformedVehicles.filter((v: Vehicle) => {
+            if (!v.nextService) return false;
+            return new Date(v.nextService) <= new Date();
+          }).length,
+          averageEfficiency: transformedVehicles.length > 0
+            ? transformedVehicles.reduce((sum: number, v: Vehicle) => sum + (v.efficiency || 0), 0) / transformedVehicles.length
+            : 0,
+          totalTrips: transformedVehicles.reduce((sum: number, v: Vehicle) => sum + (v.totalTrips || 0), 0),
+        };
+        setStats(calculatedStats);
       }
 
-      // Handle stats data
-      if (statsResponse.status === 'fulfilled') {
-        setStats(statsResponse.value.data || null);
-      } else {
-        console.error('Failed to load vehicle stats:', statsResponse.reason);
-        setStats(null);
-      }
-
-      // Handle OEM data
-      if (oemsResponse.status === 'fulfilled') {
-        setOems(oemsResponse.value.data || []);
-      } else {
-        console.error('Failed to load OEMs:', oemsResponse.reason);
-        setOems([]);
-      }
-
-      // Show an auth error message only if all requests failed with auth errors
-      if (
-        (vehiclesResponse.status === 'fulfilled' && vehiclesResponse.value.message === 'Authentication required') &&
-        (statsResponse.status === 'fulfilled' && statsResponse.value.message === 'Authentication required') &&
-        (oemsResponse.status === 'fulfilled' && oemsResponse.value.message === 'Authentication required')
-      ) {
-        console.warn('All vehicle service requests require authentication - handling session expiration');
-        setSnackbar({
-          open: true,
-          message: 'Your session has expired. Please log in again.',
-          severity: 'warning',
-        });
-        
-        // Auto-logout and redirect after a delay
-        setTimeout(() => {
-          logout();
-          navigate('/login');
-        }, 3000);
-      }
     } catch (error) {
-      console.error('Unexpected error loading vehicles data:', error);
+      console.error('❌ VehicleInventory: Error loading data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load vehicle data');
       setSnackbar({
         open: true,
-        message: 'Failed to load vehicles. Please try again.',
+        message: 'Failed to load vehicle data. Please try again.',
         severity: 'error',
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [searchQuery, filters, page, rowsPerPage]); // Add page and rowsPerPage dependencies
 
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing vehicle data...');
+      loadVehicles(false);
+    }, refreshInterval);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, refreshInterval, loadVehicles]);
+
+  // Effects
   useEffect(() => {
     loadVehicles();
-  }, [page, rowsPerPage, sortBy, sortOrder, filters, searchQuery]);
+  }, []);
 
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    // Reload data when pagination or filters change
+    loadVehicles();
+  }, [loadVehicles]);
+
+  // Enhanced Event Handlers
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadVehicles();
+  }, [loadVehicles]);
+
+  const handleSearch = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
-    setPage(0); // Reset to first page when searching
-  };
+  }, []);
 
-  const handleFilterChange = (key: keyof VehicleFilters, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setPage(0); // Reset to first page when filtering
-  };
+  const handleFilterChange = useCallback((filterType: keyof VehicleFilters, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value || undefined,
+    }));
+  }, []);
 
-  const clearFilters = () => {
+  const handleQuickFilterChange = useCallback((filter: keyof typeof quickFilters, checked: boolean) => {
+    setQuickFilters(prev => ({
+      ...prev,
+      [filter]: checked,
+    }));
+  }, []);
+
+  const handleSort = useCallback((key: keyof Vehicle) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
     setFilters({});
+    setQuickFilters({
+      lowBattery: false,
+      maintenanceDue: false,
+      recentlyUpdated: false,
+    });
     setSearchQuery('');
+  }, []);
+
+  const handlePageChange = useCallback((_event: unknown, newPage: number) => {
+    setPage(newPage);
+  }, []);
+
+  const handleRowsPerPageChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    console.log('📄 Rows per page changing:', {
+      oldValue: rowsPerPage,
+      newValue: newRowsPerPage,
+      resetPage: true
+    });
+    setRowsPerPage(newRowsPerPage);
     setPage(0);
-  };
+  }, [rowsPerPage]);
 
-  const handleArchiveVehicle = async () => {
-    if (!archiveDialog.vehicle) return;
+  // Navigation handlers
+  const handleAddVehicle = useCallback(() => {
+    navigate('/vehicles/add');
+  }, [navigate]);
 
+  const handleEditVehicle = useCallback((vehicleId: string) => {
+    navigate(`/vehicles/edit/${vehicleId}`);
+  }, [navigate]);
+
+  const handleViewVehicle = useCallback((vehicleId: string) => {
+    navigate(`/vehicles/${vehicleId}`);
+  }, [navigate]);
+
+  // Enhanced vehicle actions
+  const handleArchiveVehicle = useCallback(async (vehicleId: string) => {
     try {
-      await vehicleService.updateVehicleStatus(
-        archiveDialog.vehicle.id,
-        'Retired',
-        'Archived by admin'
-      );
-      
+      await vehicleService.updateVehicleStatus(vehicleId, 'Retired', 'Archived by admin');
       setSnackbar({
         open: true,
         message: 'Vehicle archived successfully',
         severity: 'success',
       });
-      
-      setArchiveDialog({ open: false, vehicle: null });
-      loadVehicles();
+      loadVehicles(false);
     } catch (error) {
       console.error('Error archiving vehicle:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to archive vehicle. Please try again.',
+        message: 'Failed to archive vehicle',
         severity: 'error',
       });
     }
+  }, [loadVehicles]);
+
+  const handleExportData = useCallback(() => {
+    // Implement data export
+    const csvData = vehicles.map(vehicle => ({
+      VIN: vehicle.vin,
+      Make: vehicle.make,
+      Model: vehicle.model,
+      Year: vehicle.year,
+      Status: vehicle.status,
+      'Battery Level': vehicle.batteryLevel,
+      'Mileage': vehicle.mileage,
+      Location: vehicle.location,
+    }));
+
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + "VIN,Make,Model,Year,Status,Battery Level,Mileage,Location\n"
+      + csvData.map(row => Object.values(row).join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `vehicles_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setSnackbar({
+      open: true,
+      message: 'Vehicle data exported successfully',
+      severity: 'success',
+    });
+  }, [vehicles]);
+
+  const handleCloseSnackbar = useCallback(() => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  }, []);
+
+  // Helper functions
+  const getBatteryIcon = (level?: number) => {
+    if (!level) return BatteryLowIcon;
+    if (level < 20) return BatteryLowIcon;
+    if (level < 80) return BatteryGoodIcon;
+    return BatteryFullIcon;
   };
 
-  const getServiceDueStatus = (vehicle: Vehicle) => {
-    if (!vehicle.nextServiceDue) return 'unknown';
-    
-    const daysUntilService = Math.ceil(
-      (new Date(vehicle.nextServiceDue).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  const getBatteryColor = (level?: number) => {
+    if (!level || level < 20) return 'error';
+    if (level < 50) return 'warning';
+    return 'success';
+  };
+
+  const getUniqueLocations = useMemo(() => {
+    return [...new Set(vehicles.map(v => v.location).filter(Boolean))];
+  }, [vehicles]);
+
+  const getUniqueOEMs = useMemo(() => {
+    return [...new Set(vehicles.map(v => v.oem).filter(Boolean))];
+  }, [vehicles]);
+
+  const getUniqueYears = useMemo(() => {
+    return [...new Set(vehicles.map(v => v.year))].sort((a, b) => b - a);
+  }, [vehicles]);
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Skeleton variant="text" width="40%" height={60} sx={{ mb: 3 }} />
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          {[...Array(5)].map((_, i) => (
+            <Grid item xs={12} sm={6} md={2.4} key={i}>
+              <Card>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Skeleton variant="text" width="60%" height={40} />
+                  <Skeleton variant="text" width="80%" height={20} />
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+        <Card>
+          <CardContent>
+            <Skeleton variant="text" width="100%" height={60} />
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} variant="text" width="100%" height={60} sx={{ my: 1 }} />
+            ))}
+          </CardContent>
+        </Card>
+      </Box>
     );
-    
-    if (daysUntilService < 0) return 'overdue';
-    if (daysUntilService <= 7) return 'due-soon';
-    return 'ok';
-  };
+  }
 
-  const getDamageCount = (vehicle: Vehicle) => {
-    return vehicle.damageRecords?.filter(d => d.damageStatus !== 'Resolved').length || 0;
-  };
+  // Error state
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={handleRefresh}>
+              Retry
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1" fontWeight="bold">
-          Vehicle Inventory
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/vehicles/add')}
-          size="large"
-        >
-          Add Vehicle
-        </Button>
-      </Box>
+    <Fade in={true}>
+      <Box sx={{ p: 3, maxWidth: '100%', overflow: 'hidden' }}>
+        {/* Enhanced Header */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 3,
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+              Vehicle Inventory
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Manage and monitor your vehicle fleet
+            </Typography>
+          </Box>
 
-      {/* Stats Cards */}
-      {stats && (
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <BikeIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Total Vehicles</Typography>
-                </Box>
-                <Typography variant="h4" fontWeight="bold">
-                  {stats.totalVehicles.toLocaleString()}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <ActiveIcon color="success" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Active</Typography>
-                </Box>
-                <Typography variant="h4" fontWeight="bold" color="success.main">
-                  {(stats.vehiclesByServiceStatus?.Active || stats.vehiclesByStatus?.Available || 0).toLocaleString()}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <ServiceIcon color="warning" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Under Service</Typography>
-                </Box>
-                <Typography variant="h4" fontWeight="bold" color="warning.main">
-                  {(stats.vehiclesByStatus?.['Under Maintenance'] || 0).toLocaleString()}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <WarningIcon color="error" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Services Due</Typography>
-                </Box>
-                <Typography variant="h4" fontWeight="bold" color="error.main">
-                  {(stats.vehiclesByServiceStatus?.['Scheduled for Service'] || 0).toLocaleString()}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Auto-refresh"
+              sx={{ mr: 2 }}
+            />
 
-      {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                placeholder="Search vehicles..."
-                value={searchQuery}
-                onChange={handleSearch}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            <Tooltip title="Filter vehicles">
+              <IconButton onClick={() => setFilterDrawerOpen(true)}>
+                <Badge badgeContent={Object.keys(filters).length} color="primary">
+                  <FilterIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title={refreshing ? "Refreshing..." : "Refresh data"}>
+              <IconButton onClick={handleRefresh} disabled={refreshing}>
+                <RefreshIcon className={refreshing ? 'rotating' : ''} />
+              </IconButton>
+            </Tooltip>
+
+            <Button
+              variant="outlined"
+              startIcon={<ExportIcon />}
+              onClick={handleExportData}
+            >
+              Export
+            </Button>
+
+            {hasCreatePermission('vehicle', 'vehicles') && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleAddVehicle}
+              >
+                Add Vehicle
+              </Button>
+            )}
+          </Box>
+        </Box>
+
+        {/* Enhanced Stats Cards */}
+        {stats && (
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="h4" color="primary.main">
+                        {stats.total}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Total Vehicles
+                      </Typography>
+                    </Box>
+                    <BikeIcon color="primary" sx={{ fontSize: 40 }} />
+                  </Box>
+                </CardContent>
+              </Card>
             </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>OEM Type</InputLabel>
-                <Select
-                  value={filters.oemType || ''}
-                  onChange={(e) => handleFilterChange('oemType', e.target.value)}
-                >
-                  <MenuItem value="">All OEMs</MenuItem>
-                  {oems.map((oem) => (
-                    <MenuItem key={oem.id} value={oem.name}>
-                      {oem.displayName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="h4" color="success.main">
+                        {stats.active}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Active
+                      </Typography>
+                    </Box>
+                    <SuccessIcon color="success" sx={{ fontSize: 40 }} />
+                  </Box>
+                </CardContent>
+              </Card>
             </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={filters.operationalStatus || ''}
-                  onChange={(e) => handleFilterChange('operationalStatus', e.target.value)}
-                >
-                  <MenuItem value="">All Statuses</MenuItem>
-                  <MenuItem value="Available">Available</MenuItem>
-                  <MenuItem value="Assigned">Assigned</MenuItem>
-                  <MenuItem value="Under Maintenance">Under Maintenance</MenuItem>
-                  <MenuItem value="Retired">Retired</MenuItem>
-                </Select>
-              </FormControl>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="h4" color="warning.main">
+                        {stats.maintenance}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Maintenance
+                      </Typography>
+                    </Box>
+                    <WarningIcon color="warning" sx={{ fontSize: 40 }} />
+                  </Box>
+                </CardContent>
+              </Card>
             </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Location</InputLabel>
-                <Select
-                  value={filters.location || ''}
-                  onChange={(e) => handleFilterChange('location', e.target.value)}
-                >
-                  <MenuItem value="">All Locations</MenuItem>
-                  <MenuItem value="Bangalore">Bangalore</MenuItem>
-                  <MenuItem value="Mumbai">Mumbai</MenuItem>
-                  <MenuItem value="Delhi">Delhi</MenuItem>
-                  <MenuItem value="Chennai">Chennai</MenuItem>
-                  <MenuItem value="Hyderabad">Hyderabad</MenuItem>
-                  <MenuItem value="Pune">Pune</MenuItem>
-                </Select>
-              </FormControl>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="h4" color="info.main">
+                        {stats.inactive}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Inactive
+                      </Typography>
+                    </Box>
+                    <PendingIcon color="info" sx={{ fontSize: 40 }} />
+                  </Box>
+                </CardContent>
+              </Card>
             </Grid>
-            <Grid item xs={12} md={3}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+          </Grid>
+        )}
+        {/* Enhanced Search and Quick Filters */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  placeholder="Search vehicles by VIN, make, model, registration..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                          <ClearIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={quickFilters.lowBattery}
+                        onChange={(e) => handleQuickFilterChange('lowBattery', e.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label="Low Battery"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={quickFilters.maintenanceDue}
+                        onChange={(e) => handleQuickFilterChange('maintenanceDue', e.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label="Maintenance Due"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={quickFilters.recentlyUpdated}
+                        onChange={(e) => handleQuickFilterChange('recentlyUpdated', e.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label="Recently Updated"
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+
+            {(Object.keys(filters).length > 0 || Object.values(quickFilters).some(Boolean)) && (
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Active filters:
+                </Typography>
+                {Object.entries(filters).map(([key, value]) => value && (
+                  <Chip
+                    key={key}
+                    label={`${key}: ${value}`}
+                    size="small"
+                    onDelete={() => handleFilterChange(key as keyof VehicleFilters, '')}
+                  />
+                ))}
+                {Object.entries(quickFilters).map(([key, value]) => value && (
+                  <Chip
+                    key={key}
+                    label={key.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                    size="small"
+                    onDelete={() => handleQuickFilterChange(key as keyof typeof quickFilters, false)}
+                  />
+                ))}
                 <Button
-                  variant="outlined"
-                  onClick={clearFilters}
-                  disabled={!Object.keys(filters).length && !searchQuery}
+                  size="small"
+                  startIcon={<ClearIcon />}
+                  onClick={handleClearFilters}
                 >
-                  Clear Filters
+                  Clear All
                 </Button>
-                <IconButton onClick={loadVehicles} color="primary">
-                  <RefreshIcon />
-                </IconButton>
               </Box>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Vehicles Table */}
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Vehicle</TableCell>
-                <TableCell>Registration</TableCell>
-                <TableCell>Age</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Service Due</TableCell>
-                <TableCell>Damage Reports</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
+        {/* Enhanced Vehicles Table */}
+        <Paper variant="outlined">
+          <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              Vehicles ({totalVehicles})
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Table view">
+                <IconButton
+                  color={viewMode === 'table' ? 'primary' : 'default'}
+                  onClick={() => setViewMode('table')}
+                >
+                  <TableIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Grid view">
+                <IconButton
+                  color={viewMode === 'grid' ? 'primary' : 'default'}
+                  onClick={() => setViewMode('grid')}
+                >
+                  <GridIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+
+          <TableContainer>
+            <Table size="medium">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                    Loading vehicles...
+                  <TableCell>Vehicle</TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortConfig.key === 'vin'}
+                      direction={sortConfig.key === 'vin' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('vin')}
+                    >
+                      VIN
+                    </TableSortLabel>
                   </TableCell>
-                </TableRow>
-              ) : vehicles.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                    No vehicles found
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortConfig.key === 'status'}
+                      direction={sortConfig.key === 'status' ? sortConfig.direction : 'asc'}
+                      onClick={() => handleSort('status')}
+                    >
+                      Status
+                    </TableSortLabel>
                   </TableCell>
+                  <TableCell>Battery</TableCell>
+                  <TableCell>Range</TableCell>
+                  <TableCell>Location</TableCell>
+                  <TableCell>Last Updated</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
-              ) : (
-                vehicles.map((vehicle) => {
-                  const serviceDueStatus = getServiceDueStatus(vehicle);
-                  const damageCount = getDamageCount(vehicle);
-                  const vehicleAge = Math.floor(
-                    (Date.now() - new Date(vehicle.purchaseDate || new Date()).getTime()) / (1000 * 60 * 60 * 24 * 365)
-                  );
+              </TableHead>
+              <TableBody>
+                {displayedVehicles.map((vehicle) => {
+                  const StatusIcon = statusConfig[vehicle.status]?.icon;
+                  const BatteryIcon = getBatteryIcon(vehicle.batteryLevel);
 
                   return (
-                    <TableRow key={vehicle.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ mr: 2, bgcolor: 'primary.light' }}>
-                            {oemLogos[vehicle.model?.oem?.name || ''] || '🛵'}
+                    <TableRow key={vehicle.id} hover sx={{ cursor: 'pointer' }}>
+                      <TableCell onClick={() => handleViewVehicle(vehicle.id)}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ bgcolor: 'primary.light', width: 32, height: 32 }}>
+                            <BikeIcon fontSize="small" />
                           </Avatar>
                           <Box>
-                            <Typography variant="subtitle2" fontWeight="bold">
-                              {vehicle.model?.oem?.name} {vehicle.model?.name}
+                            <Typography variant="body2" fontWeight="bold">
+                              {vehicle.registrationNumber || 'No Registration'}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {vehicle.mileage.toLocaleString()} km
+                              {vehicle.make} {vehicle.model?.displayName} • {vehicle.year}
                             </Typography>
                           </Box>
                         </Box>
                       </TableCell>
+
                       <TableCell>
-                        <Typography variant="body2" fontWeight="bold">
-                          {vehicle.registrationNumber}
+                        <Typography variant="body2" fontFamily="monospace" sx={{ fontSize: '0.875rem' }}>
+                          {vehicle.vin}
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {vehicleAge} year{vehicleAge !== 1 ? 's' : ''}
-                        </Typography>
-                      </TableCell>
+
                       <TableCell>
                         <Chip
-                          label={vehicle.operationalStatus}
-                          color={statusColors[vehicle.operationalStatus]}
+                          icon={StatusIcon ? <StatusIcon /> : <PendingIcon />}
+                          label={statusConfig[vehicle.status]?.label || 'Unknown'}
+                          color={statusConfig[vehicle.status]?.color || 'default'}
                           size="small"
+                          variant="outlined"
                         />
                       </TableCell>
+
                       <TableCell>
-                        {vehicle.nextServiceDue ? (
-                          <Chip
-                            label={
-                              serviceDueStatus === 'overdue'
-                                ? 'Overdue'
-                                : serviceDueStatus === 'due-soon'
-                                ? 'Due Soon'
-                                : 'OK'
-                            }
-                            color={
-                              serviceDueStatus === 'overdue'
-                                ? 'error'
-                                : serviceDueStatus === 'due-soon'
-                                ? 'warning'
-                                : 'success'
-                            }
-                            size="small"
-                          />
+                        {vehicle.batteryLevel !== undefined ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <BatteryIcon color={getBatteryColor(vehicle.batteryLevel)} />
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {vehicle.batteryLevel}%
+                            </Typography>
+                            <Box sx={{ width: 50, ml: 1 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={vehicle.batteryLevel}
+                                color={getBatteryColor(vehicle.batteryLevel)}
+                                sx={{ height: 6, borderRadius: 3 }}
+                              />
+                            </Box>
+                          </Box>
                         ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            Not scheduled
+                          <Typography variant="body2" color="text.secondary">
+                            N/A
                           </Typography>
                         )}
                       </TableCell>
+
                       <TableCell>
-                        {damageCount > 0 ? (
-                          <Chip
-                            label={`${damageCount} open`}
-                            color="error"
-                            size="small"
-                          />
+                        {vehicle.range ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <SpeedIcon fontSize="small" color="action" />
+                            <Typography variant="body2">
+                              {vehicle.range} km
+                            </Typography>
+                          </Box>
                         ) : (
-                          <Typography variant="caption" color="success.main">
-                            None
+                          <Typography variant="body2" color="text.secondary">
+                            N/A
                           </Typography>
                         )}
                       </TableCell>
+
                       <TableCell>
-                        <Typography variant="body2">
-                          {vehicle.location}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <LocationIcon fontSize="small" color="action" />
+                          <Typography variant="body2">
+                            {vehicle.location || 'Unknown'}
+                          </Typography>
+                        </Box>
                       </TableCell>
+
                       <TableCell>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        {vehicle.lastUpdated ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {new Date(vehicle.lastUpdated).toLocaleDateString()}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            N/A
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                           <Tooltip title="View Details">
                             <IconButton
                               size="small"
-                              onClick={() => navigate(`/vehicles/${vehicle.id}`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewVehicle(vehicle.id);
+                              }}
                             >
                               <ViewIcon />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Edit Vehicle">
-                            <IconButton
-                              size="small"
-                              onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Tooltip>
-                          {vehicle.operationalStatus !== 'Retired' && (
+                          {hasUpdatePermission('vehicle', 'vehicles') && (
+                            <Tooltip title="Edit Vehicle">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditVehicle(vehicle.id);
+                                }}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {hasDeletePermission('vehicle', 'vehicles') && (
                             <Tooltip title="Archive Vehicle">
                               <IconButton
                                 size="small"
-                                onClick={() => setArchiveDialog({ open: true, vehicle })}
+                                color="error"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleArchiveVehicle(vehicle.id);
+                                }}
                               >
                                 <ArchiveIcon />
                               </IconButton>
@@ -544,62 +989,163 @@ const VehicleInventoryPage: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   );
-                })
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {totalVehicles > 0 && (
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              component="div"
+              count={totalVehicles}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handlePageChange}
+              onRowsPerPageChange={handleRowsPerPageChange}
+              showFirstButton
+              showLastButton
+            />
+          )}
+
+          {totalVehicles === 0 && (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No vehicles found
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {totalVehicles === 0
+                  ? "No vehicles have been added yet."
+                  : "Try adjusting your search or filter criteria."
+                }
+              </Typography>
+              {totalVehicles === 0 && (
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddVehicle}
+                  sx={{ mt: 2 }}
+                >
+                  Add First Vehicle
+                </Button>
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          component="div"
-          count={totalCount}
-          page={page}
-          onPageChange={(_, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
-          rowsPerPageOptions={[10, 25, 50, 100]}
-        />
-      </Card>
+            </Box>
+          )}
+        </Paper>
 
-      {/* Archive Dialog */}
-      <Dialog
-        open={archiveDialog.open}
-        onClose={() => setArchiveDialog({ open: false, vehicle: null })}
-      >
-        <DialogTitle>Archive Vehicle</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to archive{' '}
-            <strong>
-              {archiveDialog.vehicle?.model?.oem?.name} {archiveDialog.vehicle?.model?.name} (
-              {archiveDialog.vehicle?.registrationNumber})
-            </strong>
-            ? This will mark the vehicle as retired and it will no longer be available for assignments.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setArchiveDialog({ open: false, vehicle: null })}>
-            Cancel
-          </Button>
-          <Button onClick={handleArchiveVehicle} color="error" variant="contained">
-            Archive
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {/* Filter Drawer */}
+        <Drawer
+          anchor="right"
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          PaperProps={{ sx: { width: 320, p: 2 } }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">Filters</Typography>
+            <IconButton onClick={() => setFilterDrawerOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+          <Divider sx={{ mb: 2 }} />
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={filters.status || ''}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                label="Status"
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="active">Active (Available + Assigned)</MenuItem>
+                <MenuItem value="available">Available</MenuItem>
+                <MenuItem value="assigned">Assigned</MenuItem>
+                <MenuItem value="maintenance">Under Maintenance</MenuItem>
+                <MenuItem value="inactive">Inactive (Retired + Damaged)</MenuItem>
+                <MenuItem value="retired">Retired</MenuItem>
+                <MenuItem value="damaged">Damaged</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>OEM</InputLabel>
+              <Select
+                value={filters.oem || ''}
+                onChange={(e) => handleFilterChange('oem', e.target.value)}
+                label="OEM"
+              >
+                <MenuItem value="">All</MenuItem>
+                {getUniqueOEMs.map((oemName) => (
+                  <MenuItem key={oemName} value={oemName}>
+                    {oemName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Autocomplete
+              options={getUniqueYears}
+              value={filters.year ? parseInt(filters.year) : null}
+              onChange={(_, value) => handleFilterChange('year', value?.toString() || '')}
+              renderInput={(params) => (
+                <TextField {...params} label="Year" fullWidth />
+              )}
+            />
+
+            <Autocomplete
+              options={getUniqueLocations}
+              value={filters.location || null}
+              onChange={(_, value) => handleFilterChange('location', value || '')}
+              renderInput={(params) => (
+                <TextField {...params} label="Location" fullWidth />
+              )}
+            />
+
+            <Box sx={{ mt: 'auto', pt: 2 }}>
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={handleClearFilters}
+                startIcon={<ClearIcon />}
+              >
+                Clear All Filters
+              </Button>
+            </Box>
+          </Box>
+        </Drawer>
+
+        {/* Enhanced Snackbar */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbar.severity}
+            sx={{ width: '100%' }}
+            variant="filled"
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+
+        {/* CSS for animations */}
+        <style>
+          {`
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+            .rotating {
+              animation: spin 1s linear infinite;
+            }
+          `}
+        </style>
+      </Box>
+    </Fade>
   );
 };
 

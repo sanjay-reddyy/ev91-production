@@ -1,52 +1,56 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
-import yaml from 'js-yaml';
-import swaggerUi from 'swagger-ui-express';
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
+import yaml from "js-yaml";
+import swaggerUi from "swagger-ui-express";
 
 // Load environment variables
 dotenv.config();
 
-import { config, prisma, redis } from './config';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler';
-import { authMiddleware } from './middleware/auth';
+import { config, prisma, redis } from "./config";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { authMiddleware } from "./middleware/auth";
 
 // Import routes
-import sparePartRoutes from './routes/sparePartRoutes';
-import inventoryRoutes from './routes/inventoryRoutes';
-import supplierRoutes from './routes/supplierRoutes';
-import purchaseOrderRoutes from './routes/purchaseOrderRoutes';
-import analyticsRoutes from './routes/analyticsRoutes';
-import dashboardRoutes from './routes/dashboardRoutes';
+import sparePartRoutes from "./routes/sparePartRoutes";
+import inventoryRoutes from "./routes/inventoryRoutes";
+import supplierRoutes from "./routes/supplierRoutes";
+import purchaseOrderRoutes from "./routes/purchaseOrderRoutes";
+import analyticsRoutes from "./routes/analyticsRoutes";
+import dashboardRoutes from "./routes/dashboardRoutes";
+import categoryRoutes from "./routes/categoryRoutes";
+import outwardFlowRoutes from "./routes/outwardFlowRoutes";
 
 const app = express();
 
 // Load OpenAPI specification
 let openApiSpec: any = {};
 try {
-  const openApiPath = path.join(__dirname, '..', 'openapi.yaml');
+  const openApiPath = path.join(__dirname, "..", "openapi.yaml");
   if (fs.existsSync(openApiPath)) {
-    openApiSpec = yaml.load(fs.readFileSync(openApiPath, 'utf8'));
+    openApiSpec = yaml.load(fs.readFileSync(openApiPath, "utf8"));
   }
 } catch (error) {
-  console.warn('OpenAPI specification not found or invalid:', error);
+  console.warn("OpenAPI specification not found or invalid:", error);
 }
 
 // Security middleware
 app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+app.use(
+  cors({
+    origin: "*",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -54,31 +58,31 @@ const limiter = rateLimit({
   max: config.security.rateLimitMaxRequests,
   message: {
     success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  }
+    message: "Too many requests from this IP, please try again later.",
+  },
 });
-app.use('/api', limiter);
+app.use("/api", limiter);
 
 // Request logging
-app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'));
+app.use(morgan(config.nodeEnv === "development" ? "dev" : "combined"));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get("/health", (req, res) => {
   res.json({
     success: true,
-    message: 'Spare Parts Service is running',
+    message: "Spare Parts Service is running",
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
+    version: process.env.npm_package_version || "1.0.0",
     environment: config.nodeEnv,
   });
 });
 
 // Documentation endpoints
-app.get('/docs', (req, res) => {
+app.get("/docs", (req, res) => {
   // Enhanced HTML page with CDN fallback to local assets
   const html = `
   <!DOCTYPE html>
@@ -88,17 +92,17 @@ app.get('/docs', (req, res) => {
       <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
       <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" sizes="16x16" />
       <style>
-          html { 
-              box-sizing: border-box; 
-              overflow: -moz-scrollbars-vertical; 
-              overflow-y: scroll; 
+          html {
+              box-sizing: border-box;
+              overflow: -moz-scrollbars-vertical;
+              overflow-y: scroll;
           }
-          *, *:before, *:after { 
-              box-sizing: inherit; 
+          *, *:before, *:after {
+              box-sizing: inherit;
           }
-          body { 
-              margin: 0; 
-              background: #fafafa; 
+          body {
+              margin: 0;
+              background: #fafafa;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
           }
           .swagger-ui .topbar {
@@ -143,12 +147,12 @@ app.get('/docs', (req, res) => {
 });
 
 // Serve OpenAPI specification
-app.get('/api/docs/spec', (req, res) => {
+app.get("/api/docs/spec", (req, res) => {
   res.json(openApiSpec);
 });
 
 // Serve Swagger UI assets
-app.use('/docs', swaggerUi.serve);
+app.use("/docs", swaggerUi.serve);
 
 // Create API router
 const apiRouter = express.Router();
@@ -156,19 +160,21 @@ const apiRouter = express.Router();
 // Apply authentication middleware to all API routes except documentation
 apiRouter.use((req, res, next) => {
   // Skip auth for documentation endpoints
-  if (req.path.includes('/docs')) {
+  if (req.path.includes("/docs")) {
     return next();
   }
   return authMiddleware(req, res, next);
 });
 
 // Mount route handlers
-apiRouter.use('/spare-parts', sparePartRoutes);
-apiRouter.use('/inventory', inventoryRoutes);
-apiRouter.use('/suppliers', supplierRoutes);
-apiRouter.use('/purchase-orders', purchaseOrderRoutes);
-apiRouter.use('/analytics', analyticsRoutes);
-apiRouter.use('/dashboard', dashboardRoutes);
+apiRouter.use("/spare-parts", sparePartRoutes);
+apiRouter.use("/inventory", inventoryRoutes);
+apiRouter.use("/suppliers", supplierRoutes);
+apiRouter.use("/purchase-orders", purchaseOrderRoutes);
+apiRouter.use("/analytics", analyticsRoutes);
+apiRouter.use("/dashboard", dashboardRoutes);
+apiRouter.use("/categories", categoryRoutes);
+apiRouter.use("/outward", outwardFlowRoutes);
 
 // Mount API router
 app.use(`/api/${config.apiVersion}`, apiRouter);
@@ -180,39 +186,39 @@ app.use(errorHandler);
 // Graceful shutdown handling
 const gracefulShutdown = async (signal: string) => {
   console.log(`Received ${signal}. Starting graceful shutdown...`);
-  
+
   try {
     // Close database connections
     await prisma.$disconnect();
-    console.log('Database connection closed');
-    
+    console.log("Database connection closed");
+
     // Close Redis connection
     if (redis) {
       await redis.quit();
-      console.log('Redis connection closed');
+      console.log("Redis connection closed");
     }
-    
-    console.log('Graceful shutdown completed');
+
+    console.log("Graceful shutdown completed");
     process.exit(0);
   } catch (error) {
-    console.error('Error during graceful shutdown:', error);
+    console.error("Error during graceful shutdown:", error);
     process.exit(1);
   }
 };
 
 // Handle shutdown signals
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  gracefulShutdown('uncaughtException');
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+  gracefulShutdown("uncaughtException");
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  gracefulShutdown('unhandledRejection');
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  gracefulShutdown("unhandledRejection");
 });
 
 // Start server
@@ -222,24 +228,26 @@ const server = app.listen(PORT, () => {
   console.log(`📊 Environment: ${config.nodeEnv}`);
   console.log(`🔗 API Version: ${config.apiVersion}`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-  console.log(`📖 API Base URL: http://localhost:${PORT}/api/${config.apiVersion}`);
+  console.log(
+    `📖 API Base URL: http://localhost:${PORT}/api/${config.apiVersion}`
+  );
 });
 
 // Handle server errors
-server.on('error', (error: any) => {
-  if (error.syscall !== 'listen') {
+server.on("error", (error: any) => {
+  if (error.syscall !== "listen") {
     throw error;
   }
 
-  const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+  const bind = typeof PORT === "string" ? "Pipe " + PORT : "Port " + PORT;
 
   switch (error.code) {
-    case 'EACCES':
-      console.error(bind + ' requires elevated privileges');
+    case "EACCES":
+      console.error(bind + " requires elevated privileges");
       process.exit(1);
       break;
-    case 'EADDRINUSE':
-      console.error(bind + ' is already in use');
+    case "EADDRINUSE":
+      console.error(bind + " is already in use");
       process.exit(1);
       break;
     default:

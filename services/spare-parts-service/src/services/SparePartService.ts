@@ -1,16 +1,16 @@
-import { PrismaClient, SparePart, Category, Supplier } from '@prisma/client';
-import { 
-  SparePartFilters, 
-  PaginationParams, 
+import { PrismaClient, SparePart, Category, Supplier } from "@prisma/client";
+import {
+  SparePartFilters,
+  PaginationParams,
   ApiResponse,
-  PaginationInfo 
-} from '../types';
-import { 
-  createSuccessResponse, 
-  createErrorResponse, 
-  createPaginationInfo, 
-  getPrismaSkipTake 
-} from '../utils';
+  PaginationInfo,
+} from "../types";
+import {
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginationInfo,
+  getPrismaSkipTake,
+} from "../utils";
 
 export class SparePartService {
   constructor(private prisma: PrismaClient) {}
@@ -21,20 +21,27 @@ export class SparePartService {
   async getAll(
     filters: SparePartFilters = {},
     pagination: PaginationParams = {}
-  ): Promise<ApiResponse<{ spareParts: SparePart[]; pagination: PaginationInfo }>> {
+  ): Promise<
+    ApiResponse<{ spareParts: SparePart[]; pagination: PaginationInfo }>
+  > {
     try {
-      const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = pagination;
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        sortOrder = "desc",
+      } = pagination;
       const { skip, take } = getPrismaSkipTake(page, limit);
 
       // Build where clause
       const where: any = {};
-      
+
       if (filters.search) {
         where.OR = [
-          { name: { contains: filters.search, mode: 'insensitive' } },
-          { partNumber: { contains: filters.search, mode: 'insensitive' } },
-          { internalCode: { contains: filters.search, mode: 'insensitive' } },
-          { description: { contains: filters.search, mode: 'insensitive' } },
+          { name: { contains: filters.search, mode: "insensitive" } },
+          { partNumber: { contains: filters.search, mode: "insensitive" } },
+          { internalCode: { contains: filters.search, mode: "insensitive" } },
+          { description: { contains: filters.search, mode: "insensitive" } },
         ];
       }
 
@@ -58,16 +65,16 @@ export class SparePartService {
 
       if (filters.compatibility) {
         where.compatibility = {
-          contains: filters.compatibility
+          contains: filters.compatibility,
         };
       }
 
       // Handle stock-based filters
       if (filters.inStock || filters.lowStock) {
         where.stockLevels = {
-          some: filters.inStock 
+          some: filters.inStock
             ? { currentStock: { gt: 0 } }
-            : { currentStock: { lte: { stockLevel: { reorderLevel: true } } } }
+            : { currentStock: { lte: { stockLevel: { reorderLevel: true } } } },
         };
       }
 
@@ -87,7 +94,7 @@ export class SparePartService {
               name: true,
               displayName: true,
               code: true,
-            }
+            },
           },
           supplier: {
             select: {
@@ -96,7 +103,7 @@ export class SparePartService {
               displayName: true,
               code: true,
               supplierType: true,
-            }
+            },
           },
           stockLevels: {
             select: {
@@ -105,14 +112,14 @@ export class SparePartService {
               currentStock: true,
               availableStock: true,
               minimumStock: true,
-            }
+            },
           },
-          _count: {
-            select: {
-              servicePartUsages: true,
-              purchaseOrderItems: true,
-            }
-          }
+          // _count: {
+          //   select: {
+          //     installedParts: true,
+          //     purchaseOrderItems: true,
+          //   },
+          // },
         },
       });
 
@@ -120,13 +127,13 @@ export class SparePartService {
 
       return createSuccessResponse(
         { spareParts, pagination: paginationInfo },
-        'Spare parts retrieved successfully'
+        "Spare parts retrieved successfully"
       );
     } catch (error) {
-      console.error('Error in SparePartService.getAll:', error);
+      console.error("Error in SparePartService.getAll:", error);
       return createErrorResponse(
-        'Failed to retrieve spare parts',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to retrieve spare parts",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -143,39 +150,42 @@ export class SparePartService {
           supplier: {
             include: {
               supplierContacts: {
-                where: { isActive: true }
-              }
-            }
+                where: { isActive: true },
+              },
+            },
           },
           stockLevels: {
             include: {
               stockMovements: {
                 take: 10,
-                orderBy: { movementDate: 'desc' }
-              }
-            }
+                orderBy: { movementDate: "desc" },
+              },
+            },
           },
           priceHistories: {
             take: 10,
-            orderBy: { effectiveDate: 'desc' }
+            orderBy: { effectiveDate: "desc" },
           },
-          servicePartUsages: {
-            take: 5,
-            orderBy: { usageDate: 'desc' }
-          }
+          // servicePartUsages: {
+          //   take: 5,
+          //   orderBy: { usageDate: "desc" },
+          // },
         },
       });
 
       if (!sparePart) {
-        return createErrorResponse('Spare part not found');
+        return createErrorResponse("Spare part not found");
       }
 
-      return createSuccessResponse(sparePart, 'Spare part retrieved successfully');
+      return createSuccessResponse(
+        sparePart,
+        "Spare part retrieved successfully"
+      );
     } catch (error) {
-      console.error('Error in SparePartService.getById:', error);
+      console.error("Error in SparePartService.getById:", error);
       return createErrorResponse(
-        'Failed to retrieve spare part',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to retrieve spare part",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -186,25 +196,32 @@ export class SparePartService {
   async create(data: Partial<SparePart>): Promise<ApiResponse<SparePart>> {
     try {
       // Validate required fields
-      if (!data.name || !data.partNumber || !data.categoryId || !data.supplierId) {
-        return createErrorResponse('Missing required fields: name, partNumber, categoryId, supplierId');
+      if (
+        !data.name ||
+        !data.partNumber ||
+        !data.categoryId ||
+        !data.supplierId
+      ) {
+        return createErrorResponse(
+          "Missing required fields: name, partNumber, categoryId, supplierId"
+        );
       }
 
       // Check if part number already exists
       const existingPart = await this.prisma.sparePart.findUnique({
-        where: { partNumber: data.partNumber }
+        where: { partNumber: data.partNumber },
       });
 
       if (existingPart) {
-        return createErrorResponse('Part number already exists');
+        return createErrorResponse("Part number already exists");
       }
 
       // Generate internal code if not provided
       if (!data.internalCode) {
         const category = await this.prisma.category.findUnique({
-          where: { id: data.categoryId! }
+          where: { id: data.categoryId! },
         });
-        data.internalCode = `${category?.code || 'SP'}-${Date.now()}`;
+        data.internalCode = `${category?.code || "SP"}-${Date.now()}`;
       }
 
       // Calculate selling price if not provided
@@ -212,9 +229,12 @@ export class SparePartService {
         data.sellingPrice = data.costPrice * (1 + data.markupPercent / 100);
       }
 
+      // Extract fields that are valid for the Prisma schema
+      const { createdBy, updatedBy, ...validData } = data as any;
+
       const sparePart = await this.prisma.sparePart.create({
         data: {
-          ...data,
+          ...validData,
           createdAt: new Date(),
           updatedAt: new Date(),
         } as any,
@@ -224,12 +244,15 @@ export class SparePartService {
         },
       });
 
-      return createSuccessResponse(sparePart, 'Spare part created successfully');
+      return createSuccessResponse(
+        sparePart,
+        "Spare part created successfully"
+      );
     } catch (error) {
-      console.error('Error in SparePartService.create:', error);
+      console.error("Error in SparePartService.create:", error);
       return createErrorResponse(
-        'Failed to create spare part',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to create spare part",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -237,39 +260,46 @@ export class SparePartService {
   /**
    * Update spare part
    */
-  async update(id: string, data: Partial<SparePart>): Promise<ApiResponse<SparePart>> {
+  async update(
+    id: string,
+    data: Partial<SparePart>
+  ): Promise<ApiResponse<SparePart>> {
     try {
       // Check if spare part exists
       const existingSparePart = await this.prisma.sparePart.findUnique({
-        where: { id }
+        where: { id },
       });
 
       if (!existingSparePart) {
-        return createErrorResponse('Spare part not found');
+        return createErrorResponse("Spare part not found");
       }
 
       // Check if part number is being changed and if it already exists
       if (data.partNumber && data.partNumber !== existingSparePart.partNumber) {
         const existingPartWithNumber = await this.prisma.sparePart.findUnique({
-          where: { partNumber: data.partNumber }
+          where: { partNumber: data.partNumber },
         });
 
         if (existingPartWithNumber) {
-          return createErrorResponse('Part number already exists');
+          return createErrorResponse("Part number already exists");
         }
       }
 
       // Recalculate selling price if cost price or markup changed
       if (data.costPrice || data.markupPercent) {
         const costPrice = data.costPrice || existingSparePart.costPrice;
-        const markupPercent = data.markupPercent || existingSparePart.markupPercent;
+        const markupPercent =
+          data.markupPercent || existingSparePart.markupPercent;
         data.sellingPrice = costPrice * (1 + markupPercent / 100);
       }
+
+      // Filter out fields that are not part of the Prisma schema
+      const { createdBy, updatedBy, ...validData } = data as any;
 
       const sparePart = await this.prisma.sparePart.update({
         where: { id },
         data: {
-          ...data,
+          ...validData,
           updatedAt: new Date(),
         } as any,
         include: {
@@ -278,12 +308,15 @@ export class SparePartService {
         },
       });
 
-      return createSuccessResponse(sparePart, 'Spare part updated successfully');
+      return createSuccessResponse(
+        sparePart,
+        "Spare part updated successfully"
+      );
     } catch (error) {
-      console.error('Error in SparePartService.update:', error);
+      console.error("Error in SparePartService.update:", error);
       return createErrorResponse(
-        'Failed to update spare part',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to update spare part",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -298,42 +331,48 @@ export class SparePartService {
         where: { id },
         include: {
           stockLevels: true,
-          servicePartUsages: true,
-          purchaseOrderItems: true,
-        }
+          // servicePartUsages: true,
+          // purchaseOrderItems: true,
+        },
       });
 
       if (!existingSparePart) {
-        return createErrorResponse('Spare part not found');
+        return createErrorResponse("Spare part not found");
       }
 
-      // Check if spare part is being used
-      if (existingSparePart.servicePartUsages.length > 0 || 
-          existingSparePart.purchaseOrderItems.length > 0) {
+      // Check if spare part is being used (temporarily disabled - check only stock levels)
+      if (
+        existingSparePart.stockLevels.length > 0
+        // existingSparePart.servicePartUsages.length > 0 ||
+        // existingSparePart.purchaseOrderItems.length > 0
+      ) {
         // Soft delete - mark as inactive instead of hard delete
         await this.prisma.sparePart.update({
           where: { id },
-          data: { 
+          data: {
             isActive: false,
             isDiscontinued: true,
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         });
 
-        return createSuccessResponse(true, 'Spare part marked as inactive due to existing usage');
+        return createSuccessResponse(
+          true,
+          "Spare part marked as inactive due to existing usage"
+        );
       }
 
       // Hard delete if no usage
       await this.prisma.sparePart.delete({
-        where: { id }
+        where: { id },
       });
 
-      return createSuccessResponse(true, 'Spare part deleted successfully');
+      return createSuccessResponse(true, "Spare part deleted successfully");
     } catch (error) {
-      console.error('Error in SparePartService.delete:', error);
+      console.error("Error in SparePartService.delete:", error);
       return createErrorResponse(
-        'Failed to delete spare part',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to delete spare part",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -346,7 +385,7 @@ export class SparePartService {
       const spareParts = await this.prisma.sparePart.findMany({
         where: {
           compatibility: {
-            contains: modelId
+            contains: modelId,
           },
           isActive: true,
         },
@@ -359,18 +398,21 @@ export class SparePartService {
               storeName: true,
               currentStock: true,
               availableStock: true,
-            }
-          }
+            },
+          },
         },
-        orderBy: { name: 'asc' }
+        orderBy: { name: "asc" },
       });
 
-      return createSuccessResponse(spareParts, 'Compatible spare parts retrieved successfully');
+      return createSuccessResponse(
+        spareParts,
+        "Compatible spare parts retrieved successfully"
+      );
     } catch (error) {
-      console.error('Error in SparePartService.getByVehicleModel:', error);
+      console.error("Error in SparePartService.getByVehicleModel:", error);
       return createErrorResponse(
-        'Failed to retrieve compatible spare parts',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to retrieve compatible spare parts",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -389,11 +431,11 @@ export class SparePartService {
   ): Promise<ApiResponse<SparePart>> {
     try {
       const existingSparePart = await this.prisma.sparePart.findUnique({
-        where: { id }
+        where: { id },
       });
 
       if (!existingSparePart) {
-        return createErrorResponse('Spare part not found');
+        return createErrorResponse("Spare part not found");
       }
 
       // Update spare part prices in a transaction
@@ -409,7 +451,7 @@ export class SparePartService {
             changeReason: reason,
             effectiveDate: new Date(),
             changedBy,
-          }
+          },
         });
 
         // Update spare part with new prices
@@ -425,16 +467,19 @@ export class SparePartService {
           include: {
             category: true,
             supplier: true,
-          }
+          },
         });
       });
 
-      return createSuccessResponse(result, 'Spare part pricing updated successfully');
+      return createSuccessResponse(
+        result,
+        "Spare part pricing updated successfully"
+      );
     } catch (error) {
-      console.error('Error in SparePartService.updatePricing:', error);
+      console.error("Error in SparePartService.updatePricing:", error);
       return createErrorResponse(
-        'Failed to update spare part pricing',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to update spare part pricing",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -442,7 +487,11 @@ export class SparePartService {
   /**
    * Bulk update spare parts
    */
-  async bulkUpdate(updates: Array<{ id: string; data: Partial<SparePart> }>): Promise<ApiResponse<{ successful: number; failed: number; errors: any[] }>> {
+  async bulkUpdate(
+    updates: Array<{ id: string; data: Partial<SparePart> }>
+  ): Promise<
+    ApiResponse<{ successful: number; failed: number; errors: any[] }>
+  > {
     try {
       let successful = 0;
       let failed = 0;
@@ -455,14 +504,14 @@ export class SparePartService {
             data: {
               ...update.data,
               updatedAt: new Date(),
-            } as any
+            } as any,
           });
           successful++;
         } catch (error) {
           failed++;
           errors.push({
             id: update.id,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : "Unknown error",
           });
         }
       }
@@ -472,10 +521,10 @@ export class SparePartService {
         `Bulk update completed: ${successful} successful, ${failed} failed`
       );
     } catch (error) {
-      console.error('Error in SparePartService.bulkUpdate:', error);
+      console.error("Error in SparePartService.bulkUpdate:", error);
       return createErrorResponse(
-        'Failed to perform bulk update',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to perform bulk update",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }

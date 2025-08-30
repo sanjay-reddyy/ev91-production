@@ -17,10 +17,11 @@ model Rider {
   phone         String   @unique
   phoneVerified Boolean  @default(false)
   registrationStatus String @default("PENDING") // PENDING, PHONE_VERIFIED, KYC_COMPLETED
-  
-  
+
+
   // User data
   name          String?
+  email         String?
   dob           String?
   address1      String?
   address2      String?
@@ -30,20 +31,23 @@ model Rider {
   emergencyName String?
   emergencyPhone String?
   emergencyRelation String?
-  
+
+  // Status fields
+  isActive      Boolean  @default(false)
+
   // KYC fields
   kycStatus     String   @default("pending")
   aadhaar       String?
   pan           String?
   dl            String?
   selfie        String?
-  
+
   // Compliance
   consent       Boolean  @default(false)
   consentLogs   String?
   ip            String?
   agreementSigned Boolean @default(false)
-  
+
   // Timestamps
   createdAt     DateTime @default(now())
   updatedAt DateTime @updatedAt

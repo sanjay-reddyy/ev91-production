@@ -96,6 +96,15 @@ export default function Login() {
             </Alert>
           )}
 
+          {/* Development Notice */}
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              <strong>Development Credentials:</strong><br />
+              Email: admin@ev91.com<br />
+              Password: SuperAdmin123!
+            </Typography>
+          </Alert>
+
           <form onSubmit={handleSubmit(onSubmit)}>
             <TextField
               fullWidth

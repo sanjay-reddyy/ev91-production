@@ -1,19 +1,19 @@
-import { PrismaClient, InventoryLevel, StockMovement } from '@prisma/client';
-import { 
-  StockFilters, 
-  PaginationParams, 
+import { PrismaClient, InventoryLevel, StockMovement } from "@prisma/client";
+import {
+  StockFilters,
+  PaginationParams,
   ApiResponse,
   StockMovementRequest,
-  PaginationInfo 
-} from '../types';
-import { 
-  createSuccessResponse, 
-  createErrorResponse, 
-  createPaginationInfo, 
+  PaginationInfo,
+} from "../types";
+import {
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginationInfo,
   getPrismaSkipTake,
   getStockStatus,
-  getUrgencyLevel
-} from '../utils';
+  getUrgencyLevel,
+} from "../utils";
 
 export class InventoryService {
   constructor(private prisma: PrismaClient) {}
@@ -26,12 +26,17 @@ export class InventoryService {
     pagination: PaginationParams = {}
   ): Promise<ApiResponse<{ stockLevels: any[]; pagination: PaginationInfo }>> {
     try {
-      const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = pagination;
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        sortOrder = "desc",
+      } = pagination;
       const { skip, take } = getPrismaSkipTake(page, limit);
 
       // Build where clause
       const where: any = {};
-      
+
       if (filters.storeId) {
         where.storeId = filters.storeId;
       }
@@ -50,11 +55,17 @@ export class InventoryService {
       }
 
       if (filters.minQuantity !== undefined) {
-        where.currentStock = { ...where.currentStock, gte: filters.minQuantity };
+        where.currentStock = {
+          ...where.currentStock,
+          gte: filters.minQuantity,
+        };
       }
 
       if (filters.maxQuantity !== undefined) {
-        where.currentStock = { ...where.currentStock, lte: filters.maxQuantity };
+        where.currentStock = {
+          ...where.currentStock,
+          lte: filters.maxQuantity,
+        };
       }
 
       where.isActive = true;
@@ -73,27 +84,37 @@ export class InventoryService {
             include: {
               category: true,
               supplier: true,
-            }
+            },
           },
           stockMovements: {
             take: 5,
-            orderBy: { movementDate: 'desc' },
+            orderBy: { movementDate: "desc" },
             select: {
               id: true,
               movementType: true,
               quantity: true,
               movementDate: true,
               reason: true,
-            }
-          }
+            },
+          },
         },
       });
 
       // Enhance stock levels with computed properties
       const enhancedStockLevels = stockLevels.map((stock: any) => ({
         ...stock,
-        stockStatus: getStockStatus(stock.currentStock, stock.minimumStock, stock.maximumStock),
-        urgencyLevel: getUrgencyLevel(getStockStatus(stock.currentStock, stock.minimumStock, stock.maximumStock)),
+        stockStatus: getStockStatus(
+          stock.currentStock,
+          stock.minimumStock,
+          stock.maximumStock
+        ),
+        urgencyLevel: getUrgencyLevel(
+          getStockStatus(
+            stock.currentStock,
+            stock.minimumStock,
+            stock.maximumStock
+          )
+        ),
         valueAtCost: stock.currentStock * stock.sparePart.costPrice,
         valueAtSelling: stock.currentStock * stock.sparePart.sellingPrice,
         reorderRequired: stock.currentStock <= stock.reorderLevel,
@@ -104,12 +125,12 @@ export class InventoryService {
 
       return createSuccessResponse(
         { stockLevels: enhancedStockLevels, pagination: paginationInfo },
-        'Stock levels retrieved successfully'
+        "Stock levels retrieved successfully"
       );
     } catch (error) {
       return createErrorResponse(
-        'Failed to retrieve stock levels',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to retrieve stock levels",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -117,48 +138,65 @@ export class InventoryService {
   /**
    * Get stock level by store and spare part
    */
-  async getStockLevel(storeId: string, sparePartId: string): Promise<ApiResponse<any>> {
+  async getStockLevel(
+    storeId: string,
+    sparePartId: string
+  ): Promise<ApiResponse<any>> {
     try {
       const stockLevel = await this.prisma.inventoryLevel.findUnique({
         where: {
           sparePartId_storeId: {
             sparePartId,
-            storeId
-          }
+            storeId,
+          },
         },
         include: {
           sparePart: {
             include: {
               category: true,
               supplier: true,
-            }
+            },
           },
           stockMovements: {
             take: 20,
-            orderBy: { movementDate: 'desc' }
-          }
+            orderBy: { movementDate: "desc" },
+          },
         },
       });
 
       if (!stockLevel) {
-        return createErrorResponse('Stock level not found');
+        return createErrorResponse("Stock level not found");
       }
 
       const enhanced = {
         ...stockLevel,
-        stockStatus: getStockStatus(stockLevel.currentStock, stockLevel.minimumStock, stockLevel.maximumStock),
-        urgencyLevel: getUrgencyLevel(getStockStatus(stockLevel.currentStock, stockLevel.minimumStock, stockLevel.maximumStock)),
+        stockStatus: getStockStatus(
+          stockLevel.currentStock,
+          stockLevel.minimumStock,
+          stockLevel.maximumStock
+        ),
+        urgencyLevel: getUrgencyLevel(
+          getStockStatus(
+            stockLevel.currentStock,
+            stockLevel.minimumStock,
+            stockLevel.maximumStock
+          )
+        ),
         valueAtCost: stockLevel.currentStock * stockLevel.sparePart.costPrice,
-        valueAtSelling: stockLevel.currentStock * stockLevel.sparePart.sellingPrice,
+        valueAtSelling:
+          stockLevel.currentStock * stockLevel.sparePart.sellingPrice,
         reorderRequired: stockLevel.currentStock <= stockLevel.reorderLevel,
         daysOfStock: this.calculateDaysOfStock(stockLevel),
       };
 
-      return createSuccessResponse(enhanced, 'Stock level retrieved successfully');
+      return createSuccessResponse(
+        enhanced,
+        "Stock level retrieved successfully"
+      );
     } catch (error) {
       return createErrorResponse(
-        'Failed to retrieve stock level',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to retrieve stock level",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -181,13 +219,15 @@ export class InventoryService {
         where: {
           sparePartId_storeId: {
             sparePartId,
-            storeId
-          }
-        }
+            storeId,
+          },
+        },
       });
 
       if (existing) {
-        return createErrorResponse('Stock level already exists for this spare part in this store');
+        return createErrorResponse(
+          "Stock level already exists for this spare part in this store"
+        );
       }
 
       const stockLevel = await this.prisma.inventoryLevel.create({
@@ -208,21 +248,27 @@ export class InventoryService {
 
       // Create initial stock movement if there's initial stock
       if (initialStock > 0) {
-        await this.createStockMovement({
-          sparePartId,
-          storeId,
-          movementType: 'IN',
-          quantity: initialStock,
-          reason: 'Initial stock setup',
-          referenceType: 'INITIALIZATION',
-        }, 'SYSTEM');
+        await this.createStockMovement(
+          {
+            sparePartId,
+            storeId,
+            movementType: "IN",
+            quantity: initialStock,
+            reason: "Initial stock setup",
+            referenceType: "INITIALIZATION",
+          },
+          "SYSTEM"
+        );
       }
 
-      return createSuccessResponse(stockLevel, 'Stock level initialized successfully');
+      return createSuccessResponse(
+        stockLevel,
+        "Stock level initialized successfully"
+      );
     } catch (error) {
       return createErrorResponse(
-        'Failed to initialize stock level',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to initialize stock level",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -235,23 +281,35 @@ export class InventoryService {
     createdBy: string
   ): Promise<ApiResponse<StockMovement>> {
     try {
-      const { sparePartId, storeId, movementType, quantity, unitCost, reason, notes, referenceType, referenceId } = movementRequest;
+      const {
+        sparePartId,
+        storeId,
+        movementType,
+        quantity,
+        unitCost,
+        reason,
+        notes,
+        referenceType,
+        referenceId,
+      } = movementRequest;
 
       // Get current stock level
       const stockLevel = await this.prisma.inventoryLevel.findUnique({
         where: {
           sparePartId_storeId: {
             sparePartId,
-            storeId
-          }
+            storeId,
+          },
         },
         include: {
-          sparePart: true
-        }
+          sparePart: true,
+        },
       });
 
       if (!stockLevel) {
-        return createErrorResponse('Stock level not found. Please initialize stock first.');
+        return createErrorResponse(
+          "Stock level not found. Please initialize stock first."
+        );
       }
 
       // Validate movement
@@ -259,35 +317,37 @@ export class InventoryService {
       let newStock: number;
 
       switch (movementType) {
-        case 'IN':
+        case "IN":
           newStock = previousStock + quantity;
           break;
-        case 'OUT':
+        case "OUT":
           if (previousStock < quantity) {
-            return createErrorResponse('Insufficient stock for this movement');
+            return createErrorResponse("Insufficient stock for this movement");
           }
           newStock = previousStock - quantity;
           break;
-        case 'ADJUSTMENT':
+        case "ADJUSTMENT":
           newStock = quantity; // Direct adjustment to specific quantity
           break;
-        case 'TRANSFER':
+        case "TRANSFER":
           if (previousStock < quantity) {
-            return createErrorResponse('Insufficient stock for transfer');
+            return createErrorResponse("Insufficient stock for transfer");
           }
           newStock = previousStock - quantity;
           break;
-        case 'DAMAGED':
+        case "DAMAGED":
           if (previousStock < quantity) {
-            return createErrorResponse('Cannot mark more items as damaged than available');
+            return createErrorResponse(
+              "Cannot mark more items as damaged than available"
+            );
           }
           newStock = previousStock - quantity;
           break;
-        case 'RETURN':
+        case "RETURN":
           newStock = previousStock + quantity;
           break;
         default:
-          return createErrorResponse('Invalid movement type');
+          return createErrorResponse("Invalid movement type");
       }
 
       // Create movement and update stock in transaction
@@ -299,7 +359,10 @@ export class InventoryService {
             sparePartId,
             storeId,
             movementType,
-            quantity: movementType === 'OUT' || movementType === 'DAMAGED' ? -quantity : quantity,
+            quantity:
+              movementType === "OUT" || movementType === "DAMAGED"
+                ? -quantity
+                : quantity,
             previousStock,
             newStock,
             unitCost: unitCost || stockLevel.sparePart.costPrice,
@@ -310,30 +373,34 @@ export class InventoryService {
             notes,
             createdBy,
             movementDate: new Date(),
-          }
+          },
         });
 
         // Update stock level
-        await tx.stockLevel.update({
+        await tx.inventoryLevel.update({
           where: { id: stockLevel.id },
           data: {
             currentStock: newStock,
             availableStock: newStock - stockLevel.reservedStock,
-            damagedStock: movementType === 'DAMAGED' 
-              ? stockLevel.damagedStock + quantity 
-              : stockLevel.damagedStock,
+            damagedStock:
+              movementType === "DAMAGED"
+                ? stockLevel.damagedStock + quantity
+                : stockLevel.damagedStock,
             lastMovementDate: new Date(),
-          }
+          },
         });
 
         return movement;
       });
 
-      return createSuccessResponse(result, 'Stock movement created successfully');
+      return createSuccessResponse(
+        result,
+        "Stock movement created successfully"
+      );
     } catch (error) {
       return createErrorResponse(
-        'Failed to create stock movement',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to create stock movement",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -354,17 +421,19 @@ export class InventoryService {
         where: {
           sparePartId_storeId: {
             sparePartId,
-            storeId
-          }
-        }
+            storeId,
+          },
+        },
       });
 
       if (!stockLevel) {
-        return createErrorResponse('Stock level not found');
+        return createErrorResponse("Stock level not found");
       }
 
       if (stockLevel.availableStock < quantity) {
-        return createErrorResponse('Insufficient available stock for reservation');
+        return createErrorResponse(
+          "Insufficient available stock for reservation"
+        );
       }
 
       await this.prisma.inventoryLevel.update({
@@ -372,25 +441,28 @@ export class InventoryService {
         data: {
           reservedStock: stockLevel.reservedStock + quantity,
           availableStock: stockLevel.availableStock - quantity,
-        }
+        },
       });
 
       // Create movement record for tracking
-      await this.createStockMovement({
-        sparePartId,
-        storeId,
-        movementType: 'OUT',
-        quantity,
-        reason: `Stock reserved for ${referenceType}`,
-        referenceType,
-        referenceId,
-      }, createdBy);
+      await this.createStockMovement(
+        {
+          sparePartId,
+          storeId,
+          movementType: "OUT",
+          quantity,
+          reason: `Stock reserved for ${referenceType}`,
+          referenceType,
+          referenceId,
+        },
+        createdBy
+      );
 
-      return createSuccessResponse(true, 'Stock reserved successfully');
+      return createSuccessResponse(true, "Stock reserved successfully");
     } catch (error) {
       return createErrorResponse(
-        'Failed to reserve stock',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to reserve stock",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -411,17 +483,17 @@ export class InventoryService {
         where: {
           sparePartId_storeId: {
             sparePartId,
-            storeId
-          }
-        }
+            storeId,
+          },
+        },
       });
 
       if (!stockLevel) {
-        return createErrorResponse('Stock level not found');
+        return createErrorResponse("Stock level not found");
       }
 
       if (stockLevel.reservedStock < quantity) {
-        return createErrorResponse('Cannot release more stock than reserved');
+        return createErrorResponse("Cannot release more stock than reserved");
       }
 
       await this.prisma.inventoryLevel.update({
@@ -429,25 +501,31 @@ export class InventoryService {
         data: {
           reservedStock: stockLevel.reservedStock - quantity,
           availableStock: stockLevel.availableStock + quantity,
-        }
+        },
       });
 
       // Create movement record for tracking
-      await this.createStockMovement({
-        sparePartId,
-        storeId,
-        movementType: 'IN',
-        quantity,
-        reason: `Stock released from ${referenceType}`,
-        referenceType,
-        referenceId,
-      }, createdBy);
+      await this.createStockMovement(
+        {
+          sparePartId,
+          storeId,
+          movementType: "IN",
+          quantity,
+          reason: `Stock released from ${referenceType}`,
+          referenceType,
+          referenceId,
+        },
+        createdBy
+      );
 
-      return createSuccessResponse(true, 'Reserved stock released successfully');
+      return createSuccessResponse(
+        true,
+        "Reserved stock released successfully"
+      );
     } catch (error) {
       return createErrorResponse(
-        'Failed to release reserved stock',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to release reserved stock",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -461,8 +539,8 @@ export class InventoryService {
         isActive: true,
         OR: [
           { currentStock: { lte: { reorderLevel: true } } },
-          { currentStock: 0 }
-        ]
+          { currentStock: 0 },
+        ],
       };
 
       if (storeId) {
@@ -476,25 +554,38 @@ export class InventoryService {
             include: {
               category: true,
               supplier: true,
-            }
-          }
+            },
+          },
         },
-        orderBy: { currentStock: 'asc' }
+        orderBy: { currentStock: "asc" },
       });
 
       const alerts = lowStockItems.map((stock: any) => ({
         ...stock,
-        stockStatus: getStockStatus(stock.currentStock, stock.minimumStock, stock.maximumStock),
-        urgencyLevel: getUrgencyLevel(getStockStatus(stock.currentStock, stock.minimumStock, stock.maximumStock)),
+        stockStatus: getStockStatus(
+          stock.currentStock,
+          stock.minimumStock,
+          stock.maximumStock
+        ),
+        urgencyLevel: getUrgencyLevel(
+          getStockStatus(
+            stock.currentStock,
+            stock.minimumStock,
+            stock.maximumStock
+          )
+        ),
         shortfallQuantity: Math.max(0, stock.reorderLevel - stock.currentStock),
         suggestedOrderQuantity: stock.reorderQuantity,
       }));
 
-      return createSuccessResponse(alerts, 'Low stock alerts retrieved successfully');
+      return createSuccessResponse(
+        alerts,
+        "Low stock alerts retrieved successfully"
+      );
     } catch (error) {
       return createErrorResponse(
-        'Failed to retrieve low stock alerts',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to retrieve low stock alerts",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }
@@ -504,7 +595,11 @@ export class InventoryService {
    */
   async performStockCount(
     storeId: string,
-    countData: Array<{ sparePartId: string; physicalCount: number; notes?: string }>,
+    countData: Array<{
+      sparePartId: string;
+      physicalCount: number;
+      notes?: string;
+    }>,
     countedBy: string
   ): Promise<ApiResponse<{ adjustments: number; totalVariance: number }>> {
     try {
@@ -516,24 +611,29 @@ export class InventoryService {
           where: {
             sparePartId_storeId: {
               sparePartId: item.sparePartId,
-              storeId
-            }
-          }
+              storeId,
+            },
+          },
         });
 
         if (stockLevel) {
           const variance = item.physicalCount - stockLevel.currentStock;
           if (variance !== 0) {
             // Create adjustment movement
-            await this.createStockMovement({
-              sparePartId: item.sparePartId,
-              storeId,
-              movementType: 'ADJUSTMENT',
-              quantity: Math.abs(variance),
-              reason: 'Stock count adjustment',
-              notes: `Physical count: ${item.physicalCount}, System count: ${stockLevel.currentStock}. ${item.notes || ''}`,
-              referenceType: 'STOCK_COUNT',
-            }, countedBy);
+            await this.createStockMovement(
+              {
+                sparePartId: item.sparePartId,
+                storeId,
+                movementType: "ADJUSTMENT",
+                quantity: Math.abs(variance),
+                reason: "Stock count adjustment",
+                notes: `Physical count: ${item.physicalCount}, System count: ${
+                  stockLevel.currentStock
+                }. ${item.notes || ""}`,
+                referenceType: "STOCK_COUNT",
+              },
+              countedBy
+            );
 
             adjustments++;
             totalVariance += Math.abs(variance);
@@ -542,7 +642,7 @@ export class InventoryService {
           // Update last count date
           await this.prisma.inventoryLevel.update({
             where: { id: stockLevel.id },
-            data: { lastCountDate: new Date() }
+            data: { lastCountDate: new Date() },
           });
         }
       }
@@ -553,8 +653,8 @@ export class InventoryService {
       );
     } catch (error) {
       return createErrorResponse(
-        'Failed to perform stock count',
-        error instanceof Error ? error.message : 'Unknown error'
+        "Failed to perform stock count",
+        error instanceof Error ? error.message : "Unknown error"
       );
     }
   }

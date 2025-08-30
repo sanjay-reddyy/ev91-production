@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+.expo/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+dist/
+build/
+
+# Database files
+*.db
+*.db-journal
+prisma/dev.db
+prisma/*.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Development and debugging scripts
+check-*.js
+check-*.ts
+test-*.js
+test-*.ts
+debug-*.js
+debug-*.ts
+seed-*.js
+seed-*.ts
+seed-*.sql
+create-*.js
+create-*.ts
+update-*.js
+update-*.ts
+update-*.sql
+fix-*.js
+fix-*.ts
+migrate-*.js
+migrate-*.ts
+setup-*.js
+setup-*.ts
+final-verification.js
+simple-check.js
+
+# Temporary files
+*.tmp
+*.temp
+*.backup
+*.bak
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

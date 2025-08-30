@@ -17,7 +17,16 @@ const app = express();
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || ['http://localhost:3001', 'http://localhost:5173'],
+  origin: process.env.CORS_ORIGIN || [
+    'http://localhost:3001', 
+    'http://localhost:5173', 
+    'http://localhost:8081', // Expo development server
+    'http://192.168.1.37:8081', // Mobile network access
+    'http://192.168.1.35:8081', // Alternative mobile network
+    'exp://localhost:19000', // Expo development URLs
+    'exp://192.168.1.37:19000',
+    'exp://192.168.1.35:19000'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -61,6 +70,7 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     endpoints: {
       auth: '/api/auth/*',
+      riderRegister: '/api/rider-register/*',
       teams: '/api/teams/*',
       departments: '/api/departments/*',
       vehicles: '/api/vehicles/*',
@@ -85,6 +95,7 @@ app.use('/api/spare-parts', authMiddleware);
 
 // Route configuration
 app.use('/api/auth', authRoutes);
+app.use('/api/rider-register', riderRoutes); // Public rider registration (no auth required)
 app.use('/api/teams', teamRoutes);
 app.use('/api/departments', teamRoutes); // Departments are handled by team service
 app.use('/api/vehicles', vehicleRoutes);

@@ -14,7 +14,7 @@ export interface PaginationParams {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 export interface PaginationInfo {
@@ -73,7 +73,7 @@ export interface ServiceUsageFilters {
 export interface StockMovementRequest {
   sparePartId: string;
   storeId: string;
-  movementType: 'IN' | 'OUT' | 'TRANSFER' | 'ADJUSTMENT' | 'DAMAGED' | 'RETURN';
+  movementType: "IN" | "OUT" | "TRANSFER" | "ADJUSTMENT" | "DAMAGED" | "RETURN";
   quantity: number;
   unitCost?: number;
   reason?: string;
@@ -89,7 +89,7 @@ export interface PurchaseOrderRequest {
   expectedDate?: Date;
   notes?: string;
   terms?: string;
-  urgencyLevel?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  urgencyLevel?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
   items: PurchaseOrderItemRequest[];
 }
 
@@ -127,7 +127,7 @@ export interface GoodsReceivingItemRequest {
   receivedQuantity: number;
   acceptedQuantity: number;
   rejectedQuantity: number;
-  condition?: 'GOOD' | 'DAMAGED' | 'DEFECTIVE';
+  condition?: "GOOD" | "DAMAGED" | "DEFECTIVE";
   rejectionReason?: string;
   notes?: string;
   unitCost: number;
@@ -208,7 +208,7 @@ export interface DashboardData {
 
 export interface RecentActivity {
   id: string;
-  type: 'STOCK_IN' | 'STOCK_OUT' | 'PURCHASE_ORDER' | 'SERVICE_USAGE';
+  type: "STOCK_IN" | "STOCK_OUT" | "PURCHASE_ORDER" | "SERVICE_USAGE";
   description: string;
   timestamp: Date;
   value?: number;
@@ -223,8 +223,8 @@ export interface StockAlert {
   storeName: string;
   currentStock: number;
   minimumStock: number;
-  alertType: 'LOW_STOCK' | 'OUT_OF_STOCK' | 'EXCESS_STOCK';
-  urgency: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  alertType: "LOW_STOCK" | "OUT_OF_STOCK" | "EXCESS_STOCK";
+  urgency: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 }
 
 // Utility types
@@ -267,3 +267,6 @@ export interface SystemConfiguration {
   smsNotificationsEnabled: boolean;
   auditLogRetentionDays: number;
 }
+
+// Export outward flow types
+export * from "./outward";

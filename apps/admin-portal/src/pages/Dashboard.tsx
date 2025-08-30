@@ -25,7 +25,7 @@ import {
 // Mock data - replace with real API calls
 const statsData = [
   {
-    title: 'Total Users',
+    title: 'Total Employees',
     value: '1,234',
     change: '+12%',
     icon: <PeopleIcon />,
@@ -87,10 +87,10 @@ const recentActivities = [
 
 const quickActions = [
   {
-    title: 'Add New User',
-    description: 'Create a new user account',
-    action: 'Create User',
-    link: '/users/new',
+    title: 'Add New Employee',
+    description: 'Create a new employee account',
+    action: 'Create Employee',
+    link: '/employees',
   },
   {
     title: 'Create Team',

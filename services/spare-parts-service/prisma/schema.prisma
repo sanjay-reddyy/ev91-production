@@ -1,5 +1,3 @@
-// Prisma schema for Spare Parts Inventory Management Service
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
@@ -12,647 +10,618 @@ datasource db {
   schemas  = ["spare_parts"]
 }
 
-// ================================
-// MASTER DATA MODELS
-// ================================
-
-// Categories for spare parts (hierarchical structure)
 model Category {
-  id String @id @default(cuid())
-
-  // Basic Information
+  id          String      @id @default(cuid())
   name        String
   displayName String
-  code        String  @unique
+  code        String      @unique
   description String?
-
-  // Hierarchy
-  parentId String?
-  level    Int     @default(1) // 1=Root, 2=Sub, 3=Sub-sub
-  path     String? // "Engine/Cooling System/Radiator"
-
-  // Properties
-  isActive    Boolean @default(true)
-  sortOrder   Int     @default(0)
+  parentId    String?
+  level       Int         @default(1)
+  path        String?
+  isActive    Boolean     @default(true)
+  sortOrder   Int         @default(0)
   imageUrl    String?
-  properties  String? // JSON for category-specific properties
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  parent     Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children   Category[]  @relation("CategoryHierarchy")
-  spareParts SparePart[]
+  properties  String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  parent      Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[]  @relation("CategoryHierarchy")
+  spareParts  SparePart[]
 
   @@map("categories")
   @@schema("spare_parts")
 }
 
-// Suppliers/Vendors who supply spare parts
 model Supplier {
-  id String @id @default(cuid())
-
-  // Basic Information
-  name         String
-  displayName  String
-  code         String  @unique
-  supplierType String  @default("OEM") // OEM, Aftermarket, Authorized, Local
-
-  // Contact Information
-  contactPerson String?
-  email         String?
-  phone         String?
-  website       String?
-
-  // Address
-  address    String?
-  city       String?
-  state      String?
-  country    String  @default("India")
-  pinCode    String?
-  gstNumber  String?
-  panNumber  String?
-
-  // Business Terms
-  paymentTerms     String? // "30 Days", "COD", etc.
-  creditLimit      Float?  @default(0)
-  creditDays       Int?    @default(30)
-  discountPercent  Float?  @default(0)
-  minOrderValue    Float?  @default(0)
-  deliveryTime     Int?    // Days
-
-  // Rating & Performance
-  rating           Float?  @default(0) // 0-5 scale
-  onTimeDelivery   Float?  @default(0) // Percentage
-  qualityRating    Float?  @default(0) // 0-5 scale
-  totalOrders      Int     @default(0)
-  completedOrders  Int     @default(0)
-
-  // Status
-  isActive     Boolean @default(true)
-  isPreferred  Boolean @default(false)
-  isBlacklisted Boolean @default(false)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  spareParts        SparePart[]
-  purchaseOrders    PurchaseOrder[]
-  supplierContacts  SupplierContact[]
-  priceHistories    SupplierPriceHistory[]
+  id               String                 @id @default(cuid())
+  name             String
+  displayName      String
+  code             String                 @unique
+  supplierType     String                 @default("OEM")
+  contactPerson    String?
+  email            String?
+  phone            String?
+  website          String?
+  address          String?
+  city             String?
+  state            String?
+  country          String                 @default("India")
+  pinCode          String?
+  gstNumber        String?
+  panNumber        String?
+  paymentTerms     String?
+  creditLimit      Float?                 @default(0)
+  creditDays       Int?                   @default(30)
+  discountPercent  Float?                 @default(0)
+  minOrderValue    Float?                 @default(0)
+  deliveryTime     Int?
+  rating           Float?                 @default(0)
+  onTimeDelivery   Float?                 @default(0)
+  qualityRating    Float?                 @default(0)
+  totalOrders      Int                    @default(0)
+  completedOrders  Int                    @default(0)
+  isActive         Boolean                @default(true)
+  isPreferred      Boolean                @default(false)
+  isBlacklisted    Boolean                @default(false)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  purchaseOrders   PurchaseOrder[]
+  spareParts       SparePart[]
+  supplierContacts SupplierContact[]
+  priceHistories   SupplierPriceHistory[]
 
   @@map("suppliers")
   @@schema("spare_parts")
 }
 
-// Supplier contacts for better communication
 model SupplierContact {
-  id         String @id @default(cuid())
-  supplierId String
-
-  // Contact Information
-  name         String
-  designation  String?
-  email        String?
-  phone        String?
-  whatsapp     String?
-  department   String? // Sales, Technical, Accounts
-  isPrimary    Boolean @default(false)
-  isActive     Boolean @default(true)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  supplierId  String
+  name        String
+  designation String?
+  email       String?
+  phone       String?
+  whatsapp    String?
+  department  String?
+  isPrimary   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@map("supplier_contacts")
   @@schema("spare_parts")
 }
 
-// ================================
-// SPARE PARTS MASTER DATA
-// ================================
-
-// Main spare parts master table
 model SparePart {
-  id String @id @default(cuid())
-
-  // Basic Information
-  name           String
-  displayName    String
-  partNumber     String  @unique // Manufacturer part number
-  oemPartNumber  String? // Original OEM part number
-  internalCode   String  @unique // Internal system code
-  description    String?
-
-  // Classification
-  categoryId String
-  supplierId String
-
-  // Compatibility (which vehicle models this part fits)
-  compatibility String // JSON array of model IDs
-
-  // Technical Specifications
-  specifications String? // JSON object with technical specs
-  dimensions     String? // L x W x H
-  weight         Float?  // in kg
-  material       String?
-  color          String?
-  warranty       Int?    // months
-
-  // Pricing Information
-  costPrice      Float // Purchase cost from supplier
-  sellingPrice   Float // Selling price to service centers
-  mrp            Float // Maximum retail price
-  markupPercent  Float @default(20) // Markup percentage
-
-  // Inventory Management
-  unitOfMeasure     String @default("PCS") // PCS, KG, LITER, METER
-  minimumStock      Int    @default(10)
-  maximumStock      Int    @default(100)
-  reorderLevel      Int    @default(20)
-  reorderQuantity   Int    @default(50)
-  leadTimeDays      Int    @default(7)
-
-  // Quality & Compliance
-  qualityGrade   String  @default("A") // A, B, C
-  isOemApproved  Boolean @default(false)
-  certifications String? // JSON array of certifications
-
-  // Media
-  imageUrls     String? // JSON array of image URLs
-  documentUrls  String? // JSON array of document URLs (catalogs, manuals)
-
-  // Status
-  isActive      Boolean @default(true)
-  isDiscontinued Boolean @default(false)
-  isHazardous   Boolean @default(false)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  category         Category               @relation(fields: [categoryId], references: [id])
-  supplier         Supplier               @relation(fields: [supplierId], references: [id])
-  stockLevels      InventoryLevel[]
-  purchaseOrderItems PurchaseOrderItem[]
-  servicePartUsages ServicePartUsage[]
-  priceHistories   PartPriceHistory[]
-  stockMovements   StockMovement[]
-  supplierPrices   SupplierPriceHistory[]
+  id                  String                 @id @default(cuid())
+  name                String
+  displayName         String
+  partNumber          String                 @unique
+  oemPartNumber       String?
+  internalCode        String                 @unique
+  description         String?
+  categoryId          String
+  supplierId          String
+  compatibility       String
+  specifications      String?
+  dimensions          String?
+  weight              Float?
+  material            String?
+  color               String?
+  warranty            Int?
+  costPrice           Float
+  sellingPrice        Float
+  mrp                 Float
+  markupPercent       Float                  @default(20)
+  unitOfMeasure       String                 @default("PCS")
+  minimumStock        Int                    @default(10)
+  maximumStock        Int                    @default(100)
+  reorderLevel        Int                    @default(20)
+  reorderQuantity     Int                    @default(50)
+  leadTimeDays        Int                    @default(7)
+  qualityGrade        String                 @default("A")
+  isOemApproved       Boolean                @default(false)
+  certifications      String?
+  imageUrls           String?
+  documentUrls        String?
+  isActive            Boolean                @default(true)
+  isDiscontinued      Boolean                @default(false)
+  isHazardous         Boolean                @default(false)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
   goodsReceivingItems GoodsReceivingItem[]
+  installedParts      InstalledPart[]
+  stockLevels         InventoryLevel[]
+  priceHistories      PartPriceHistory[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  partRequests        SparePartRequest[]
+  category            Category               @relation(fields: [categoryId], references: [id])
+  supplier            Supplier               @relation(fields: [supplierId], references: [id])
+  stockMovements      StockMovement[]
+  stockReservations   StockReservation[]
+  supplierPrices      SupplierPriceHistory[]
 
   @@map("spare_parts")
   @@schema("spare_parts")
 }
 
-// ================================
-// INVENTORY MANAGEMENT
-// ================================
-
-// Stock levels per store/hub location
 model InventoryLevel {
-  id String @id @default(cuid())
-
-  sparePartId String
-  storeId     String // Reference to store/hub from client-store-service
-  storeName   String // Denormalized for performance
-
-  // Current Stock
-  currentStock     Int   @default(0)
-  reservedStock    Int   @default(0) // Stock reserved for pending orders
-  availableStock   Int   @default(0) // currentStock - reservedStock
-  damagedStock     Int   @default(0)
-  
-  // Stock Limits
-  minimumStock    Int @default(10)
-  maximumStock    Int @default(100)
-  reorderLevel    Int @default(20)
-  reorderQuantity Int @default(50)
-
-  // Location Details
-  rackNumber   String?
-  shelfNumber  String?
-  binLocation  String?
-  
-  // Last Updated
+  id                String             @id @default(cuid())
+  sparePartId       String
+  storeId           String
+  storeName         String
+  currentStock      Int                @default(0)
+  reservedStock     Int                @default(0)
+  availableStock    Int                @default(0)
+  damagedStock      Int                @default(0)
+  minimumStock      Int                @default(10)
+  maximumStock      Int                @default(100)
+  reorderLevel      Int                @default(20)
+  reorderQuantity   Int                @default(50)
+  rackNumber        String?
+  shelfNumber       String?
+  binLocation       String?
   lastCountDate     DateTime?
   lastMovementDate  DateTime?
-  
-  // Status
-  isActive Boolean @default(true)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  sparePart      SparePart       @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
-  stockMovements StockMovement[]
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  sparePart         SparePart          @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  stockMovements    StockMovement[]
+  stockReservations StockReservation[]
 
   @@unique([sparePartId, storeId])
   @@map("inventory_levels")
   @@schema("spare_parts")
 }
 
-// Stock movement transactions
 model StockMovement {
-  id String @id @default(cuid())
-
-  stockLevelId String
-  sparePartId  String
-  storeId      String
-
-  // Movement Details
-  movementType   String   // IN, OUT, TRANSFER, ADJUSTMENT, DAMAGED, RETURN
-  quantity       Int
-  previousStock  Int
-  newStock       Int
-  unitCost       Float?
-  totalValue     Float?
-
-  // Transaction Context
-  referenceType String? // PURCHASE, SERVICE, TRANSFER, ADJUSTMENT
-  referenceId   String? // ID of related transaction
+  id            String         @id @default(cuid())
+  stockLevelId  String
+  sparePartId   String
+  storeId       String
+  movementType  String
+  quantity      Int
+  previousStock Int
+  newStock      Int
+  unitCost      Float?
+  totalValue    Float?
+  referenceType String?
+  referenceId   String?
   reason        String?
   notes         String?
-
-  // User & Authorization
-  createdBy     String // User ID who performed the movement
-  approvedBy    String? // User ID who approved (for adjustments)
-  
-  // Timestamps
-  movementDate  DateTime @default(now())
-  createdAt     DateTime @default(now())
-
-  // Relationships
-  stockLevel InventoryLevel @relation(fields: [stockLevelId], references: [id], onDelete: Cascade)
-  sparePart  SparePart  @relation(fields: [sparePartId], references: [id])
+  createdBy     String
+  approvedBy    String?
+  movementDate  DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  sparePart     SparePart      @relation(fields: [sparePartId], references: [id])
+  stockLevel    InventoryLevel @relation(fields: [stockLevelId], references: [id], onDelete: Cascade)
 
   @@map("stock_movements")
   @@schema("spare_parts")
 }
 
-// ================================
-// PROCUREMENT MANAGEMENT
-// ================================
-
-// Purchase orders to suppliers
 model PurchaseOrder {
-  id String @id @default(cuid())
-
-  // Order Information
-  orderNumber   String   @unique
-  supplierId    String
-  storeId       String   // Destination store
-  storeName     String   // Denormalized
-
-  // Order Details
-  orderDate     DateTime @default(now())
-  expectedDate  DateTime?
-  deliveryDate  DateTime?
-  
-  // Financial
-  subtotal      Float    @default(0)
-  taxAmount     Float    @default(0)
-  discountAmount Float   @default(0)
-  totalAmount   Float    @default(0)
-
-  // Status
-  status        String   @default("DRAFT") // DRAFT, SENT, CONFIRMED, PARTIAL, DELIVERED, CANCELLED
-  urgencyLevel  String   @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
-
-  // Notes & Terms
-  notes         String?
-  terms         String?
-  
-  // User Information
-  createdBy     String
-  approvedBy    String?
-  receivedBy    String?
-
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relationships
-  supplier        Supplier            @relation(fields: [supplierId], references: [id])
-  items           PurchaseOrderItem[]
-  receivings      GoodsReceiving[]
+  id             String              @id @default(cuid())
+  orderNumber    String              @unique
+  supplierId     String
+  storeId        String
+  storeName      String
+  orderDate      DateTime            @default(now())
+  expectedDate   DateTime?
+  deliveryDate   DateTime?
+  subtotal       Float               @default(0)
+  taxAmount      Float               @default(0)
+  discountAmount Float               @default(0)
+  totalAmount    Float               @default(0)
+  status         String              @default("DRAFT")
+  urgencyLevel   String              @default("NORMAL")
+  notes          String?
+  terms          String?
+  createdBy      String
+  approvedBy     String?
+  receivedBy     String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  receivings     GoodsReceiving[]
+  items          PurchaseOrderItem[]
+  supplier       Supplier            @relation(fields: [supplierId], references: [id])
 
   @@map("purchase_orders")
   @@schema("spare_parts")
 }
 
-// Items in a purchase order
 model PurchaseOrderItem {
-  id String @id @default(cuid())
-
-  purchaseOrderId String
-  sparePartId     String
-
-  // Quantity & Pricing
+  id               String        @id @default(cuid())
+  purchaseOrderId  String
+  sparePartId      String
   orderedQuantity  Int
-  receivedQuantity Int   @default(0)
+  receivedQuantity Int           @default(0)
   unitCost         Float
   totalCost        Float
-  
-  // Status
-  status          String @default("PENDING") // PENDING, PARTIAL, RECEIVED, CANCELLED
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  sparePart     SparePart     @relation(fields: [sparePartId], references: [id])
+  status           String        @default("PENDING")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  sparePart        SparePart     @relation(fields: [sparePartId], references: [id])
 
   @@map("purchase_order_items")
   @@schema("spare_parts")
 }
 
-// Goods receiving when purchase orders arrive
 model GoodsReceiving {
-  id String @id @default(cuid())
-
-  purchaseOrderId String
-  receivingNumber String @unique
-
-  // Receiving Details
-  receivingDate   DateTime @default(now())
-  receivedBy      String // User ID
-  
-  // Quality Check
-  qualityChecked    Boolean @default(false)
-  qualityCheckedBy  String?
-  qualityNotes      String?
-  qualityRating     Int? // 1-5 scale
-
-  // Documentation
-  invoiceNumber     String?
-  invoiceDate       DateTime?
-  invoiceAmount     Float?
-  transportDetails  String?
-  packingListUrl    String?
-
-  // Status
-  status           String @default("RECEIVED") // RECEIVED, QUALITY_CHECK, ACCEPTED, REJECTED
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relationships
-  purchaseOrder   PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
-  receivingItems  GoodsReceivingItem[]
+  id               String               @id @default(cuid())
+  purchaseOrderId  String
+  receivingNumber  String               @unique
+  receivingDate    DateTime             @default(now())
+  receivedBy       String
+  qualityChecked   Boolean              @default(false)
+  qualityCheckedBy String?
+  qualityNotes     String?
+  qualityRating    Int?
+  invoiceNumber    String?
+  invoiceDate      DateTime?
+  invoiceAmount    Float?
+  transportDetails String?
+  packingListUrl   String?
+  status           String               @default("RECEIVED")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  purchaseOrder    PurchaseOrder        @relation(fields: [purchaseOrderId], references: [id])
+  receivingItems   GoodsReceivingItem[]
 
   @@map("goods_receiving")
   @@schema("spare_parts")
 }
 
-// Items received in goods receiving
 model GoodsReceivingItem {
-  id String @id @default(cuid())
-
+  id               String         @id @default(cuid())
   goodsReceivingId String
   sparePartId      String
-
-  // Quantities
   orderedQuantity  Int
   receivedQuantity Int
   acceptedQuantity Int
   rejectedQuantity Int
-
-  // Quality & Condition
-  condition      String @default("GOOD") // GOOD, DAMAGED, DEFECTIVE
-  rejectionReason String?
-  notes          String?
-
-  // Cost Information
-  unitCost       Float
-  totalCost      Float
-
-  // Timestamps
-  createdAt DateTime @default(now())
-
-  // Relationships
-  goodsReceiving GoodsReceiving @relation(fields: [goodsReceivingId], references: [id], onDelete: Cascade)
-  sparePart      SparePart      @relation(fields: [sparePartId], references: [id])
+  condition        String         @default("GOOD")
+  rejectionReason  String?
+  notes            String?
+  unitCost         Float
+  totalCost        Float
+  createdAt        DateTime       @default(now())
+  goodsReceiving   GoodsReceiving @relation(fields: [goodsReceivingId], references: [id], onDelete: Cascade)
+  sparePart        SparePart      @relation(fields: [sparePartId], references: [id])
 
   @@map("goods_receiving_items")
   @@schema("spare_parts")
 }
 
-// ================================
-// SERVICE INTEGRATION
-// ================================
+model ServiceRequest {
+  id                String                @id @default(cuid())
+  ticketNumber      String                @unique
+  vehicleId         String
+  vehicleNumber     String?
+  technicianId      String
+  technicianName    String?
+  serviceType       String
+  priority          String                @default("Medium")
+  status            String                @default("Open")
+  description       String?
+  storeId           String
+  storeName         String?
+  serviceAdvisorId  String?
+  estimatedCost     Float?                @default(0)
+  actualCost        Float?                @default(0)
+  partsCost         Float?                @default(0)
+  laborCost         Float?                @default(0)
+  scheduledDate     DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  externalServiceId String?
+  jobCardNumber     String?
+  customerName      String?
+  customerPhone     String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  installedParts    InstalledPart[]
+  costBreakdowns    ServiceCostBreakdown?
+  partRequests      SparePartRequest[]
 
-// Parts usage in vehicle service
-model ServicePartUsage {
-  id String @id @default(cuid())
-
-  // Service Context
-  serviceRecordId String // Reference to vehicle service record
-  vehicleId       String // Vehicle being serviced
-  sparePartId     String
-  storeId         String // Store from which part was issued
-
-  // Usage Details
-  quantityUsed    Int
-  unitCost        Float // Cost at the time of usage
-  sellingPrice    Float // Price charged to customer
-  totalCost       Float
-  totalRevenue    Float
-  
-  // Margin Analysis
-  marginAmount    Float // Revenue - Cost
-  marginPercent   Float
-
-  // Justification
-  usageReason     String? // "Replacement", "Upgrade", "Preventive"
-  notes           String?
-  
-  // Authorization
-  authorizedBy    String // Technician/Service Manager
-  isWarranty      Boolean @default(false)
-  
-  // Timestamps
-  usageDate       DateTime @default(now())
-  createdAt       DateTime @default(now())
-
-  // Relationships
-  sparePart SparePart @relation(fields: [sparePartId], references: [id])
-
-  @@map("service_part_usage")
+  @@map("service_requests")
   @@schema("spare_parts")
 }
 
-// ================================
-// FINANCIAL MANAGEMENT
-// ================================
+model SparePartRequest {
+  id                String             @id @default(cuid())
+  serviceRequestId  String
+  sparePartId       String
+  storeId           String
+  requestedBy       String
+  requestedQuantity Int
+  urgency           String             @default("Normal")
+  justification     String
+  estimatedCost     Float?
+  status            String             @default("Pending")
+  approvalLevel     Int                @default(1)
+  currentApprover   String?
+  approvedBy        String?
+  approvedAt        DateTime?
+  rejectedBy        String?
+  rejectedAt        DateTime?
+  rejectionReason   String?
+  issuedQuantity    Int?               @default(0)
+  issuedBy          String?
+  issuedAt          DateTime?
+  issuedCost        Float?
+  batchNumbers      String?
+  returnedQuantity  Int?               @default(0)
+  returnedBy        String?
+  returnedAt        DateTime?
+  returnReason      String?
+  returnCondition   String?
+  technicianNotes   String?
+  approverNotes     String?
+  issuerNotes       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  approvalHistory   ApprovalHistory[]
+  serviceRequest    ServiceRequest     @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  sparePart         SparePart          @relation(fields: [sparePartId], references: [id])
+  stockReservations StockReservation[]
 
-// Price history for tracking cost changes
+  @@map("spare_part_requests")
+  @@schema("spare_parts")
+}
+
+model ApprovalHistory {
+  id             String           @id @default(cuid())
+  requestId      String
+  level          Int
+  approverId     String
+  approverName   String?
+  approverRole   String?
+  decision       String
+  comments       String?
+  conditions     String?
+  assignedAt     DateTime         @default(now())
+  processedAt    DateTime?
+  escalatedAt    DateTime?
+  requestValue   Float?
+  availableStock Int?
+  request        SparePartRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("approval_history")
+  @@schema("spare_parts")
+}
+
+model StockReservation {
+  id                String           @id @default(cuid())
+  requestId         String
+  sparePartId       String
+  storeId           String
+  inventoryLevelId  String
+  reservedQuantity  Int
+  reservedBy        String
+  reservedFor       String
+  reservationReason String           @default("Service Request")
+  status            String           @default("Active")
+  expiresAt         DateTime
+  releasedAt        DateTime?
+  releasedBy        String?
+  releaseReason     String?
+  reservedCost      Float?
+  actualCost        Float?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  inventoryLevel    InventoryLevel   @relation(fields: [inventoryLevelId], references: [id])
+  request           SparePartRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  sparePart         SparePart        @relation(fields: [sparePartId], references: [id])
+
+  @@map("stock_reservations")
+  @@schema("spare_parts")
+}
+
+model InstalledPart {
+  id                  String         @id @default(cuid())
+  serviceRequestId    String
+  sparePartId         String
+  technicianId        String
+  storeId             String
+  batchNumber         String?
+  serialNumber        String?
+  quantity            Int
+  unitCost            Float
+  totalCost           Float
+  sellingPrice        Float?
+  totalRevenue        Float?
+  installedAt         DateTime       @default(now())
+  installationNotes   String?
+  replacedPartId      String?
+  replacementReason   String?
+  warrantyMonths      Int?
+  warrantyExpiry      DateTime?
+  warrantyTerms       String?
+  warrantyProvider    String?
+  removalDate         DateTime?
+  removalReason       String?
+  removedBy           String?
+  removalNotes        String?
+  expectedLife        Int?
+  actualLife          Int?
+  failureReason       String?
+  qualityChecked      Boolean        @default(false)
+  qualityRating       Int?
+  complianceCertified Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  serviceRequest      ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  sparePart           SparePart      @relation(fields: [sparePartId], references: [id])
+
+  @@map("installed_parts")
+  @@schema("spare_parts")
+}
+
+model ServiceCostBreakdown {
+  id               String         @id @default(cuid())
+  serviceRequestId String         @unique
+  partsCost        Float          @default(0)
+  partsMarkup      Float          @default(0)
+  partsTotal       Float          @default(0)
+  laborHours       Float          @default(0)
+  laborRate        Float          @default(0)
+  laborCost        Float          @default(0)
+  laborMarkup      Float          @default(0)
+  laborTotal       Float          @default(0)
+  overheadCost     Float          @default(0)
+  miscCost         Float          @default(0)
+  transportCost    Float          @default(0)
+  subtotal         Float          @default(0)
+  discountPercent  Float          @default(0)
+  discountAmount   Float          @default(0)
+  taxPercent       Float          @default(0)
+  taxAmount        Float          @default(0)
+  totalCost        Float          @default(0)
+  totalRevenue     Float          @default(0)
+  netMargin        Float          @default(0)
+  marginPercent    Float          @default(0)
+  calculatedBy     String
+  calculatedAt     DateTime       @default(now())
+  approvedBy       String?
+  approvedAt       DateTime?
+  notes            String?
+  breakdown        String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@map("service_cost_breakdown")
+  @@schema("spare_parts")
+}
+
+model TechnicianLimit {
+  id                    String    @id @default(cuid())
+  technicianId          String
+  technicianName        String?
+  storeId               String?
+  categoryId            String?
+  sparePartId           String?
+  limitType             String    @default("VALUE")
+  maxValuePerRequest    Float?
+  maxQuantityPerRequest Int?
+  maxValuePerDay        Float?
+  maxValuePerMonth      Float?
+  requiresApproval      Boolean   @default(true)
+  approverLevel         Int       @default(1)
+  autoApproveBelow      Float?
+  isActive              Boolean   @default(true)
+  effectiveFrom         DateTime  @default(now())
+  effectiveTo           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([technicianId, categoryId, sparePartId])
+  @@map("technician_limits")
+  @@schema("spare_parts")
+}
+
 model PartPriceHistory {
-  id String @id @default(cuid())
-
-  sparePartId String
-
-  // Price Information
+  id            String    @id @default(cuid())
+  sparePartId   String
   costPrice     Float
   sellingPrice  Float
   mrp           Float
   markupPercent Float
-
-  // Change Context
-  changeReason  String? // "Supplier Price Change", "Market Adjustment", etc.
-  effectiveDate DateTime @default(now())
+  changeReason  String?
+  effectiveDate DateTime  @default(now())
   changedBy     String
-
-  // Timestamps
-  createdAt DateTime @default(now())
-
-  // Relationships
-  sparePart SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  sparePart     SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
 
   @@map("part_price_history")
   @@schema("spare_parts")
 }
 
-// Supplier-specific pricing
 model SupplierPriceHistory {
-  id String @id @default(cuid())
-
-  supplierId  String
-  sparePartId String
-
-  // Pricing
+  id            String    @id @default(cuid())
+  supplierId    String
+  sparePartId   String
   unitCost      Float
   minimumOrder  Int?
-  discountTiers String? // JSON for quantity-based discounts
-  
-  // Validity
-  effectiveFrom DateTime @default(now())
+  discountTiers String?
+  effectiveFrom DateTime  @default(now())
   effectiveTo   DateTime?
-  isActive      Boolean  @default(true)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-
-  // Relationships
-  supplier  Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  sparePart SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  sparePart     SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  supplier      Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@map("supplier_price_history")
   @@schema("spare_parts")
 }
 
-// ================================
-// ANALYTICS & REPORTING
-// ================================
-
-// Inventory analytics for business intelligence
 model InventoryAnalytics {
-  id String @id @default(cuid())
-
-  // Time Period
-  periodType String // DAILY, WEEKLY, MONTHLY, QUARTERLY
-  periodDate DateTime
-  storeId    String?
-  storeName  String?
-
-  // Inventory Metrics
-  totalItems        Int     @default(0)
-  totalValue        Float   @default(0)
-  totalCostValue    Float   @default(0)
-  lowStockItems     Int     @default(0)
-  outOfStockItems   Int     @default(0)
-  excessStockItems  Int     @default(0)
-
-  // Movement Metrics
-  totalInbound      Int     @default(0)
-  totalOutbound     Int     @default(0)
-  totalAdjustments  Int     @default(0)
-  stockTurnover     Float   @default(0)
-
-  // Financial Metrics
-  totalPurchases    Float   @default(0)
-  totalSales        Float   @default(0)
-  totalMargin       Float   @default(0)
-  averageMargin     Float   @default(0)
-
-  // Performance Metrics
-  fastMovingItems   Int     @default(0)
-  slowMovingItems   Int     @default(0)
-  deadStockItems    Int     @default(0)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  periodType       String
+  periodDate       DateTime
+  storeId          String?
+  storeName        String?
+  totalItems       Int      @default(0)
+  totalValue       Float    @default(0)
+  totalCostValue   Float    @default(0)
+  lowStockItems    Int      @default(0)
+  outOfStockItems  Int      @default(0)
+  excessStockItems Int      @default(0)
+  totalInbound     Int      @default(0)
+  totalOutbound    Int      @default(0)
+  totalAdjustments Int      @default(0)
+  stockTurnover    Float    @default(0)
+  totalPurchases   Float    @default(0)
+  totalSales       Float    @default(0)
+  totalMargin      Float    @default(0)
+  averageMargin    Float    @default(0)
+  fastMovingItems  Int      @default(0)
+  slowMovingItems  Int      @default(0)
+  deadStockItems   Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([periodType, periodDate, storeId])
   @@map("inventory_analytics")
   @@schema("spare_parts")
 }
 
-// Sales analytics for spare parts
 model SalesAnalytics {
-  id String @id @default(cuid())
-
-  // Time Period
-  periodType String // DAILY, WEEKLY, MONTHLY, QUARTERLY
-  periodDate DateTime
-  storeId    String?
-  categoryId String?
-
-  // Sales Metrics
-  totalSales       Float @default(0)
-  totalCost        Float @default(0)
-  totalMargin      Float @default(0)
-  totalTransactions Int  @default(0)
-  averageTransactionValue Float @default(0)
-
-  // Top Performers
-  topSellingPartId String?
-  topProfitablePartId String?
-  
-  // Timestamps
-  createdAt DateTime @default(now())
+  id                      String   @id @default(cuid())
+  periodType              String
+  periodDate              DateTime
+  storeId                 String?
+  categoryId              String?
+  totalSales              Float    @default(0)
+  totalCost               Float    @default(0)
+  totalMargin             Float    @default(0)
+  totalTransactions       Int      @default(0)
+  averageTransactionValue Float    @default(0)
+  topSellingPartId        String?
+  topProfitablePartId     String?
+  createdAt               DateTime @default(now())
 
   @@unique([periodType, periodDate, storeId, categoryId])
   @@map("sales_analytics")
   @@schema("spare_parts")
 }
 
-// ================================
-// CONFIGURATION & SETTINGS
-// ================================
-
-// System configuration for the spare parts module
 model SystemConfig {
-  id String @id @default(cuid())
-
-  // Configuration
-  configKey     String @unique
-  configValue   String
-  description   String?
-  configType    String @default("STRING") // STRING, NUMBER, BOOLEAN, JSON
-  
-  // Validation
-  isRequired    Boolean @default(false)
-  defaultValue  String?
+  id             String   @id @default(cuid())
+  configKey      String   @unique
+  configValue    String
+  description    String?
+  configType     String   @default("STRING")
+  isRequired     Boolean  @default(false)
+  defaultValue   String?
   validationRule String?
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@map("system_config")
   @@schema("spare_parts")

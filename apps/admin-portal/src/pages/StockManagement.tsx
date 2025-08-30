@@ -50,6 +50,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useSnackbar } from 'notistack'
 import { inventoryService, type InventoryLevel } from '../services/sparePartsService'
+import AddStockForm from '../components/spare-parts/AddStockForm'
 
 const StockManagement: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar()
@@ -66,6 +67,7 @@ const StockManagement: React.FC = () => {
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false)
   const [adjustQuantity, setAdjustQuantity] = useState('')
   const [adjustReason, setAdjustReason] = useState('')
+  const [addStockDialogOpen, setAddStockDialogOpen] = useState(false)
 
   // Fetch inventory data
   const {
@@ -163,32 +165,30 @@ const StockManagement: React.FC = () => {
   }
 
   const getStockStatus = (item: InventoryLevel) => {
-    const { currentQuantity, minThreshold } = item
-    if (currentQuantity === 0) {
+    const { currentStock, minimumStock } = item
+    if (currentStock === 0) {
       return { status: 'out-of-stock', color: 'error', label: 'Out of Stock', icon: <ErrorIcon /> }
-    } else if (currentQuantity <= minThreshold) {
+    } else if (currentStock <= minimumStock) {
       return { status: 'low-stock', color: 'warning', label: 'Low Stock', icon: <WarningIcon /> }
     }
     return { status: 'in-stock', color: 'success', label: 'In Stock', icon: <CheckCircleIcon /> }
   }
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(amount)
+  // Format as INR with ₹ symbol
+  const formatCurrency = (amount: number) => {
+    return `₹${amount.toLocaleString('en-IN')}`
   }
 
   // Summary statistics
   const stats = inventoryData
     ? {
-        totalItems: inventoryData.data.pagination.totalItems,
-        totalValue: inventoryData.data.stockLevels.reduce((sum: number, item: InventoryLevel) => 
-          sum + (item.currentQuantity * (item.sparePart?.unitPrice || 0)), 0),
-        lowStockItems: inventoryData.data.stockLevels.filter((item: InventoryLevel) => 
-          item.currentQuantity <= item.minThreshold).length,
-        outOfStockItems: inventoryData.data.stockLevels.filter((item: InventoryLevel) => 
-          item.currentQuantity === 0).length,
+        totalItems: inventoryData.data?.pagination?.totalItems || 0,
+        totalValue: inventoryData.data?.stockLevels?.reduce((sum: number, item: InventoryLevel) =>
+          sum + (item.currentStock * (item.sparePart?.sellingPrice || item.sparePart?.costPrice || 0)), 0) || 0,
+        lowStockItems: inventoryData.data?.stockLevels?.filter((item: InventoryLevel) =>
+          item.currentStock <= item.minimumStock).length || 0,
+        outOfStockItems: inventoryData.data?.stockLevels?.filter((item: InventoryLevel) =>
+          item.currentStock === 0).length || 0,
       }
     : { totalItems: 0, totalValue: 0, lowStockItems: 0, outOfStockItems: 0 }
 
@@ -220,7 +220,7 @@ const StockManagement: React.FC = () => {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => {/* Navigate to add stock */}}
+            onClick={() => setAddStockDialogOpen(true)}
           >
             Add Stock
           </Button>
@@ -410,26 +410,26 @@ const StockManagement: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     ))
-                  : inventoryData?.data.stockLevels.map((item: InventoryLevel) => {
+                  : inventoryData?.data?.stockLevels?.map((item: InventoryLevel) => {
                       const stockStatus = getStockStatus(item)
-                      const stockValue = item.currentQuantity * (item.sparePart?.unitPrice || 0)
+                      const stockValue = item.currentStock * (item.sparePart?.sellingPrice || item.sparePart?.costPrice || 0)
                       return (
                         <TableRow key={`${item.storeId}-${item.sparePartId}`} hover>
                           <TableCell>
                             <Box display="flex" alignItems="center" gap={2}>
                               <Avatar
                                 variant="rounded"
-                                src={item.sparePart?.imageUrl}
+                                src={item.sparePart?.imageUrls ? JSON.parse(item.sparePart.imageUrls)?.[0] : undefined}
                                 sx={{ width: 40, height: 40 }}
                               >
                                 <InventoryIcon />
                               </Avatar>
                               <Box>
                                 <Typography variant="subtitle2" fontWeight="medium">
-                                  {item.sparePart?.name}
+                                  {item.sparePart?.name || 'Unknown Part'}
                                 </Typography>
                                 <Typography variant="caption" color="textSecondary">
-                                  {item.sparePart?.partNumber}
+                                  {item.sparePart?.partNumber || 'N/A'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -439,11 +439,11 @@ const StockManagement: React.FC = () => {
                               <StoreIcon fontSize="small" color="action" />
                               <Box>
                                 <Typography variant="body2">
-                                  {item.store?.name || 'Unknown Store'}
+                                  {item.storeName || 'Unknown Store'}
                                 </Typography>
-                                {item.location && (
+                                {(item.rackNumber || item.shelfNumber || item.binLocation) && (
                                   <Typography variant="caption" color="textSecondary">
-                                    {item.location}
+                                    {[item.rackNumber, item.shelfNumber, item.binLocation].filter(Boolean).join(' - ')}
                                   </Typography>
                                 )}
                               </Box>
@@ -452,23 +452,23 @@ const StockManagement: React.FC = () => {
                           <TableCell>
                             <Badge
                               badgeContent={
-                                item.currentQuantity <= item.minThreshold ? (
+                                item.currentStock <= item.minimumStock ? (
                                   <WarningIcon fontSize="small" />
                                 ) : null
                               }
                               color="warning"
                             >
                               <Typography variant="h6" fontWeight="bold">
-                                {item.currentQuantity}
+                                {item.currentStock || 0}
                               </Typography>
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2">{item.minThreshold}</Typography>
+                            <Typography variant="body2">{item.minimumStock || 0}</Typography>
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" fontWeight="medium">
-                              {formatCurrency(stockValue, item.sparePart?.currency)}
+                              {formatCurrency(stockValue)}
                             </Typography>
                           </TableCell>
                           <TableCell>
@@ -481,7 +481,7 @@ const StockManagement: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             <Typography variant="caption" color="textSecondary">
-                              {new Date(item.updatedAt).toLocaleDateString()}
+                              {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : 'N/A'}
                             </Typography>
                           </TableCell>
                           <TableCell align="center">
@@ -494,7 +494,7 @@ const StockManagement: React.FC = () => {
                           </TableCell>
                         </TableRow>
                       )
-                    })}
+                    }) || []}
               </TableBody>
             </Table>
           </TableContainer>
@@ -545,7 +545,7 @@ const StockManagement: React.FC = () => {
                 {selectedItem.sparePart?.name}
               </Typography>
               <Typography variant="body2" color="textSecondary" gutterBottom>
-                Current Stock: {selectedItem.currentQuantity}
+                Current Stock: {selectedItem.currentStock}
               </Typography>
               <TextField
                 fullWidth
@@ -578,6 +578,12 @@ const StockManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Add Stock Dialog */}
+      <AddStockForm
+        open={addStockDialogOpen}
+        onClose={() => setAddStockDialogOpen(false)}
+      />
     </Box>
   )
 }
