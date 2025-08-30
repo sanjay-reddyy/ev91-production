@@ -38,7 +38,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case 'AUTH_FAILURE':
       return { ...state, isLoading: false, isAuthenticated: false }
     case 'LOGOUT':
-      return { ...initialState }
+      return {
+        user: null,
+        token: null,
+        isLoading: false, // Set loading to false so ProtectedRoute can redirect
+        isAuthenticated: false,
+      }
     case 'UPDATE_USER':
       return { ...state, user: action.payload }
     default:
@@ -55,35 +60,67 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState)
 
+  // Token refresh mechanism
+  const refreshTokenIfNeeded = async () => {
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (!refreshToken) return false
+
+    try {
+      const response = await apiService.refreshToken(refreshToken)
+      if (response.success && response.data) {
+        const { user, tokens } = response.data
+        const accessToken = tokens.accessToken
+
+        localStorage.setItem('authToken', accessToken)
+        localStorage.setItem('user', JSON.stringify(user))
+
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: { user, token: accessToken }
+        })
+        return true
+      }
+    } catch (error) {
+      console.warn('Token refresh failed:', error)
+    }
+    return false
+  }
+
   // Check for existing token on app load and validate it
   useEffect(() => {
     const validateToken = async () => {
       const token = localStorage.getItem('authToken')
       const user = localStorage.getItem('user')
-      
+
       if (token && user) {
         try {
-          // Validate token with backend
+          // First try to get profile with current token
           const response = await apiService.getProfile()
           if (response.success && response.data) {
-            dispatch({ 
-              type: 'AUTH_SUCCESS', 
-              payload: { user: response.data.user, token } 
+            dispatch({
+              type: 'AUTH_SUCCESS',
+              payload: { user: response.data.user || response.data, token }
             })
-          } else {
-            throw new Error('Token validation failed')
+            return
           }
         } catch (error) {
-          // Invalid token or backend error, clear stored data
-          console.warn('Token validation failed:', error)
-          localStorage.removeItem('authToken')
-          localStorage.removeItem('user')
-          dispatch({ type: 'AUTH_FAILURE' })
+          console.warn('Token validation failed, trying refresh:', error)
+
+          // Try to refresh token
+          const refreshed = await refreshTokenIfNeeded()
+          if (!refreshed) {
+            // Both validation and refresh failed, clear auth data
+            localStorage.removeItem('authToken')
+            localStorage.removeItem('refreshToken')
+            localStorage.removeItem('user')
+            dispatch({ type: 'AUTH_FAILURE' })
+          }
+          return
         }
-      } else {
-        // No token found, user is not authenticated
-        dispatch({ type: 'AUTH_FAILURE' })
       }
+
+      // No token found, user is not authenticated
+      dispatch({ type: 'AUTH_FAILURE' })
     }
 
     validateToken()
@@ -91,21 +128,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (credentials: LoginRequest): Promise<void> => {
     dispatch({ type: 'AUTH_START' })
-    
+
     try {
       const response = await apiService.login(credentials)
-      
+
       if (response.success && response.data) {
         const { user, tokens } = response.data
         const accessToken = tokens.accessToken
-        
+        const refreshToken = tokens.refreshToken
+
         // Store in localStorage
         localStorage.setItem('authToken', accessToken)
+        localStorage.setItem('refreshToken', refreshToken)
         localStorage.setItem('user', JSON.stringify(user))
-        
-        dispatch({ 
-          type: 'AUTH_SUCCESS', 
-          payload: { user, token: accessToken } 
+
+        // Reset 401 counter on successful login
+        sessionStorage.setItem('api_401_count', '0')
+
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: { user, token: accessToken }
         })
       } else {
         throw new Error(response.message || 'Login failed')
@@ -118,21 +160,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (userData: RegisterRequest): Promise<void> => {
     dispatch({ type: 'AUTH_START' })
-    
+
     try {
       const response = await apiService.register(userData)
-      
+
       if (response.success && response.data) {
         const { user, tokens } = response.data
         const accessToken = tokens.accessToken
-        
+        const refreshToken = tokens.refreshToken
+
         // Store in localStorage
         localStorage.setItem('authToken', accessToken)
+        localStorage.setItem('refreshToken', refreshToken)
         localStorage.setItem('user', JSON.stringify(user))
-        
-        dispatch({ 
-          type: 'AUTH_SUCCESS', 
-          payload: { user, token: accessToken } 
+
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: { user, token: accessToken }
         })
       } else {
         throw new Error(response.message || 'Registration failed')
@@ -143,23 +187,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const logout = (): void => {
-    apiService.logout()
-    dispatch({ type: 'LOGOUT' })
+  const logout = async (): Promise<void> => {
+    try {
+      // Call API logout to invalidate backend sessions
+      await apiService.logout()
+    } catch (error) {
+      // Even if API call fails, we still want to logout locally
+      console.warn('Logout API call failed:', error)
+    } finally {
+      // Always dispatch logout action to clear state and trigger redirect
+      dispatch({ type: 'LOGOUT' })
+
+      // Optional: Force immediate redirect as backup
+      // This ensures redirection even if there are any state update delays
+      setTimeout(() => {
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
+      }, 100)
+    }
   }
 
   const updateProfile = async (data: Partial<User>): Promise<void> => {
     if (!state.user) return
-    
+
     try {
-      // This would need to be implemented in the backend
-      // const response = await apiService.updateUser(state.user.id, data)
-      
-      // For now, just update local state
-      const updatedUser = { ...state.user, ...data }
-      localStorage.setItem('user', JSON.stringify(updatedUser))
-      dispatch({ type: 'UPDATE_USER', payload: updatedUser })
+      // Call the API to update the employee
+      const response = await apiService.updateEmployee(state.user.id, data)
+
+      if (response.success && response.data?.employee) {
+        // Update local state with the updated user data
+        const updatedUser = response.data.employee
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+        dispatch({ type: 'UPDATE_USER', payload: updatedUser })
+      } else {
+        throw new Error(response.error || 'Failed to update profile')
+      }
     } catch (error) {
+      console.error('Profile update failed:', error)
       throw error
     }
   }

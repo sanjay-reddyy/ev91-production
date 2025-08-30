@@ -13,9 +13,11 @@ out/
 
 # Environment files
 .env
-.env.*
-!.env.example
-!.env.template
+.env.local
+.env.development.local
+.env.test
+.env.test.local
+.env.production.local
 
 # Database files
 *.db
@@ -23,25 +25,17 @@ out/
 *.sqlite
 *.sqlite3
 dev.db*
-test.db*
 
 # Prisma
 prisma/migrations/
-prisma/dev.db
-prisma/*.db
 
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # IDE files
 .vscode/launch.json
 .vscode/tasks.json
-.vscode/settings.json.bak
-.vscode/*.log
 .idea/
 *.swp
 *.swo
@@ -73,7 +67,6 @@ coverage/
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
-package-lock.json.backup
 
 # Runtime data
 pids
@@ -120,53 +113,19 @@ pids
 # TernJS port file
 .tern-port
 
-# Development and debugging scripts
-**/check-*.js
-**/check-*.ts
-**/test-*.js
-**/test-*.ts
-**/debug-*.js
-**/debug-*.ts
-**/seed-*.js
-**/seed-*.ts
-**/seed-*.sql
-**/create-*.js
-**/create-*.ts
-**/update-*.js
-**/update-*.ts
-**/update-*.sql
-**/fix-*.js
-**/fix-*.ts
-**/migrate-*.js
-**/migrate-*.ts
-**/setup-*.js
-**/setup-*.ts
+# Test files and scripts
+test-*.js
+debug-*.js
 quick-test.js
 get-token.js
 try-credentials.js
 test-auth-endpoints.js
-final-verification.js
-simple-check.js
+*-test.js
 
-# Development batch and shell scripts
-*.bat
-*.sh
-!scripts/*.bat
-!scripts/*.sh
-
-# Temporary documentation files
+# Documentation files (optional - remove if you want to include them)
 *_COMPLETE.md
 *_SUMMARY.md
 *_FIX.md
-*_INTEGRATION.md
-*_IMPLEMENTATION.md
-*SETUP*.md
-*CLEANUP*.md
-*API_*.md
-*AUTH_*.md
-*BEGUASS*.md
-*CORS*.md
-*FIXED*.md
 
 # Removed applications
 apps/auth-dashboard/
@@ -197,24 +156,8 @@ apps/auth-dashboard/
 *.tar.gz
 *.7z
 
-# Backup files
-*.backup
-*.bak
-*.orig
-
-# Error logs and debug files
-error.log
-debug.log
-access.log
-combined.log
-
-# Development artifacts
-.expo/
-.expo-shared/
-*.expo
-*.expo.*
-
-# Temporary development files
-*.local
-*.dev
-*.development
+# OS and editor cache files
+.vscode/settings.json.bak
+.vscode/*.log
+**/.DS_Store
+**/Thumbs.db
