@@ -1,19 +1,20 @@
 // Use a legacy import style that works with this JWT version
-const jwt = require('jsonwebtoken');
-import { JwtPayload } from '../types/auth';
+const jwt = require("jsonwebtoken");
+import { JwtPayload } from "../types/auth";
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
+const JWT_REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || "your-refresh-secret-key";
+const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
 
 export class JwtService {
   /**
    * Generate access token
    */
-  static generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+  static generateAccessToken(payload: Omit<JwtPayload, "iat" | "exp">): string {
     return jwt.sign(payload, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN
+      expiresIn: JWT_EXPIRES_IN,
     });
   }
 
@@ -22,7 +23,7 @@ export class JwtService {
    */
   static generateRefreshToken(userId: string): string {
     return jwt.sign({ userId }, JWT_REFRESH_SECRET, {
-      expiresIn: JWT_REFRESH_EXPIRES_IN
+      expiresIn: JWT_REFRESH_EXPIRES_IN,
     });
   }
 
@@ -33,7 +34,7 @@ export class JwtService {
     try {
       return jwt.verify(token, JWT_SECRET) as JwtPayload;
     } catch (error) {
-      throw new Error('Invalid or expired access token');
+      throw new Error("Invalid or expired access token");
     }
   }
 
@@ -44,7 +45,7 @@ export class JwtService {
     try {
       return jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string };
     } catch (error) {
-      throw new Error('Invalid or expired refresh token');
+      throw new Error("Invalid or expired refresh token");
     }
   }
 
@@ -62,7 +63,7 @@ export class JwtService {
   /**
    * Generate token pair (access + refresh)
    */
-  static generateTokenPair(payload: Omit<JwtPayload, 'iat' | 'exp'>) {
+  static generateTokenPair(payload: Omit<JwtPayload, "iat" | "exp">) {
     return {
       accessToken: this.generateAccessToken(payload),
       refreshToken: this.generateRefreshToken(payload.userId),

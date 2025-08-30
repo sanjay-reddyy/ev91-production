@@ -72,36 +72,36 @@ export interface EsignResponse {
 // --- API Functions ---
 
 /**
- * Start registration and send OTP via unified rider registration endpoint
+ * Start registration and send OTP via API Gateway
  */
 export function useStartRegistration() {
   return useMutation({
     mutationFn: async (data: StartRegistrationRequest) => {
-      const response = await apiClient.post('/api/v1/rider-register/start', data);
+      const response = await apiClient.post('/api/rider-register/start', data);
       return response.data as RegistrationResponse;
     }
   });
 }
 
 /**
- * Verify OTP sent via unified rider registration
+ * Verify OTP sent via API Gateway
  */
 export function useVerifyOtp() {
   return useMutation({
     mutationFn: async (data: VerifyOtpRequest) => {
-      const response = await apiClient.post('/api/v1/rider-register/verify-otp', data);
+      const response = await apiClient.post('/api/rider-register/verify-otp', data);
       return response.data as RegistrationResponse;
     }
   });
 }
 
 /**
- * Resend OTP via unified rider registration
+ * Resend OTP via API Gateway
  */
 export function useResendOtp() {
   return useMutation({
     mutationFn: async ({ tempId }: { tempId: string }) => {
-      const response = await apiClient.post('/api/v1/rider-register/resend-otp', { tempId });
+      const response = await apiClient.post('/api/rider-register/resend-otp', { tempId });
       return response.data as RegistrationResponse;
     }
   });
@@ -162,7 +162,7 @@ export function useSaveProfile() {
           dob: convertDateToISO(profileData.dob)
         };
         
-        const response = await apiClient.post(`/api/v1/rider-register/profile/${riderId}`, convertedData);
+        const response = await apiClient.post(`/api/rider-register/profile/${riderId}`, convertedData);
         return response.data as RegistrationResponse;
       } catch (error) {
         // Enhanced error handling for better user experience
@@ -180,7 +180,7 @@ export function useSaveEmergencyContact() {
   return useMutation({
     mutationFn: async ({ riderId, ...emergencyData }: EmergencyContactData & { riderId: string }) => {
       try {
-        const response = await apiClient.post(`/api/v1/rider-register/emergency-contact/${riderId}`, emergencyData);
+        const response = await apiClient.post(`/api/rider-register/emergency-contact/${riderId}`, emergencyData);
         return response.data as RegistrationResponse;
       } catch (error) {
         // Enhanced error handling for better user experience
@@ -203,7 +203,7 @@ export function useGetProfile(riderId: string, enabled = true) {
       }
       
       try {
-        const response = await apiClient.get(`/api/v1/rider-register/profile/${riderId}`);
+        const response = await apiClient.get(`/api/rider-register/profile/${riderId}`);
         
         if (!response.data.success) {
           throw new Error(response.data.error || 'Failed to fetch profile');
@@ -248,7 +248,7 @@ export function useUploadKycDocument() {
       formData.append('file', file);
       
       const response = await apiClient.post(
-        `/api/v1/rider-register/kyc/document/${riderId}/${documentType}`, 
+        `/api/rider-register/kyc/document/${riderId}/${documentType}`, 
         formData,
         {
           headers: {
@@ -268,7 +268,7 @@ export function useKycStatus(riderId: string, enabled = true) {
   return useQuery({
     queryKey: ['kycStatus', riderId],
     queryFn: async () => {
-      const response = await apiClient.get(`/api/v1/rider-register/kyc-status/${riderId}`);
+      const response = await apiClient.get(`/api/rider-register/kyc-status/${riderId}`);
       return response.data as KycStatusResponse;
     },
     enabled,
@@ -282,7 +282,7 @@ export function useKycStatus(riderId: string, enabled = true) {
 export function useSubmitKyc() {
   return useMutation({
     mutationFn: async ({ riderId }: { riderId: string }) => {
-      const response = await apiClient.post(`/api/v1/rider-register/kyc/submit/${riderId}`);
+      const response = await apiClient.post(`/api/rider-register/kyc/submit/${riderId}`);
       return response.data;
     }
   });
@@ -294,7 +294,7 @@ export function useSubmitKyc() {
 export function useEsignAgreement() {
   return useMutation({
     mutationFn: async ({ riderId, agreementData }: { riderId: string, agreementData: any }) => {
-      const response = await apiClient.post('/api/v1/register/esign', { riderId, agreementData });
+      const response = await apiClient.post('/api/rider-register/esign', { riderId, agreementData });
       return response.data as EsignResponse;
     }
   });

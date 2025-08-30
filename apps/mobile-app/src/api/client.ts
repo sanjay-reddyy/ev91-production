@@ -9,18 +9,18 @@ const getBaseURL = () => {
     return process.env.EXPO_PUBLIC_API_URL;
   }
   
-  // Platform-specific URLs
+  // Platform-specific URLs - Always use API Gateway (port 8000)
   if (Platform.OS === 'android') {
     // For Android emulator, use 10.0.2.2 which maps to host machine's localhost
-    return 'http://192.168.1.37:4004';
+    return 'http://192.168.1.37:8000';
   } else if (Platform.OS === 'ios') {
     // For iOS simulator, localhost should work
-    return 'http://localhost:4004';
+    return 'http://localhost:8000';
   }
   
-  // For physical devices or expo development, use your machine's IP
+  // For physical devices or expo development, use your machine's IP with API Gateway port
   // Update this IP to match your machine's local network IP
-  return 'http://192.168.1.35:4004';
+  return 'http://192.168.1.35:8000';
 };
 
 const baseURL = getBaseURL();

@@ -2,12 +2,14 @@
 // Add more fields and relations as needed
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["rider"]
 }
 
 model Rider {
@@ -15,10 +17,11 @@ model Rider {
   phone         String   @unique
   phoneVerified Boolean  @default(false)
   registrationStatus String @default("PENDING") // PENDING, PHONE_VERIFIED, KYC_COMPLETED
-  
-  
+
+
   // User data
   name          String?
+  email         String?
   dob           String?
   address1      String?
   address2      String?
@@ -28,24 +31,28 @@ model Rider {
   emergencyName String?
   emergencyPhone String?
   emergencyRelation String?
-  
+
+  // Status fields
+  isActive      Boolean  @default(false)
+
   // KYC fields
   kycStatus     String   @default("pending")
   aadhaar       String?
   pan           String?
   dl            String?
   selfie        String?
-  
+
   // Compliance
   consent       Boolean  @default(false)
   consentLogs   String?
   ip            String?
   agreementSigned Boolean @default(false)
-  
+
   // Timestamps
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  lastLoginAt   DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@schema("rider")
 }
 
 // Temporary OTP verification table for MSG91 flow
@@ -59,4 +66,6 @@ model OtpVerification {
   verified  Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@schema("rider")
 }

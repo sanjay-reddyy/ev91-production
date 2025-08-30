@@ -1,0 +1,260 @@
+version: '3.8'
+services:
+  # Database Services
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ev91user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ev91pass}
+      POSTGRES_DB: ${POSTGRES_DB:-ev91db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database-init:/docker-entrypoint-initdb.d
+      - ./database-backup:/docker-entrypoint-initdb.d/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ev91user} -d ${POSTGRES_DB:-ev91db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ev91-network
+  
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ev91-network
+  
+  # Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - api-gateway
+      - admin-portal
+    networks:
+      - ev91-network
+
+  # Backend Services
+  api-gateway:
+    build:
+      context: ../apps/api-gateway
+      dockerfile: Dockerfile
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SERVICE_URL=http://auth-service:4001
+      - TEAM_SERVICE_URL=http://team-service:3002
+      - CLIENT_STORE_SERVICE_URL=http://client-store-service:3004
+      - RIDER_SERVICE_URL=http://rider-service:6000
+      - PAYMENT_SERVICE_URL=http://payment-service:4003
+      - VEHICLE_SERVICE_URL=http://vehicle-service:4004
+      - USER_SERVICE_URL=http://user-service:3001
+      - ORDER_SERVICE_URL=http://order-service:3005
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
+      - TEMPLATE_SERVICE_URL=http://template-service:3007
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - ev91-network
+    deploy:
+      replicas: 2
+
+  # Microservices
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=4001
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-8h}
+      - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ev91-network
+    deploy:
+      replicas: 2
+
+  user-service:
+    build:
+      context: ../services/user-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  team-service:
+    build:
+      context: ../services/team-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  payment-service:
+    build:
+      context: ../services/payment-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=4003
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  client-store-service:
+    build:
+      context: ../services/client-store-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3004
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  vehicle-service:
+    build:
+      context: ../services/vehicle-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=4004
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  order-service:
+    build:
+      context: ../services/order-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3005
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  rider-service:
+    build:
+      context: ../services/rider-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=6000
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  notification-service:
+    build:
+      context: ../services/notification-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3006
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ev91-network
+
+  template-service:
+    build:
+      context: ../services/template-service
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3007
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ev91user}:${POSTGRES_PASSWORD:-ev91pass}@postgres:5432/${POSTGRES_DB:-ev91db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ev91-network
+  
+  # Frontend Services
+  admin-portal:
+    build:
+      context: ../apps/admin-portal
+      dockerfile: Dockerfile
+    environment:
+      - VITE_API_URL=http://api-gateway:4000
+      - VITE_AUTH_SERVICE_URL=http://auth-service:4001
+    depends_on:
+      - api-gateway
+    networks:
+      - ev91-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  ev91-network:
+    driver: bridge

@@ -47,6 +47,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { vehicleService, Vehicle, ServiceRecord, DamageRecord, MediaFile } from '../services/vehicleService';
+import VehicleServiceManager from '../components/VehicleServiceManager';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -396,68 +397,15 @@ const VehicleDetailsPage: React.FC = () => {
 
         {/* Service History Tab */}
         <TabPanel value={tabValue} index={1}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Service History</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => navigate(`/services/schedule?vehicleId=${vehicle.id}`)}
-            >
-              Schedule Service
-            </Button>
-          </Box>
-          
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Cost</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {serviceRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      No service records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  serviceRecords.map((service) => (
-                    <TableRow key={service.id} hover>
-                      <TableCell>
-                        {format(new Date(service.serviceDate), 'dd MMM yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={service.serviceType} size="small" />
-                      </TableCell>
-                      <TableCell>{service.description}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={service.serviceStatus}
-                          color={serviceStatusColors[service.serviceStatus]}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{formatCurrency(service.totalCost)}</TableCell>
-                      <TableCell>
-                        <IconButton
-                          size="small"
-                          onClick={() => navigate(`/services/${service.id}`)}
-                        >
-                          <HistoryIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <VehicleServiceManager
+            vehicleId={vehicle.id}
+            vehicleInfo={{
+              registrationNumber: vehicle.registrationNumber,
+              model: vehicle.model?.name || 'Unknown',
+              make: vehicle.model?.oem?.name || 'Unknown',
+              mileage: vehicle.mileage || 0
+            }}
+          />
         </TabPanel>
 
         {/* Damage Records Tab */}

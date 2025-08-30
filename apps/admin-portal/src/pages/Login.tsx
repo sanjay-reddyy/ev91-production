@@ -96,6 +96,15 @@ export default function Login() {
             </Alert>
           )}
 
+          {/* Development Notice */}
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              <strong>Development Credentials:</strong><br />
+              Email: admin@ev91.com<br />
+              Password: SuperAdmin123!
+            </Typography>
+          </Alert>
+
           <form onSubmit={handleSubmit(onSubmit)}>
             <TextField
               fullWidth
@@ -160,11 +169,26 @@ export default function Login() {
               )}
             </Button>
 
+            <Box sx={{ textAlign: 'center', mb: 2 }}>
+              <Link component={RouterLink} to="/forgot-password">
+                Forgot your password?
+              </Link>
+            </Box>
+
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2">
                 Don't have an account?{' '}
-                <Link component={RouterLink} to="/register">
+                <Link component={RouterLink} to="/signup">
                   Sign up
+                </Link>
+              </Typography>
+            </Box>
+
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Need to verify your email?{' '}
+                <Link component={RouterLink} to="/resend-verification">
+                  Resend verification
                 </Link>
               </Typography>
             </Box>

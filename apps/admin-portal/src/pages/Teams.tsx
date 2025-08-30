@@ -174,7 +174,7 @@ const Teams: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Use API service to fetch teams
       const response = await apiService.getTeams();
       if (response.success && response.data) {
@@ -252,14 +252,26 @@ const Teams: React.FC = () => {
   // Memoized filtered and sorted teams
   const filteredAndSortedTeams = useMemo(() => {
     let filtered = teams.filter(team => {
-      const matchesSearch = 
+      // Handle both string department (mock data) and object department (API data)
+      const departmentName = typeof team.department === 'string' ? team.department : team.department?.name || '';
+
+      // Handle both string teamLead (mock data) and object teamLead/manager (API data)
+      const teamLeadName = typeof team.teamLead === 'string'
+        ? team.teamLead || ''
+        : team.teamLead
+          ? `${team.teamLead.firstName} ${team.teamLead.lastName}`
+          : team.manager
+            ? `${team.manager.firstName} ${team.manager.lastName}`
+            : '';
+
+      const matchesSearch =
         team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (team.department && team.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        team.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (team.teamLead && team.teamLead.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesDepartment = departmentFilter === 'all' || team.department === departmentFilter;
-      
+        (departmentName && departmentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (team.city && team.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (teamLeadName && teamLeadName.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesDepartment = departmentFilter === 'all' || departmentName === departmentFilter;
+
       return matchesSearch && matchesDepartment;
     });
 
@@ -310,8 +322,8 @@ const Teams: React.FC = () => {
   const departments = useMemo(() => {
     const uniqueDepts = Array.from(new Set(
       teams
-        .map(team => team.department)
-        .filter((dept): dept is string => dept !== undefined)
+        .map(team => typeof team.department === 'string' ? team.department : team.department?.name)
+        .filter((dept): dept is string => dept !== undefined && dept !== '')
     ));
     return uniqueDepts.sort();
   }, [teams]);
@@ -346,7 +358,7 @@ const Teams: React.FC = () => {
           {error}
         </Alert>
       )}
-      
+
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h4" component="h1">
@@ -479,8 +491,8 @@ const Teams: React.FC = () => {
                       No teams found
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {searchTerm || departmentFilter !== 'all' 
-                        ? 'Try adjusting your search criteria or filters' 
+                      {searchTerm || departmentFilter !== 'all'
+                        ? 'Try adjusting your search criteria or filters'
                         : 'Create your first team to get started'
                       }
                     </Typography>
@@ -504,47 +516,58 @@ const Teams: React.FC = () => {
                     </Box>
                   </TableCell>
                   <TableCell>
-                    <Chip 
-                      label={team.department || 'No Department'} 
-                      size="small" 
+                    <Chip
+                      label={
+                        typeof team.department === 'string'
+                          ? team.department || 'No Department'
+                          : team.department?.name || 'No Department'
+                      }
+                      size="small"
                       variant="outlined"
                       color={team.department ? "primary" : "default"}
                     />
                   </TableCell>
-                  <TableCell>{team.city}, {team.country}</TableCell>
+                  <TableCell>{team.city || 'N/A'}, {team.country || 'N/A'}</TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="medium">
-                      {team.teamLead || 'No Team Lead'}
+                      {typeof team.teamLead === 'string'
+                        ? team.teamLead || 'No Team Lead'
+                        : team.teamLead
+                          ? `${team.teamLead.firstName} ${team.teamLead.lastName}`
+                          : team.manager
+                            ? `${team.manager.firstName} ${team.manager.lastName}`
+                            : 'No Team Lead'
+                      }
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2">
-                        {team.memberCount}/{team.maxMembers}
+                        {team.employees ? team.employees.length : (team.memberCount || 0)}/{team.maxMembers || 10}
                       </Typography>
-                      <Box 
-                        sx={{ 
-                          width: 40, 
-                          height: 6, 
-                          bgcolor: 'grey.200', 
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 6,
+                          bgcolor: 'grey.200',
                           borderRadius: 3,
                           overflow: 'hidden'
                         }}
                       >
-                        <Box 
-                          sx={{ 
-                            width: `${(team.memberCount / team.maxMembers) * 100}%`,
+                        <Box
+                          sx={{
+                            width: `${(team.employees ? team.employees.length : (team.memberCount || 0)) / (team.maxMembers || 10) * 100}%`,
                             height: '100%',
-                            bgcolor: team.memberCount === team.maxMembers ? 'error.main' : 'primary.main',
+                            bgcolor: (team.employees ? team.employees.length : (team.memberCount || 0)) === (team.maxMembers || 10) ? 'error.main' : 'primary.main',
                             transition: 'width 0.3s ease'
-                          }} 
+                          }}
                         />
                       </Box>
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {team.skills.slice(0, 2).map((skill: string) => (
+                      {(team.skills || []).slice(0, 2).map((skill: string) => (
                         <Chip
                           key={skill}
                           label={skill}
@@ -553,9 +576,9 @@ const Teams: React.FC = () => {
                           sx={{ fontSize: '0.75rem' }}
                         />
                       ))}
-                      {team.skills.length > 2 && (
+                      {(team.skills || []).length > 2 && (
                         <Chip
-                          label={`+${team.skills.length - 2}`}
+                          label={`+${(team.skills || []).length - 2}`}
                           size="small"
                           variant="outlined"
                           sx={{ fontSize: '0.75rem' }}
@@ -565,9 +588,9 @@ const Teams: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={team.status}
+                      label={team.status || (team.isActive ? 'Active' : 'Inactive')}
                       size="small"
-                      color={getStatusColor(team.status) as any}
+                      color={getStatusColor(team.status || (team.isActive ? 'Active' : 'Inactive')) as any}
                       sx={{ fontWeight: 'medium' }}
                     />
                   </TableCell>
@@ -635,9 +658,9 @@ const Teams: React.FC = () => {
           <Typography>
             Are you sure you want to delete the team <strong>"{selectedTeam?.name}"</strong>?
           </Typography>
-          {selectedTeam && selectedTeam.memberCount > 0 && (
+          {selectedTeam && ((selectedTeam as any).employees ? (selectedTeam as any).employees.length : selectedTeam.memberCount || 0) > 0 && (
             <Typography color="error" sx={{ mt: 1 }}>
-              This team has {selectedTeam.memberCount} active member{selectedTeam.memberCount !== 1 ? 's' : ''}.
+              This team has {(selectedTeam as any).employees ? (selectedTeam as any).employees.length : selectedTeam.memberCount || 0} active member{((selectedTeam as any).employees ? (selectedTeam as any).employees.length : selectedTeam.memberCount || 0) !== 1 ? 's' : ''}.
             </Typography>
           )}
         </DialogContent>
@@ -645,9 +668,9 @@ const Teams: React.FC = () => {
           <Button onClick={() => setDeleteDialogOpen(false)} variant="outlined">
             Cancel
           </Button>
-          <Button 
-            onClick={confirmDelete} 
-            color="error" 
+          <Button
+            onClick={confirmDelete}
+            color="error"
             variant="contained"
             startIcon={<DeleteIcon />}
           >

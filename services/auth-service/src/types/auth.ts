@@ -1,6 +1,7 @@
-import { Request } from 'express';
+import { Request } from "express";
+import { Employee, Role, Permission } from "./employee";
 
-// Enhanced User interface with RBAC
+// Enhanced User interface with RBAC and Employee context
 export interface AuthUser {
   id: string;
   email: string;
@@ -8,16 +9,44 @@ export interface AuthUser {
   lastName: string;
   phone?: string;
   isActive: boolean;
+  emailVerified?: boolean;
+  lastLoginAt?: Date;
+
+  // Enhanced role and permission structure
   roles: Array<{
     id: string;
     name: string;
+    level?: number; // Make this optional
+    isActive: boolean; // Add this
     permissions: Array<{
       id: string;
       name: string;
+      service: string;
       resource: string;
       action: string;
+      isActive?: boolean; // Add this
     }>;
   }>;
+
+  // Employee context if user is an employee
+  employee?: {
+    id: string;
+    employeeId: string;
+    position?: string;
+    department: {
+      id: string;
+      name: string;
+      code?: string;
+    };
+    team?: {
+      id: string;
+      name: string;
+    };
+    manager?: {
+      id: string;
+      name: string;
+    };
+  };
 }
 
 // Authentication types
@@ -33,6 +62,51 @@ export interface RegisterUserData {
   lastName: string;
   phone?: string;
   roleIds?: string[];
+}
+
+// Password reset types
+export interface ForgotPasswordData {
+  email: string;
+}
+
+export interface ResetPasswordData {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirm {
+  token: string;
+  newPassword: string;
+}
+
+export interface EmailVerificationRequest {
+  email: string;
+}
+
+export interface ChangePasswordData {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+// Enhanced sign-up with email verification
+export interface SignUpData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  acceptTerms: boolean;
+}
+
+export interface EmailVerificationData {
+  token: string;
 }
 
 // Role types
@@ -63,20 +137,65 @@ export interface AssignRoleData {
   expiresAt?: Date;
 }
 
-// JWT payload
+// Employee-specific authentication types
+export interface EmployeeLoginCredentials {
+  email: string;
+  password: string;
+  employeeId?: string; // Optional alternative to email
+}
+
+export interface EmployeeRegistrationData {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  departmentId: string;
+  teamId?: string;
+  managerId?: string;
+  position?: string;
+  hireDate: Date;
+  roleIds: string[];
+  temporaryPassword: string;
+  sendWelcomeEmail?: boolean;
+}
+
+// Enhanced JWT payload for employees
 export interface JwtPayload {
   userId: string;
   email: string;
-  roles: string[];
-  permissions: string[];
+
+  // Role and permission context
+  roles: Array<{
+    id: string;
+    name: string;
+    level?: number; // Make this optional
+  }>;
+  permissions: Array<{
+    service: string;
+    resource: string;
+    action: string;
+  }>;
+
+  // Employee context (if applicable)
+  employee?: {
+    id: string;
+    employeeId: string;
+    departmentId: string;
+    teamId?: string;
+    managerId?: string;
+  };
+
+  // Standard JWT fields
   iat?: number;
   exp?: number;
 }
 
-// Permission check types
+// Permission check types with enhanced service context
 export interface PermissionCheck {
-  resource: string;
-  action: string;
+  service: string; // auth, vehicle, rider, client-store, spare-parts, etc.
+  resource: string; // users, vehicles, reports, etc.
+  action: string; // create, read, update, delete, approve, etc.
   requireAll?: boolean; // For multiple permissions
 }
 
@@ -97,7 +216,7 @@ export interface PaginationQuery {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
   search?: string;
 }
 

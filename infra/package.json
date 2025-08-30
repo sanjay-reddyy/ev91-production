@@ -1,0 +1,17 @@
+{
+  "name": "ev91-database-migration",
+  "version": "1.0.0",
+  "description": "Database migration tools for EV91 Platform",
+  "main": "migrate-sqlite-to-postgres.js",
+  "scripts": {
+    "migrate": "node migrate-sqlite-to-postgres.js"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
+    "pg": "^8.16.3",
+    "sqlite3": "^5.1.7"
+  },
+  "author": "EV91 Platform",
+  "license": "MIT"
+}

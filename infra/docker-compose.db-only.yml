@@ -1,0 +1,44 @@
+version: '3.8'
+services:
+  # Database Services Only
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-ev91db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ev91db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ev91-network
+  
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ev91-network
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  ev91-network:
+    driver: bridge

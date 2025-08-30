@@ -34,9 +34,64 @@
     }
   ],
   "settings": {
+    // TypeScript Performance Optimizations
     "typescript.preferences.includePackageJsonAutoImports": "off",
     "typescript.suggest.autoImports": false,
+    "typescript.disableAutomaticTypeAcquisition": true,
+    "typescript.updateImportsOnFileMove.enabled": "never",
+    "typescript.preferences.allowIncompleteCompletions": false,
+    "typescript.maxTsServerMemory": 4096,
+    
+    // Search and File Watching Optimizations
     "search.useIgnoreFiles": true,
+    "search.useGlobalIgnoreFiles": true,
+    "search.followSymlinks": false,
+    "search.smartCase": true,
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/dist/**": true,
+      "**/build/**": true,
+      "**/.git/**": true,
+      "**/logs/**": true,
+      "**/*.log": true,
+      "**/uploads/**": true,
+      "**/.next/**": true,
+      "**/out/**": true,
+      "**/.cache/**": true,
+      "**/coverage/**": true
+    },
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/build": true,
+      "**/.git": true,
+      "**/logs": true,
+      "**/*.log": true,
+      "**/uploads": true,
+      "**/.next": true,
+      "**/out": true,
+      "**/.cache": true,
+      "**/coverage": true
+    },
+    
+    // Editor Performance Optimizations
+    "editor.renderWhitespace": "none",
+    "editor.renderLineHighlight": "line",
+    "editor.codeLens": false,
+    "editor.minimap.enabled": false,
+    "editor.semanticHighlighting.enabled": false,
+    "editor.bracketPairColorization.enabled": false,
+    "editor.guides.bracketPairs": false,
+    "editor.lightbulb.enabled": "off",
+    
+    // Memory and Resource Optimizations
+    "extensions.ignoreRecommendations": true,
+    "git.enabled": true,
+    "git.autorefresh": false,
+    "git.autofetch": false,
+    "emmet.showSuggestionsAsSnippets": false,
+    
+    // File Operations
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
     "editor.formatOnSave": true,

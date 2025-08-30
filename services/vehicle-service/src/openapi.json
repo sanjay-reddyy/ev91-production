@@ -61,6 +61,73 @@
     }
   },
   "paths": {
+    "/api/v1/oems": {
+      "get": {"summary": "Get all OEMs with optional filters", "tags": ["OEMs"], "responses": {"200": {"description": "List of OEMs"}}},
+      "post": {"summary": "Create new OEM", "tags": ["OEMs"], "responses": {"201": {"description": "OEM created successfully"}}}
+    },
+    "/api/v1/oems/stats": {
+      "get": {"summary": "Get OEM statistics", "tags": ["OEMs"], "responses": {"200": {"description": "OEM statistics"}}}
+    },
+    "/api/v1/oems/{id}": {
+      "get": {"summary": "Get OEM by ID", "tags": ["OEMs"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "OEM details"}, "404": {"description": "OEM not found"}}},
+      "put": {"summary": "Update OEM", "tags": ["OEMs"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "OEM updated successfully"}}},
+      "delete": {"summary": "Delete OEM (soft delete)", "tags": ["OEMs"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "OEM deleted successfully"}}}
+    },
+    "/api/v1/damage": {
+      "get": {"summary": "Get all damage records with filtering and pagination", "tags": ["Damage"], "responses": {"200": {"description": "List of damage records"}}},
+      "post": {"summary": "Create new damage record", "tags": ["Damage"], "responses": {"201": {"description": "Damage record created successfully"}}}
+    },
+    "/api/v1/damage/stats": {
+      "get": {"summary": "Get damage statistics", "tags": ["Damage"], "responses": {"200": {"description": "Damage statistics"}}}
+    },
+    "/api/v1/damage/{id}": {
+      "get": {"summary": "Get single damage record by ID", "tags": ["Damage"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Damage record details"}, "404": {"description": "Damage record not found"}}},
+      "put": {"summary": "Update damage record", "tags": ["Damage"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Damage record updated successfully"}}},
+      "delete": {"summary": "Delete damage record", "tags": ["Damage"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Damage record deleted successfully"}}}
+    },
+    "/api/v1/damage/{id}/status": {
+      "patch": {"summary": "Update damage status only", "tags": ["Damage"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Damage status updated successfully"}}}
+    },
+    "/api/v1/vehicle-models": {
+      "get": {"summary": "Get all vehicle models with optional filters", "tags": ["VehicleModels"], "responses": {"200": {"description": "List of vehicle models"}}},
+      "post": {"summary": "Create new vehicle model", "tags": ["VehicleModels"], "responses": {"201": {"description": "Vehicle model created successfully"}}}
+    },
+    "/api/v1/vehicle-models/metadata": {
+      "get": {"summary": "Get model categories, segments, etc.", "tags": ["VehicleModels"], "responses": {"200": {"description": "Model metadata"}}}
+    },
+    "/api/v1/vehicle-models/oem/{oemId}": {
+      "get": {"summary": "Get vehicle models by OEM ID", "tags": ["VehicleModels"], "parameters": [{"in": "path", "name": "oemId", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "List of vehicle models for OEM"}}}
+    },
+    "/api/v1/vehicle-models/{id}": {
+      "get": {"summary": "Get vehicle model by ID", "tags": ["VehicleModels"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Vehicle model details"}, "404": {"description": "Vehicle model not found"}}},
+      "put": {"summary": "Update vehicle model", "tags": ["VehicleModels"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Vehicle model updated successfully"}}},
+      "delete": {"summary": "Delete vehicle model (soft delete)", "tags": ["VehicleModels"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Vehicle model deleted successfully"}}}
+    },
+    "/api/v1/vehicle-models/{id}/specs": {
+      "get": {"summary": "Get vehicle model specifications (for autofill)", "tags": ["VehicleModels"], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Vehicle model specifications"}}}
+    },
+    "/api/v1/service": {
+      "get": {"summary": "Get service records with filtering", "tags": ["Service"], "security": [{"bearerAuth": []}], "parameters": [
+        {"in": "query", "name": "vehicleId", "schema": {"type": "string"}},
+        {"in": "query", "name": "serviceType", "schema": {"type": "string", "enum": ["Preventive", "Corrective", "Emergency"]}},
+        {"in": "query", "name": "page", "schema": {"type": "integer", "default": 1}},
+        {"in": "query", "name": "limit", "schema": {"type": "integer", "default": 20}}
+      ], "responses": {"200": {"description": "List of service records"}}},
+      "post": {"summary": "Create a new service record", "tags": ["Service"], "security": [{"bearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateServiceRecordRequest"}}}}, "responses": {"201": {"description": "Service record created successfully"}}}
+    },
+    "/api/v1/service/{id}": {
+      "get": {"summary": "Get service record by ID", "tags": ["Service"], "security": [{"bearerAuth": []}], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Service record details"}, "404": {"description": "Service record not found"}}},
+      "put": {"summary": "Update service record", "tags": ["Service"], "security": [{"bearerAuth": []}], "parameters": [{"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateServiceRecordRequest"}}}}, "responses": {"200": {"description": "Service record updated successfully"}}}
+    },
+    "/api/v1/service/schedule": {
+      "post": {"summary": "Schedule upcoming service", "tags": ["Service"], "security": [{"bearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"vehicleId": {"type": "string"}, "serviceType": {"type": "string", "enum": ["Preventive", "Corrective", "Emergency"]}, "scheduledDate": {"type": "string", "format": "date-time"}, "description": {"type": "string"}}}}}}, "responses": {"201": {"description": "Service scheduled successfully"}}}
+    },
+    "/api/v1/service/upcoming": {
+      "get": {"summary": "Get upcoming scheduled services", "tags": ["Service"], "security": [{"bearerAuth": []}], "parameters": [{"in": "query", "name": "days", "schema": {"type": "integer", "default": 30, "description": "Number of days to look ahead"}}], "responses": {"200": {"description": "List of upcoming services"}}}
+    },
+    "/api/v1/service/analytics": {
+      "get": {"summary": "Get service analytics and statistics", "tags": ["Service"], "security": [{"bearerAuth": []}], "parameters": [{"in": "query", "name": "period", "schema": {"type": "string", "enum": ["week", "month", "quarter", "year"], "default": "month"}}], "responses": {"200": {"description": "Service analytics data"}}}
+    },
     "/health": {
       "get": {
         "summary": "Health check endpoint",
@@ -74,21 +141,183 @@
     },
     "/api/v1/vehicles": {
       "get": {
-        "summary": "Get all vehicles",
+        "summary": "Get all vehicles with filtering and pagination",
         "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "query", "name": "page", "schema": {"type": "integer", "default": 1}},
+          {"in": "query", "name": "limit", "schema": {"type": "integer", "default": 20}},
+          {"in": "query", "name": "oemType", "schema": {"type": "string"}},
+          {"in": "query", "name": "operationalStatus", "schema": {"type": "string"}},
+          {"in": "query", "name": "assignedRider", "schema": {"type": "string"}}
+        ],
         "responses": {
-          "200": {
-            "description": "List of vehicles"
-          }
+          "200": {"description": "List of vehicles"}
         }
       },
       "post": {
         "summary": "Create a new vehicle",
         "tags": ["Vehicles"],
-        "responses": {
-          "201": {
-            "description": "Vehicle created successfully"
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CreateVehicleRequest"}
+            }
           }
+        },
+        "responses": {
+          "201": {"description": "Vehicle created successfully"},
+          "400": {"description": "Validation error"},
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/v1/vehicles/stats": {
+      "get": {
+        "summary": "Get vehicle statistics",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {"description": "Vehicle statistics including counts by status, model distribution, etc."}
+        }
+      }
+    },
+    "/api/v1/vehicles/{id}": {
+      "get": {
+        "summary": "Get vehicle by ID",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Vehicle details"},
+          "404": {"description": "Vehicle not found"}
+        }
+      },
+      "put": {
+        "summary": "Update vehicle",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/UpdateVehicleRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Vehicle updated successfully"},
+          "404": {"description": "Vehicle not found"}
+        }
+      },
+      "delete": {
+        "summary": "Delete vehicle (soft delete)",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Vehicle deleted successfully"},
+          "404": {"description": "Vehicle not found"}
+        }
+      }
+    },
+    "/api/v1/vehicles/{id}/status": {
+      "get": {
+        "summary": "Get vehicle status",
+        "tags": ["Vehicles"],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Vehicle status"}
+        }
+      },
+      "patch": {
+        "summary": "Update vehicle status",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operationalStatus": {"type": "string", "enum": ["Available", "Assigned", "Under Maintenance", "Retired", "Damaged"]},
+                  "serviceStatus": {"type": "string", "enum": ["Active", "Inactive", "Scheduled for Service"]},
+                  "reason": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Status updated successfully"}
+        }
+      }
+    },
+    "/api/v1/vehicles/{id}/assign": {
+      "post": {
+        "summary": "Assign vehicle to rider",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "riderId": {"type": "string"},
+                  "assignmentNotes": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Vehicle assigned successfully"}
+        }
+      }
+    },
+    "/api/v1/vehicles/{id}/unassign": {
+      "post": {
+        "summary": "Unassign vehicle from rider",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Vehicle unassigned successfully"}
+        }
+      }
+    },
+    "/api/v1/vehicles/{id}/history": {
+      "get": {
+        "summary": "Get vehicle history (status changes, assignments, etc.)",
+        "tags": ["Vehicles"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"in": "path", "name": "id", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Vehicle history"}
         }
       }
     }

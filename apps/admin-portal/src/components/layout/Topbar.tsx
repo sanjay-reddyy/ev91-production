@@ -29,7 +29,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
   const { user, logout } = useAuth()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'))
-  
+
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<null | HTMLElement>(null)
 
@@ -49,9 +49,14 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
     setNotificationsAnchorEl(null)
   }
 
-  const handleLogout = () => {
-    logout()
-    handleProfileMenuClose()
+  const handleLogout = async () => {
+    try {
+      await logout()
+      handleProfileMenuClose()
+    } catch (error) {
+      console.error('Logout failed:', error)
+      handleProfileMenuClose()
+    }
   }
 
   const menuId = 'primary-search-account-menu'
@@ -124,7 +129,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               <MenuIcon />
             </IconButton>
           )}
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {isMobile ? 'EV91' : 'EV91 Admin Dashboard'}
           </Typography>
