@@ -18,10 +18,11 @@ export const authenticateEmployee = async (
     const token = req.headers.authorization?.replace("Bearer ", "");
 
     if (!token) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: "Authentication token required",
       });
+      return;
     }
 
     // Verify JWT token
@@ -72,18 +73,20 @@ export const authenticateEmployee = async (
     });
 
     if (!user || !user.isActive) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: "User account not found or inactive",
       });
+      return;
     }
 
     // Check if user is an employee
     if (!user.employee || !user.employee.isActive) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         error: "Employee access required",
       });
+      return;
     }
 
     // Build enhanced user object
@@ -137,10 +140,11 @@ export const authenticateEmployee = async (
     next();
   } catch (error) {
     console.error("Authentication error:", error);
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: "Invalid authentication token",
     });
+    return;
   }
 };
 

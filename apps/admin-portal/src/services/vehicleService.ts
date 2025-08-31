@@ -129,7 +129,9 @@ export interface City {
 export interface Hub {
   id: string;
   name: string;
+  hubName?: string; // Backend also provides this
   code: string;
+  hubCode?: string; // Backend also provides this
   cityId: string;
   address: string;
   pinCode: string;
@@ -231,9 +233,19 @@ export interface Vehicle {
     validUpto?: Date;
   };
   insuranceDetails?: Array<{
-    policyNumber: string;
-    policyEndDate: Date;
+    id: string;
+    insuranceType: string;
     providerName: string;
+    policyNumber: string;
+    policyStartDate: Date;
+    policyEndDate: Date;
+    premiumAmount: number;
+    coverageAmount: number;
+    isActive: boolean;
+    renewalReminder: boolean;
+    policyPhotoUrl?: string;
+    policyUploadDate?: Date;
+    verificationStatus: string;
   }>;
   lastServiceDate?: Date;
   nextServiceDue?: Date;

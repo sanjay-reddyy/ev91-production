@@ -5,7 +5,6 @@ import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
 import { prisma } from "./config/database";
-import * as openApiSpec from "./openapi.json";
 import authRoutes from "./routes/authRoutes";
 import employeeRoutes from "./routes/employeeRoutes";
 import roleRoutes from "./routes/roleRoutes";
@@ -92,7 +91,11 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 // API Documentation
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
+app.use(
+  "/api/docs",
+  swaggerUi.serve,
+  swaggerUi.setup(require("./openapi.json"))
+);
 
 // API Routes
 app.use("/api/v1/auth", authRoutes);

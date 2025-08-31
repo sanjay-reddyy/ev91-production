@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const RIDER_SERVICE_URL =
-  import.meta.env.VITE_RIDER_API_URL || "http://localhost:8000/api/riders";
+  import.meta.env.VITE_RIDER_API_URL || "http://localhost:8000/api/v1";
 
 // Configure axios instance for rider service
 const api = axios.create({
@@ -470,10 +470,12 @@ class RiderService {
    */
   async assignVehicle(
     riderId: string,
-    vehicleId: string
+    vehicleId: string,
+    hubId?: string
   ): Promise<APIResponse<Rider>> {
     const response = await api.post(`/riders/${riderId}/assign-vehicle`, {
       vehicleId,
+      hubId,
     });
     return response.data;
   }
@@ -489,8 +491,19 @@ class RiderService {
   /**
    * Get available vehicles for assignment
    */
-  async getAvailableVehicles(): Promise<APIResponse<VehicleAssignment[]>> {
-    const response = await api.get(`/vehicles/available`);
+  async getAvailableVehicles(
+    hubId?: string
+  ): Promise<APIResponse<VehicleAssignment[]>> {
+    const queryParams = hubId ? `?hubId=${hubId}` : "";
+    const response = await api.get(`/vehicles/available${queryParams}`);
+    return response.data;
+  }
+
+  /**
+   * Get available hubs for dropdown
+   */
+  async getHubs(): Promise<APIResponse<any[]>> {
+    const response = await api.get(`/hubs`);
     return response.data;
   }
 

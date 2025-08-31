@@ -27,10 +27,11 @@ export interface QueryParams {
   limit?: number;
   search?: string;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
   // Vehicle-specific query params
   oemId?: string;
   modelId?: string;
+  hubId?: string;
   operationalStatus?: string;
   serviceStatus?: string;
   assignedRider?: string;

@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 
 // Import routes with simple auth for testing
 import vehicleRoutes from './routes/vehicles';
-import serviceRoutes from './routes/service';
+import serviceRoutes from './routes/services';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';

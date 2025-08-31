@@ -397,7 +397,7 @@ const Step2_RegistrationAndInsurance: React.FC<Step2RegistrationAndInsuranceProp
           render={({ field }) => (
             <Autocomplete
               options={hubs}
-              getOptionLabel={(option) => `${option.name} (${option.code})`}
+              getOptionLabel={(option) => `${option.hubName || option.name} (${option.hubCode || option.code})`}
               value={hubs.find(hub => hub.id === field.value) || null}
               onChange={(_, newValue) => {
                 field.onChange(newValue?.id || '');
@@ -432,7 +432,7 @@ const Step2_RegistrationAndInsurance: React.FC<Step2RegistrationAndInsuranceProp
                   <Box component="li" key={key} {...otherProps}>
                     <Box>
                       <Typography variant="body2" fontWeight="medium">
-                        {option.name} ({option.code})
+                        {option.hubName || option.name} ({option.hubCode || option.code})
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {option.address} • {option.hubType} • {option.hubCategory}

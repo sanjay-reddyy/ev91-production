@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-const VEHICLE_SERVICE_URL = process.env.VEHICLE_SERVICE_URL || 'http://host.docker.internal:4003';
+const VEHICLE_SERVICE_URL = process.env.VEHICLE_SERVICE_URL || 'http://host.docker.internal:4004';
 
 // Proxy all vehicle requests to vehicle service
 router.all('/*', async (req, res) => {
@@ -12,7 +12,12 @@ router.all('/*', async (req, res) => {
     // Handle analytics routes specially
     if (req.path.startsWith('/analytics/')) {
       targetUrl = `${VEHICLE_SERVICE_URL}/api/v1${req.path}`;
-    } else {
+    }
+    // Handle hub routes specially  
+    else if (req.path.startsWith('/hubs/')) {
+      targetUrl = `${VEHICLE_SERVICE_URL}/api/v1${req.path}`;
+    } 
+    else {
       targetUrl = `${VEHICLE_SERVICE_URL}/api/v1/vehicles${req.path}`;
     }
     

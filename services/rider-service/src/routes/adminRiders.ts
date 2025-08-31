@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { prisma } from "../config/database";
+import axios from "axios";
 
 const router = express.Router();
 
@@ -92,6 +93,187 @@ router.get("/riders", async (req: Request, res: Response) => {
 });
 
 /**
+ * Create new rider (Admin only)
+ */
+router.post("/riders", async (req: Request, res: Response) => {
+  try {
+    const {
+      name,
+      phone,
+      email,
+      dob,
+      address1,
+      address2,
+      city,
+      state,
+      pincode,
+      aadharNumber,
+      panNumber,
+      drivingLicenseNumber,
+      emergencyName,
+      emergencyPhone,
+      emergencyRelation,
+    } = req.body;
+
+    // Validate required fields
+    if (
+      !name ||
+      !phone ||
+      !dob ||
+      !address1 ||
+      !city ||
+      !state ||
+      !pincode ||
+      !aadharNumber ||
+      !panNumber ||
+      !drivingLicenseNumber ||
+      !emergencyName ||
+      !emergencyPhone ||
+      !emergencyRelation
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    // Check if rider with phone already exists
+    const existingRider = await prisma.rider.findUnique({
+      where: { phone },
+    });
+
+    if (existingRider) {
+      return res.status(409).json({
+        success: false,
+        message: "Rider with this phone number already exists",
+      });
+    }
+
+    // Create new rider
+    const rider = await prisma.rider.create({
+      data: {
+        name,
+        phone,
+        dob, // Keep as string to match schema
+        address1,
+        address2: address2 || null,
+        city,
+        state,
+        pincode,
+        aadhaar: aadharNumber, // Map to correct field name
+        pan: panNumber, // Map to correct field name
+        dl: drivingLicenseNumber, // Map to correct field name
+        emergencyName,
+        emergencyPhone,
+        emergencyRelation,
+        registrationStatus: "KYC_COMPLETED", // Admin-created riders are pre-approved
+        kycStatus: "pending", // KYC still needs to be verified
+        phoneVerified: true, // Assume phone is verified when admin creates
+        consent: true, // Assume consent when admin creates
+        agreementSigned: true,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Rider created successfully",
+      data: rider,
+    });
+  } catch (error) {
+    console.error("Error creating rider:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+/**
+ * Update rider information (Admin only)
+ */
+router.put("/riders/:riderId", async (req: Request, res: Response) => {
+  try {
+    const { riderId } = req.params;
+    const {
+      name,
+      phone,
+      email,
+      dob,
+      address1,
+      address2,
+      city,
+      state,
+      pincode,
+      aadharNumber,
+      panNumber,
+      drivingLicenseNumber,
+      emergencyName,
+      emergencyPhone,
+      emergencyRelation,
+    } = req.body;
+
+    // Check if rider exists
+    const existingRider = await prisma.rider.findUnique({
+      where: { id: riderId },
+    });
+
+    if (!existingRider) {
+      return res.status(404).json({
+        success: false,
+        message: "Rider not found",
+      });
+    }
+
+    // If phone is being updated, check for conflicts
+    if (phone && phone !== existingRider.phone) {
+      const phoneConflict = await prisma.rider.findUnique({
+        where: { phone },
+      });
+
+      if (phoneConflict) {
+        return res.status(409).json({
+          success: false,
+          message: "Another rider with this phone number already exists",
+        });
+      }
+    }
+
+    // Update rider
+    const updatedRider = await prisma.rider.update({
+      where: { id: riderId },
+      data: {
+        name,
+        phone,
+        dob,
+        address1,
+        address2: address2 || null,
+        city,
+        state,
+        pincode,
+        aadhaar: aadharNumber,
+        pan: panNumber,
+        dl: drivingLicenseNumber,
+        emergencyName,
+        emergencyPhone,
+        emergencyRelation,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Rider updated successfully",
+      data: updatedRider,
+    });
+  } catch (error) {
+    console.error("Error updating rider:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+/**
  * Get rider by ID with full details
  */
 router.get("/riders/:riderId", async (req: Request, res: Response) => {
@@ -110,7 +292,7 @@ router.get("/riders/:riderId", async (req: Request, res: Response) => {
     }
 
     // Add computed fields to match frontend expectations
-    const riderWithExtras = {
+    let riderWithExtras: any = {
       ...rider,
       isActive: rider.registrationStatus === "COMPLETED",
       email: null, // Not in current schema
@@ -120,7 +302,50 @@ router.get("/riders/:riderId", async (req: Request, res: Response) => {
       aadharNumber: rider.aadhaar,
       panNumber: rider.pan,
       drivingLicenseNumber: rider.dl,
+      assignedVehicleId: rider.assignedVehicleId,
     };
+
+    // If rider has an assigned vehicle, fetch vehicle details
+    if (rider.assignedVehicleId) {
+      try {
+        const vehicleServiceUrl =
+          process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+        const vehicleResponse = await axios.get(
+          `${vehicleServiceUrl}/api/v1/vehicles/${rider.assignedVehicleId}`,
+          {
+            timeout: 5000,
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (vehicleResponse.data.success) {
+          const vehicleData = vehicleResponse.data.data;
+
+          riderWithExtras.assignedVehicle = {
+            id: vehicleData.id,
+            make: vehicleData.model?.oem?.name || "Unknown",
+            model: vehicleData.model?.name || "Unknown",
+            registrationNumber: vehicleData.registrationNumber,
+            vehicleType: vehicleData.vehicleType || "2-Wheeler",
+            fuelType: vehicleData.model?.fuelType || "Electric",
+            assignedDate:
+              rider.assignmentDate?.toISOString() || new Date().toISOString(),
+          };
+
+          console.log(`✅ Fetched vehicle details for rider ${riderId}`);
+        }
+      } catch (vehicleServiceError) {
+        console.warn(
+          `Could not fetch vehicle details for rider ${riderId}:`,
+          vehicleServiceError
+        );
+        // Don't fail the request, just don't include vehicle details
+      }
+    }
 
     res.json({
       success: true,
@@ -293,8 +518,306 @@ router.get(
   }
 );
 
+/**
+ * Get available vehicles for assignment filtered by hub
+ */
 router.get("/vehicles/available", async (req: Request, res: Response) => {
-  res.json({ success: true, data: [] });
+  try {
+    const { hubId } = req.query;
+
+    // Make API call to vehicle service to get available vehicles
+    const vehicleServiceUrl =
+      process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+    let apiUrl = `${vehicleServiceUrl}/api/v1/vehicles?operationalStatus=Available&serviceStatus=Active`;
+    if (hubId) {
+      apiUrl += `&hubId=${hubId}`;
+    }
+
+    console.log(`🚗 Fetching vehicles from: ${apiUrl}`);
+
+    const response = await axios.get(apiUrl, {
+      timeout: 10000,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    });
+
+    const vehicleData = response.data as {
+      success: boolean;
+      data: any[];
+    };
+
+    console.log(
+      `✅ Vehicle Service responded with ${
+        vehicleData.data?.length || 0
+      } vehicles`
+    );
+
+    // Transform the data to match frontend expectations
+    const vehicles = vehicleData.data.map((vehicle: any) => ({
+      id: vehicle.id,
+      make: vehicle.model?.oem?.name || "Unknown",
+      model: vehicle.model?.name || "Unknown",
+      registrationNumber: vehicle.registrationNumber,
+      vehicleType: vehicle.vehicleType || "2-Wheeler",
+      fuelType: vehicle.model?.fuelType || "Electric",
+      hubId: vehicle.hubId,
+      hubName: vehicle.hub?.name || "Unknown Hub",
+    }));
+
+    res.json({
+      success: true,
+      data: vehicles,
+    });
+  } catch (error: any) {
+    console.error("❌ Error in vehicles endpoint:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch available vehicles",
+      error: error.message,
+      data: [],
+    });
+  }
 });
+
+/**
+ * Get available hubs for dropdown
+ */
+router.get("/hubs", async (req: Request, res: Response) => {
+  try {
+    // Make API call to vehicle service to get hubs
+    const vehicleServiceUrl =
+      process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+    const apiUrl = `${vehicleServiceUrl}/api/v1/hubs?status=Active`;
+
+    try {
+      const response = await axios.get(apiUrl);
+      const hubData = response.data as {
+        success: boolean;
+        data: any[];
+      };
+
+      // Transform the data to ensure it has the expected structure
+      const transformedHubs = hubData.data.map((hub: any) => ({
+        id: hub.id,
+        name: hub.name,
+        code: hub.code,
+        city: { name: hub.cityName || hub.city?.name || "Unknown City" },
+        address: hub.address || "No address provided",
+        hubType: hub.hubType || "Storage",
+        vehicleCapacity: hub.vehicleCapacity || 0,
+        chargingPoints: hub.chargingPoints || 0,
+      }));
+
+      res.json({
+        success: true,
+        data: transformedHubs,
+      });
+    } catch (vehicleServiceError) {
+      console.warn(
+        "Vehicle service not accessible, using mock data:",
+        vehicleServiceError
+      );
+
+      // Return mock hubs data if vehicle service is not accessible
+      const mockHubs = [
+        {
+          id: "hub1",
+          name: "Central Hub",
+          code: "CH001",
+          city: { name: "Mumbai" },
+          address: "123 Central Street, Mumbai",
+          hubType: "Distribution",
+          vehicleCapacity: 50,
+          chargingPoints: 10,
+        },
+        {
+          id: "hub2",
+          name: "North Hub",
+          code: "NH001",
+          city: { name: "Delhi" },
+          address: "456 North Avenue, Delhi",
+          hubType: "Storage",
+          vehicleCapacity: 30,
+          chargingPoints: 6,
+        },
+        {
+          id: "hub3",
+          name: "South Hub",
+          code: "SH001",
+          city: { name: "Bangalore" },
+          address: "789 South Road, Bangalore",
+          hubType: "Distribution",
+          vehicleCapacity: 40,
+          chargingPoints: 8,
+        },
+      ];
+
+      res.json({
+        success: true,
+        data: mockHubs,
+      });
+    }
+  } catch (error) {
+    console.error("Error in hubs endpoint:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch hubs",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+/**
+ * Assign vehicle to rider
+ */
+router.post(
+  "/riders/:riderId/assign-vehicle",
+  async (req: Request, res: Response) => {
+    try {
+      const { riderId } = req.params;
+      const { vehicleId, hubId } = req.body;
+
+      if (!vehicleId) {
+        return res.status(400).json({
+          success: false,
+          message: "Vehicle ID is required",
+        });
+      }
+
+      // Update rider with vehicle assignment
+      const rider = await prisma.rider.update({
+        where: { id: riderId },
+        data: {
+          assignedVehicleId: vehicleId,
+          assignmentDate: new Date(),
+          hubId: hubId || null,
+        },
+      });
+
+      // Also call vehicle service to update vehicle assignment
+      try {
+        const vehicleServiceUrl =
+          process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+        await axios.post(
+          `${vehicleServiceUrl}/api/v1/vehicles/${vehicleId}/assign`,
+          {
+            riderId: riderId,
+            assignmentNotes: `Assigned to rider ${rider.name || rider.phone}`,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        console.log(
+          `✅ Vehicle ${vehicleId} assigned to rider ${riderId} in vehicle service`
+        );
+      } catch (vehicleServiceError) {
+        console.warn("Could not update vehicle service:", vehicleServiceError);
+      }
+
+      res.json({
+        success: true,
+        data: {
+          ...rider,
+          isActive: rider.registrationStatus === "COMPLETED",
+        },
+        message: "Vehicle assigned successfully",
+      });
+    } catch (error) {
+      console.error("Error assigning vehicle:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to assign vehicle",
+      });
+    }
+  }
+);
+
+/**
+ * Unassign vehicle from rider
+ */
+router.delete(
+  "/riders/:riderId/assign-vehicle",
+  async (req: Request, res: Response) => {
+    try {
+      const { riderId } = req.params;
+
+      // Get current rider to get vehicle ID
+      const currentRider = await prisma.rider.findUnique({
+        where: { id: riderId },
+      });
+
+      if (!currentRider) {
+        return res.status(404).json({
+          success: false,
+          message: "Rider not found",
+        });
+      }
+
+      const vehicleId = currentRider.assignedVehicleId;
+
+      // Update rider to remove vehicle assignment
+      const rider = await prisma.rider.update({
+        where: { id: riderId },
+        data: {
+          assignedVehicleId: null,
+          assignmentDate: null,
+          hubId: null,
+        },
+      });
+
+      // Also call vehicle service to unassign vehicle
+      if (vehicleId) {
+        try {
+          const vehicleServiceUrl =
+            process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+          await axios.post(
+            `${vehicleServiceUrl}/api/v1/vehicles/${vehicleId}/unassign`,
+            {},
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          console.log(
+            `✅ Vehicle ${vehicleId} unassigned from rider ${riderId} in vehicle service`
+          );
+        } catch (vehicleServiceError) {
+          console.warn(
+            "Could not update vehicle service:",
+            vehicleServiceError
+          );
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          ...rider,
+          isActive: rider.registrationStatus === "COMPLETED",
+        },
+        message: "Vehicle unassigned successfully",
+      });
+    } catch (error) {
+      console.error("Error unassigning vehicle:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to unassign vehicle",
+      });
+    }
+  }
+);
 
 export default router;

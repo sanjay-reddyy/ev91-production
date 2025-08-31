@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -75,6 +75,9 @@ const VehicleProfile: React.FC = () => {
     try {
       setLoading(true);
       const response = await vehicleService.getVehicle(id!);
+      console.log('Vehicle data received:', response.data);
+      console.log('Hub data:', response.data.hub);
+      console.log('Insurance data:', response.data.insuranceDetails);
       setVehicle(response.data);
     } catch (error: any) {
       console.error('Error fetching vehicle:', error);
@@ -276,6 +279,21 @@ const VehicleProfile: React.FC = () => {
 
       {/* Main Content with Tabs */}
       <Card variant="outlined">
+        {/* Debug Info - Remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <Box sx={{ p: 2, bgcolor: 'grey.100', borderBottom: 1, borderColor: 'divider' }}>
+            <Typography variant="caption" color="text.secondary">
+              Debug Info: Hub Data Available: {vehicle.hub ? 'Yes' : 'No'} | 
+              Insurance Data Available: {vehicle.insuranceDetails && vehicle.insuranceDetails.length > 0 ? 'Yes' : 'No'}
+            </Typography>
+            {vehicle.hub && (
+              <Typography variant="caption" sx={{ display: 'block' }}>
+                Hub Properties: {Object.keys(vehicle.hub).join(', ')}
+              </Typography>
+            )}
+          </Box>
+        )}
+        
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="vehicle profile tabs">
             <Tab label="Basic Information" />
@@ -334,8 +352,20 @@ const VehicleProfile: React.FC = () => {
                         <Typography variant="body2" fontWeight="medium">{vehicle.mileage} km</Typography>
                       </Grid>
                       <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">Hub</Typography>
-                        <Typography variant="body2" fontWeight="medium">{vehicle.hub?.name || 'Not assigned'}</Typography>
+                        <Typography variant="caption" color="text.secondary">Assigned Hub</Typography>
+                        <Typography variant="body2" fontWeight="medium" color="primary.main">
+                          {(vehicle.hub as any)?.hubName || vehicle.hub?.name || 'Not assigned'}
+                        </Typography>
+                        {vehicle.hub?.address && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                            📍 {vehicle.hub.address}
+                          </Typography>
+                        )}
+                        {vehicle.hub?.city && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            🏙️ {vehicle.hub.city.name || vehicle.hub.city.displayName}
+                          </Typography>
+                        )}
                       </Grid>
                     </Grid>
                   </Grid>
@@ -381,6 +411,93 @@ const VehicleProfile: React.FC = () => {
                 </Grid>
               </CardContent>
             </Card>
+
+            {/* Hub Assignment Details */}
+            {vehicle.hub && (
+              <Card variant="outlined" sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Assigned Hub Details</Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Hub Name</Typography>
+                      <Typography variant="body2" fontWeight="medium">
+                        {(vehicle.hub as any)?.hubName || vehicle.hub?.name || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Hub Code</Typography>
+                      <Typography variant="body2" fontWeight="medium">
+                        {(vehicle.hub as any)?.hubCode || vehicle.hub?.code || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary">City</Typography>
+                      <Typography variant="body2" fontWeight="medium">
+                        {vehicle.hub.city?.name || vehicle.hub.city?.displayName || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={8}>
+                      <Typography variant="caption" color="text.secondary">Address</Typography>
+                      <Typography variant="body2" fontWeight="medium">
+                        {vehicle.hub.address || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Hub Type</Typography>
+                      <Typography variant="body2" fontWeight="medium">
+                        {vehicle.hub.hubType || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    {vehicle.hub.contactNumber && (
+                      <Grid item xs={6} sm={4}>
+                        <Typography variant="caption" color="text.secondary">Contact Number</Typography>
+                        <Typography variant="body2" fontWeight="medium">{vehicle.hub.contactNumber}</Typography>
+                      </Grid>
+                    )}
+                    {vehicle.hub.managerName && (
+                      <Grid item xs={6} sm={4}>
+                        <Typography variant="caption" color="text.secondary">Manager</Typography>
+                        <Typography variant="body2" fontWeight="medium">{vehicle.hub.managerName}</Typography>
+                      </Grid>
+                    )}
+                    {vehicle.hub.vehicleCapacity && (
+                      <Grid item xs={6} sm={4}>
+                        <Typography variant="caption" color="text.secondary">Vehicle Capacity</Typography>
+                        <Typography variant="body2" fontWeight="medium">{vehicle.hub.vehicleCapacity} vehicles</Typography>
+                      </Grid>
+                    )}
+                    {vehicle.hub.chargingPoints && (
+                      <Grid item xs={6} sm={4}>
+                        <Typography variant="caption" color="text.secondary">Charging Points</Typography>
+                        <Typography variant="body2" fontWeight="medium">{vehicle.hub.chargingPoints}</Typography>
+                      </Grid>
+                    )}
+                    {vehicle.hub.hasChargingStation !== undefined && (
+                      <Grid item xs={6} sm={4}>
+                        <Typography variant="caption" color="text.secondary">Charging Station</Typography>
+                        <Chip
+                          label={vehicle.hub.hasChargingStation ? 'Available' : 'Not Available'}
+                          color={vehicle.hub.hasChargingStation ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </Grid>
+                    )}
+                  </Grid>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Show message if no hub assigned */}
+            {!vehicle.hub && (
+              <Card variant="outlined" sx={{ mb: 3, bgcolor: 'warning.light', borderColor: 'warning.main' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="warning.contrastText">Hub Assignment</Typography>
+                  <Typography color="warning.contrastText">
+                    🚨 This vehicle is not assigned to any hub. Please assign it to a hub for proper operation.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Registration Details */}
             <Card variant="outlined" sx={{ mb: 3 }}>
@@ -430,7 +547,7 @@ const VehicleProfile: React.FC = () => {
                     <Card variant="outlined" key={index} sx={{ mb: index < vehicle.insuranceDetails!.length - 1 ? 2 : 0, bgcolor: 'grey.50' }}>
                       <CardContent>
                         <Typography variant="subtitle2" gutterBottom color="primary.main">
-                          Policy #{index + 1}
+                          Policy #{index + 1} • {insurance.insuranceType || 'Comprehensive'}
                         </Typography>
                         <Grid container spacing={2}>
                           <Grid item xs={6} sm={4}>
@@ -440,6 +557,12 @@ const VehicleProfile: React.FC = () => {
                           <Grid item xs={6} sm={4}>
                             <Typography variant="caption" color="text.secondary">Policy Number</Typography>
                             <Typography variant="body2" fontWeight="medium">{insurance.policyNumber}</Typography>
+                          </Grid>
+                          <Grid item xs={6} sm={4}>
+                            <Typography variant="caption" color="text.secondary">Start Date</Typography>
+                            <Typography variant="body2" fontWeight="medium">
+                              {new Date(insurance.policyStartDate).toLocaleDateString()}
+                            </Typography>
                           </Grid>
                           <Grid item xs={6} sm={4}>
                             <Typography variant="caption" color="text.secondary">Expiry Date</Typography>
@@ -454,14 +577,66 @@ const VehicleProfile: React.FC = () => {
                               )}
                             </Typography>
                           </Grid>
+                          <Grid item xs={6} sm={4}>
+                            <Typography variant="caption" color="text.secondary">Premium Amount</Typography>
+                            <Typography variant="body2" fontWeight="medium">
+                              ₹{insurance.premiumAmount?.toLocaleString() || 'N/A'}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6} sm={4}>
+                            <Typography variant="caption" color="text.secondary">Coverage Amount</Typography>
+                            <Typography variant="body2" fontWeight="medium">
+                              ₹{insurance.coverageAmount?.toLocaleString() || 'N/A'}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6} sm={4}>
+                            <Typography variant="caption" color="text.secondary">Status</Typography>
+                            <Chip
+                              label={insurance.isActive ? 'Active' : 'Inactive'}
+                              color={insurance.isActive ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={6} sm={4}>
+                            <Typography variant="caption" color="text.secondary">Verification</Typography>
+                            <Chip
+                              label={insurance.verificationStatus}
+                              color={insurance.verificationStatus === 'Verified' ? 'success' : 
+                                     insurance.verificationStatus === 'Rejected' ? 'error' : 'warning'}
+                              size="small"
+                            />
+                          </Grid>
+                          {insurance.renewalReminder && (
+                            <Grid item xs={6} sm={4}>
+                              <Typography variant="caption" color="text.secondary">Renewal Reminder</Typography>
+                              <Chip label="Enabled" color="info" size="small" />
+                            </Grid>
+                          )}
                         </Grid>
                       </CardContent>
                     </Card>
                   ))
                 ) : (
-                  <Card variant="outlined" sx={{ bgcolor: 'warning.light', borderColor: 'warning.main' }}>
+                  <Card variant="outlined" sx={{ bgcolor: 'error.light', borderColor: 'error.main' }}>
                     <CardContent>
-                      <Typography color="warning.contrastText">No insurance details available. Please add insurance information.</Typography>
+                      <Typography variant="h6" gutterBottom color="error.contrastText">⚠️ No Insurance Coverage</Typography>
+                      <Typography color="error.contrastText">
+                        This vehicle does not have any insurance details on record. This is a compliance risk and should be addressed immediately.
+                      </Typography>
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="error.contrastText">
+                          Required actions:
+                        </Typography>
+                        <Typography variant="body2" color="error.contrastText">
+                          • Add valid insurance policy details
+                        </Typography>
+                        <Typography variant="body2" color="error.contrastText">
+                          • Upload insurance certificate documents
+                        </Typography>
+                        <Typography variant="body2" color="error.contrastText">
+                          • Verify coverage amounts and validity
+                        </Typography>
+                      </Box>
                     </CardContent>
                   </Card>
                 )}
