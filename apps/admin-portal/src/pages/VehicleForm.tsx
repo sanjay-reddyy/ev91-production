@@ -245,6 +245,14 @@ const VehicleFormPage: React.FC = () => {
   const clearFormState = () => {
     const stateKey = isEdit ? `vehicle-form-edit-${id}` : 'vehicle-form-create';
     localStorage.removeItem(stateKey);
+    
+    // Also clear the temporary city/hub storage for edit mode
+    if (isEdit && id) {
+      localStorage.removeItem(`vehicle-${id}-cityId`);
+      localStorage.removeItem(`vehicle-${id}-hubId`);
+      console.log('🗑️ Cleared temporary city/hub storage for vehicle:', id);
+    }
+    
     console.log('🗑️ Form state cleared from localStorage');
   };
 
@@ -312,19 +320,50 @@ const VehicleFormPage: React.FC = () => {
     }
   }, [isEdit, id]);
 
-  // Re-populate form when master data changes during edit mode
+  // Re-populate form when master data changes during edit mode - simplified
   useEffect(() => {
-    if (isEdit && id && !loading && oems.length > 0) {
-      console.log('🔄 Master data loaded, checking if form needs re-population');
+    if (isEdit && id && !loading && oems.length > 0 && cities.length > 0) {
+      const currentCityId = watch('cityId');
       const currentOemId = watch('oemId');
 
-      // If we have IDs but no actual data in the form fields, re-load the vehicle
-      if (currentOemId && !oems.find(o => o.id === currentOemId)) {
-        console.log('🔄 OEM data not found in options, re-loading vehicle');
+      // Check if we need to reload data
+      const needsOemReload = currentOemId && !oems.find((o: OEM) => o.id === currentOemId);
+      const needsCityReload = currentCityId && !cities.find((c: City) => c.id === currentCityId);
+      
+      if (needsOemReload || needsCityReload) {
+        console.log('🔄 Master data mismatch detected, reloading vehicle data');
         loadVehicle();
       }
     }
-  }, [isEdit, id, loading, oems.length, vehicleModels.length, cities.length]);
+  }, [isEdit, id, loading, oems.length, cities.length]);
+
+  // Additional effect to handle form population after city/hub data is loaded
+  useEffect(() => {
+    if (isEdit && id && !loading && cities.length > 0) {
+      const currentCityId = watch('cityId');
+      const currentHubId = watch('hubId');
+      
+      // If we have form values and matching data exists, we're good
+      if (currentCityId && currentHubId) {
+        const cityExists = cities.find((c: City) => c.id === currentCityId);
+        const hubExists = hubs.find((h: Hub) => h.id === currentHubId);
+        if (cityExists && hubExists) {
+          console.log('✅ City and Hub data properly loaded and form populated');
+          return;
+        }
+      }
+      
+      // If we reach here, form might need re-population
+      console.log('🔧 Form may need re-population, current values:', { currentCityId, currentHubId });
+      console.log('🔧 Available cities:', cities.length, 'Available hubs:', hubs.length);
+      
+      // Re-trigger vehicle loading if data seems incomplete
+      if (cities.length > 0 && (!currentCityId || !currentHubId)) {
+        console.log('� Re-triggering vehicle load due to incomplete form data');
+        loadVehicle();
+      }
+    }
+  }, [isEdit, id, loading, cities.length, hubs.length, setValue, watch]);
 
   const loadOEMs = async () => {
     try {
@@ -451,38 +490,68 @@ const VehicleFormPage: React.FC = () => {
       console.log('🔍 Hub data structure:', vehicleData.hub);
       console.log('🔍 Hub city data:', vehicleData.hub?.city);
 
-      // Ensure OEMs are loaded first
+      // Extract IDs early for loading dependencies
+      const cityIdToLoad = vehicleData.hub?.city?.id || vehicleData.hub?.cityId;
+      const hubIdToLoad = vehicleData.hubId;
+      const oemIdToLoad = vehicleData.model?.oemId;
+
+      console.log('� IDs to load:', { cityIdToLoad, hubIdToLoad, oemIdToLoad });
+
+      // Load all master data in parallel but wait for completion
+      const masterDataPromises = [];
+
+      // Ensure OEMs are loaded
       if (oems.length === 0) {
-        console.log('🔄 Loading OEMs first...');
-        await loadOEMs();
-      }
-
-      // Set OEM and model data if available
-      if (vehicleData.model) {
-        setSelectedModel(vehicleData.model);
-        console.log('🔄 Selected model set:', vehicleData.model);
-
-        // Load models for the OEM
-        if (vehicleData.model.oemId) {
-          console.log('🔄 Loading vehicle models for OEM:', vehicleData.model.oemId);
-          await loadVehicleModels(vehicleData.model.oemId);
-        }
+        console.log('🔄 Loading OEMs...');
+        masterDataPromises.push(loadOEMs());
       }
 
       // Ensure cities are loaded
       if (cities.length === 0) {
-        console.log('🔄 Loading cities first...');
-        await loadCities();
+        console.log('🔄 Loading cities...');
+        masterDataPromises.push(loadCities());
       }
 
-      // Pre-load hubs for the city if available
-      if (vehicleData.hub?.city?.id) {
-        console.log('🔄 Loading hubs for city:', vehicleData.hub.city.id);
-        await loadHubsByCity(vehicleData.hub.city.id);
+      // Wait for basic master data to load
+      await Promise.all(masterDataPromises);
+      console.log('✅ Basic master data loaded');
+
+      // Load dependent data sequentially
+      if (oemIdToLoad && vehicleModels.length === 0) {
+        console.log('🔄 Loading vehicle models for OEM:', oemIdToLoad);
+        await loadVehicleModels(oemIdToLoad);
       }
 
-      // Wait for cities and hubs to be loaded before resetting form
-  // ...existing code...
+      if (cityIdToLoad) {
+        console.log('🔄 Loading hubs for city:', cityIdToLoad);
+        await loadHubsByCity(cityIdToLoad);
+      }
+
+      // Wait for all state updates to complete
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Get fresh state references after all async operations
+      const freshCitiesResponse = await vehicleService.getCities({ isActive: true, isOperational: true });
+      const freshCities: City[] = freshCitiesResponse.data;
+      
+      let freshHubs: Hub[] = [];
+      if (cityIdToLoad) {
+        const freshHubsResponse = await vehicleService.getHubsByCity(cityIdToLoad);
+        freshHubs = freshHubsResponse.data;
+      }
+
+      console.log('� Fresh Cities:', freshCities.map(c => ({ id: c.id, name: c.displayName })));
+      console.log('🔍 Fresh Hubs:', freshHubs.map(h => ({ id: h.id, name: h.name })));
+
+      // Update state with fresh data
+      setCities(freshCities);
+      setHubs(freshHubs);
+
+      // Set OEM and model data if available
+      if (vehicleData.model) {
+        setSelectedModel(vehicleData.model);
+        console.log('� Selected model set:', vehicleData.model);
+      }
 
       // Populate form with existing data with explicit type safety
       const formData = {
@@ -529,41 +598,41 @@ const VehicleFormPage: React.FC = () => {
         modelId: formData.modelId,
         color: formData.color,
         year: formData.year,
-        chassisNumber: formData.chassisNumber,
-        engineNumber: formData.engineNumber,
-        batteryCapacity: formData.batteryCapacity,
-        maxRange: formData.maxRange,
-        maxSpeed: formData.maxSpeed,
-        variant: formData.variant,
-        purchaseDate: formData.purchaseDate,
-        registrationDate: formData.registrationDate,
-        purchasePrice: formData.purchasePrice,
-        currentValue: formData.currentValue,
         cityId: formData.cityId,
         hubId: formData.hubId,
         mileage: formData.mileage
       });
 
-      console.log('🔍 Available OEMs:', oems.map(o => ({ id: o.id, name: o.displayName })));
-      console.log('🔍 Available Models:', vehicleModels.map(m => ({ id: m.id, name: m.displayName })));
-      console.log('🔍 Available Cities:', cities.map(c => ({ id: c.id, name: c.displayName })));
-      console.log('🔍 Available Hubs:', hubs.map(h => ({ id: h.id, name: h.name })));
+      // Verify matching data exists
+      const matchingCity = freshCities.find((city: City) => city.id === formData.cityId);
+      const matchingHub = freshHubs.find((hub: Hub) => hub.id === formData.hubId);
+      console.log('🔍 Matching city found:', matchingCity);
+      console.log('🔍 Matching hub found:', matchingHub);
 
-
-      // Wait for cities and hubs to be loaded before resetting form
-  // ...existing code...
-
-      // Debug the matching process after waiting
-      console.log('🔍 [AFTER WAIT] Available Cities:', cities.map(c => ({ id: c.id, name: c.displayName })));
-      console.log('🔍 [AFTER WAIT] Available Hubs:', hubs.map(h => ({ id: h.id, name: h.name })));
-      console.log('🔍 [AFTER WAIT] Looking for cityId:', formData.cityId);
-      console.log('🔍 [AFTER WAIT] Looking for hubId:', formData.hubId);
-      const matchingCity = cities.find(city => city.id === formData.cityId);
-      const matchingHub = hubs.find(hub => hub.id === formData.hubId);
-      console.log('🔍 [AFTER WAIT] Matching city found:', matchingCity);
-      console.log('🔍 [AFTER WAIT] Matching hub found:', matchingHub);
-
+      // Reset form with the data
       reset(formData);
+      
+      // Wait for form reset to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Verify form values were set correctly
+      const currentFormValues = watch();
+      console.log('🔍 Form values after reset:', {
+        cityId: currentFormValues.cityId,
+        hubId: currentFormValues.hubId,
+        registrationNumber: currentFormValues.registrationNumber
+      });
+
+      // If values didn't set correctly, force set them
+      if (formData.cityId && currentFormValues.cityId !== formData.cityId) {
+        console.log('🔧 Force setting cityId:', formData.cityId);
+        setValue('cityId', formData.cityId, { shouldValidate: true });
+      }
+      
+      if (formData.hubId && currentFormValues.hubId !== formData.hubId) {
+        console.log('🔧 Force setting hubId:', formData.hubId);
+        setValue('hubId', formData.hubId, { shouldValidate: true });
+      }
 
       // Load existing documents
       try {

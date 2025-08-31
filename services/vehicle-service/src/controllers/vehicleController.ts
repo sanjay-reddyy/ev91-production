@@ -1,4 +1,4 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { VehicleService } from "../services";
@@ -31,25 +31,23 @@ export const createVehicle = asyncHandler(
 );
 
 // Get all vehicles with filtering and pagination
-export const getVehicles = asyncHandler(
-  async (req: AuthenticatedRequest, res: Response) => {
-    Logger.info("Get vehicles request received", { userId: req.user?.id });
+export const getVehicles = asyncHandler(async (req: Request, res: Response) => {
+  Logger.info("Get vehicles request received", { params: req.query });
 
-    const params: QueryParams = req.query as any;
+  const params: QueryParams = req.query as any;
 
-    try {
-      const result = await VehicleService.getVehicles(params);
+  try {
+    const result = await VehicleService.getVehicles(params);
 
-      res.json({
-        success: true,
-        data: result.vehicles,
-        pagination: result.pagination,
-      });
-    } catch (error) {
-      throw error; // Let the global error handler manage it
-    }
+    res.json({
+      success: true,
+      data: result.vehicles,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    throw error; // Let the global error handler manage it
   }
-);
+});
 
 // Get vehicle by ID
 export const getVehicleById = asyncHandler(

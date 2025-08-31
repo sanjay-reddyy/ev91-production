@@ -418,7 +418,7 @@ const VehicleInventoryPage: React.FC = () => {
   }, [navigate]);
 
   const handleViewVehicle = useCallback((vehicleId: string) => {
-    navigate(`/vehicles/${vehicleId}`);
+    navigate(`/vehicles/${vehicleId}`); // Now unified to use VehicleProfile
   }, [navigate]);
 
   // Enhanced vehicle actions

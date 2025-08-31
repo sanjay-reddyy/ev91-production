@@ -15,10 +15,11 @@ export const authMiddleware = async (
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: "Access token required",
       });
+      return;
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
@@ -28,19 +29,21 @@ export const authMiddleware = async (
     const user = await AuthService.getUserWithRoles(payload.userId);
 
     if (!user || !user.isActive) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: "User not found or inactive",
       });
+      return;
     }
 
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: "Invalid or expired token",
     });
+    return;
   }
 };
 
@@ -54,10 +57,11 @@ export const requirePermission = (
 ) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: "User not authenticated",
       });
+      return;
     }
 
     // Super Admin bypass - always allow if user has Super Admin role
@@ -67,7 +71,8 @@ export const requirePermission = (
 
     if (isSuperAdmin) {
       console.log(`Super Admin bypass for ${service}:${resource}:${action}`);
-      return next();
+      next();
+      return;
     }
 
     // Check if user has the required permission
@@ -82,10 +87,11 @@ export const requirePermission = (
     );
 
     if (!hasPermission) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         error: `Access denied. Required permission: ${service}:${resource}:${action}`,
       });
+      return;
     }
 
     next();
@@ -98,19 +104,21 @@ export const requirePermission = (
 export const requireRole = (requiredRole: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: "User not authenticated",
       });
+      return;
     }
 
     const hasRole = req.user.roles.some((role) => role.name === requiredRole);
 
     if (!hasRole) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         error: `Access denied. Required role: ${requiredRole}`,
       });
+      return;
     }
 
     next();
@@ -122,10 +130,11 @@ export const requireRole = (requiredRole: string) => {
  */
 export const adminOnly = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: "User not authenticated",
     });
+    return;
   }
 
   // Check for Super Admin role
@@ -137,10 +146,11 @@ export const adminOnly = (req: Request, res: Response, next: NextFunction) => {
   const isAdmin = req.user.roles.some((role) => role.name === "ADMIN");
 
   if (!isSuperAdmin && !isAdmin) {
-    return res.status(403).json({
+    res.status(403).json({
       success: false,
       error: "Access denied. Admin role required.",
     });
+    return;
   }
 
   next();

@@ -27,7 +27,6 @@ import RiderProfile from './pages/RiderProfile'
 // Vehicle Management Pages
 import VehicleDashboard from './pages/VehicleDashboard'
 import VehicleInventory from './pages/VehicleInventory'
-import VehicleDetails from './pages/VehicleDetails'
 import VehicleForm from './pages/VehicleForm'
 import VehicleProfile from './pages/VehicleProfile'
 import DamageManagement from './pages/DamageManagement'
@@ -180,7 +179,7 @@ const App: React.FC = () => {
                 <Route path="/vehicles/add" element={<VehicleForm />} />
                 <Route path="/vehicles/edit/:id" element={<VehicleForm />} />
                 <Route path="/vehicles/view/:id" element={<VehicleProfile />} />
-                <Route path="/vehicles/:id" element={<VehicleDetails />} />
+                <Route path="/vehicles/:id" element={<VehicleProfile />} />
                 <Route path="/damage" element={<DamageManagement />} />
                 <Route path="/damage/new" element={<DamageForm />} />
                 <Route path="/damage/:id/edit" element={<DamageForm />} />

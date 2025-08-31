@@ -18,9 +18,10 @@ export default defineConfig({
         secure: false,
       },
       "/api/riders": {
-        target: "http://localhost:8000",
+        target: "http://localhost:4005",
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/api\/riders/, "/api/v1"),
       },
       "/api/clients": {
         target: "http://localhost:3004",
@@ -42,8 +43,8 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      "/api": {
-        target: "http://localhost:4001",
+      "/api/spare-parts": {
+        target: "http://localhost:4006",
         changeOrigin: true,
         secure: false,
       },
@@ -52,8 +53,8 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      "/api/spare-parts": {
-        target: "http://localhost:4006",
+      "/api": {
+        target: "http://localhost:4001",
         changeOrigin: true,
         secure: false,
       },

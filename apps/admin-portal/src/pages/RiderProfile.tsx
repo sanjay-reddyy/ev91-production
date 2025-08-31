@@ -85,6 +85,8 @@ const RiderProfile: React.FC = () => {
   const [earnings, setEarnings] = useState<RiderEarning[]>([])
   const [earningsSummary, setEarningsSummary] = useState<RiderEarningsSummary | null>(null)
   const [availableVehicles, setAvailableVehicles] = useState<VehicleAssignment[]>([])
+  const [availableHubs, setAvailableHubs] = useState<any[]>([])
+  const [selectedHub, setSelectedHub] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [tabValue, setTabValue] = useState(0)
@@ -176,14 +178,25 @@ const RiderProfile: React.FC = () => {
     }
   }, [riderId, earningsPeriod])
 
-  const loadAvailableVehicles = useCallback(async () => {
+  const loadAvailableVehicles = useCallback(async (hubId?: string) => {
     try {
-      const response = await riderService.getAvailableVehicles()
+      const response = await riderService.getAvailableVehicles(hubId)
       if (response.success) {
         setAvailableVehicles(response.data)
       }
     } catch (error) {
       console.error('Error loading available vehicles:', error)
+    }
+  }, [])
+
+  const loadAvailableHubs = useCallback(async () => {
+    try {
+      const response = await riderService.getHubs()
+      if (response.success) {
+        setAvailableHubs(response.data)
+      }
+    } catch (error) {
+      console.error('Error loading available hubs:', error)
     }
   }, [])
 
@@ -193,20 +206,28 @@ const RiderProfile: React.FC = () => {
     loadOrders()
     loadEarnings()
     loadAvailableVehicles()
-  }, [loadRiderData, loadKYCDocuments, loadOrders, loadEarnings, loadAvailableVehicles])
+    loadAvailableHubs()
+  }, [loadRiderData, loadKYCDocuments, loadOrders, loadEarnings, loadAvailableVehicles, loadAvailableHubs])
 
   useEffect(() => {
     loadEarnings()
   }, [earningsPeriod, loadEarnings])
 
+  const handleHubChange = (hubId: string) => {
+    setSelectedHub(hubId)
+    setSelectedVehicle('') // Reset vehicle selection when hub changes
+    loadAvailableVehicles(hubId) // Load vehicles for selected hub
+  }
+
   const handleAssignVehicle = async () => {
     if (!riderId || !selectedVehicle) return
 
     try {
-      await riderService.assignVehicle(riderId, selectedVehicle)
+      await riderService.assignVehicle(riderId, selectedVehicle, selectedHub)
       setSnackbar({ open: true, message: 'Vehicle assigned successfully', severity: 'success' })
       setVehicleAssignDialog(false)
       setSelectedVehicle('')
+      setSelectedHub('')
       loadRiderData()
       loadAvailableVehicles()
     } catch (error) {
@@ -845,23 +866,50 @@ const RiderProfile: React.FC = () => {
       <Dialog open={vehicleAssignDialog} onClose={() => setVehicleAssignDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Assign Vehicle to Rider</DialogTitle>
         <DialogContent>
-          <FormControl fullWidth sx={{ mt: 2 }}>
-            <InputLabel>Select Vehicle</InputLabel>
-            <Select
-              value={selectedVehicle}
-              label="Select Vehicle"
-              onChange={(e) => setSelectedVehicle(e.target.value)}
-            >
-              {availableVehicles.map((vehicle) => (
-                <MenuItem key={vehicle.id} value={vehicle.id}>
-                  {vehicle.registrationNumber} - {vehicle.make} {vehicle.model}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Stack spacing={3} sx={{ mt: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Select Hub</InputLabel>
+              <Select
+                value={selectedHub}
+                label="Select Hub"
+                onChange={(e) => handleHubChange(e.target.value)}
+              >
+                {availableHubs.map((hub) => (
+                  <MenuItem key={hub.id} value={hub.id}>
+                    {hub.name} - {hub.city?.name || 'Unknown City'}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth disabled={!selectedHub}>
+              <InputLabel>Select Vehicle</InputLabel>
+              <Select
+                value={selectedVehicle}
+                label="Select Vehicle"
+                onChange={(e) => setSelectedVehicle(e.target.value)}
+              >
+                {availableVehicles.map((vehicle) => (
+                  <MenuItem key={vehicle.id} value={vehicle.id}>
+                    {vehicle.registrationNumber} - {vehicle.make} {vehicle.model} ({vehicle.fuelType})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {selectedHub && availableVehicles.length === 0 && (
+              <Alert severity="info">
+                No available vehicles found in the selected hub.
+              </Alert>
+            )}
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setVehicleAssignDialog(false)}>Cancel</Button>
+          <Button onClick={() => {
+            setVehicleAssignDialog(false)
+            setSelectedHub('')
+            setSelectedVehicle('')
+          }}>Cancel</Button>
           <Button onClick={handleAssignVehicle} variant="contained" disabled={!selectedVehicle}>
             Assign
           </Button>

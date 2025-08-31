@@ -9,7 +9,7 @@
       "path": "./services/auth-service"
     },
     {
-      "name": "🏪 Client Store Service", 
+      "name": "🏪 Client Store Service",
       "path": "./services/client-store-service"
     },
     {
@@ -27,10 +27,6 @@
     {
       "name": "📱 Mobile App",
       "path": "./apps/mobile-app"
-    },
-    {
-      "name": "🎨 UI Components",
-      "path": "./apps/ui-components"
     }
   ],
   "settings": {
@@ -41,7 +37,7 @@
     "typescript.updateImportsOnFileMove.enabled": "never",
     "typescript.preferences.allowIncompleteCompletions": false,
     "typescript.maxTsServerMemory": 4096,
-    
+
     // Search and File Watching Optimizations
     "search.useIgnoreFiles": true,
     "search.useGlobalIgnoreFiles": true,
@@ -73,7 +69,7 @@
       "**/.cache": true,
       "**/coverage": true
     },
-    
+
     // Editor Performance Optimizations
     "editor.renderWhitespace": "none",
     "editor.renderLineHighlight": "line",
@@ -83,21 +79,22 @@
     "editor.bracketPairColorization.enabled": false,
     "editor.guides.bracketPairs": false,
     "editor.lightbulb.enabled": "off",
-    
+
     // Memory and Resource Optimizations
     "extensions.ignoreRecommendations": true,
     "git.enabled": true,
     "git.autorefresh": false,
     "git.autofetch": false,
     "emmet.showSuggestionsAsSnippets": false,
-    
+
     // File Operations
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
       "source.fixAll.eslint": "explicit"
-    }
+    },
+    "powershell.cwd": "🏗️ Root"
   },
   "extensions": {
     "recommendations": [

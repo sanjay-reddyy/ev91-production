@@ -51,6 +51,7 @@ import {
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import { riderService, Rider } from '../services'
+import RiderForm from '../components/RiderForm'
 
 const REGISTRATION_STATUSES = [
   { value: 'pending', label: 'Pending', color: 'warning' },
@@ -84,6 +85,24 @@ interface RiderFormData {
   emergencyRelation: string
 }
 
+interface FormErrors {
+  name?: string
+  phone?: string
+  email?: string
+  dob?: string
+  address1?: string
+  address2?: string
+  city?: string
+  state?: string
+  pincode?: string
+  aadharNumber?: string
+  panNumber?: string
+  drivingLicenseNumber?: string
+  emergencyName?: string
+  emergencyPhone?: string
+  emergencyRelation?: string
+}
+
 const RiderManagement: React.FC = () => {
   const navigate = useNavigate()
   const [riders, setRiders] = useState<Rider[]>([])
@@ -107,6 +126,8 @@ const RiderManagement: React.FC = () => {
     emergencyPhone: '',
     emergencyRelation: '',
   })
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [validationEnabled, setValidationEnabled] = useState(false)
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -227,15 +248,160 @@ const RiderManagement: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false)
     setEditingRider(null)
+    setValidationEnabled(false)
+    setFormErrors({})
+    setFormData({
+      name: '',
+      phone: '',
+      email: '',
+      dob: '',
+      address1: '',
+      address2: '',
+      city: '',
+      state: '',
+      pincode: '',
+      aadharNumber: '',
+      panNumber: '',
+      drivingLicenseNumber: '',
+      emergencyName: '',
+      emergencyPhone: '',
+      emergencyRelation: '',
+    })
+  }
+
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {}
+
+    // Name validation
+    if (!formData.name.trim()) {
+      errors.name = 'Full name is required'
+    } else if (formData.name.trim().length < 2) {
+      errors.name = 'Name must be at least 2 characters long'
+    }
+
+    // Phone validation - exactly 10 digits
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone number is required'
+    } else if (!/^[6-9]\d{9}$/.test(formData.phone.trim())) {
+      errors.phone = 'Phone number must be exactly 10 digits and start with 6, 7, 8, or 9'
+    }
+
+    // Email validation (optional but if provided should be valid)
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address'
+    }
+
+    // Date of birth validation
+    if (!formData.dob) {
+      errors.dob = 'Date of birth is required'
+    } else {
+      const dobDate = new Date(formData.dob)
+      const today = new Date()
+      const age = today.getFullYear() - dobDate.getFullYear()
+      if (age < 18 || age > 65) {
+        errors.dob = 'Rider must be between 18 and 65 years old'
+      }
+    }
+
+    // Address validation
+    if (!formData.address1.trim()) {
+      errors.address1 = 'Address is required'
+    }
+
+    // City validation
+    if (!formData.city.trim()) {
+      errors.city = 'City is required'
+    }
+
+    // State validation
+    if (!formData.state.trim()) {
+      errors.state = 'State is required'
+    }
+
+    // PIN code validation - exactly 6 digits
+    if (!formData.pincode.trim()) {
+      errors.pincode = 'PIN code is required'
+    } else if (!/^\d{6}$/.test(formData.pincode.trim())) {
+      errors.pincode = 'PIN code must be exactly 6 digits'
+    }
+
+    // Aadhar validation - 12 digits
+    if (!formData.aadharNumber.trim()) {
+      errors.aadharNumber = 'Aadhar number is required'
+    } else if (!/^\d{12}$/.test(formData.aadharNumber.trim())) {
+      errors.aadharNumber = 'Aadhar number must be exactly 12 digits'
+    }
+
+    // PAN validation - standard PAN format
+    if (!formData.panNumber.trim()) {
+      errors.panNumber = 'PAN number is required'
+    } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber.trim().toUpperCase())) {
+      errors.panNumber = 'PAN number must be in format ABCDE1234F'
+    }
+
+    // Driving license validation
+    if (!formData.drivingLicenseNumber.trim()) {
+      errors.drivingLicenseNumber = 'Driving license number is required'
+    } else if (formData.drivingLicenseNumber.trim().length < 8) {
+      errors.drivingLicenseNumber = 'Driving license number must be at least 8 characters'
+    }
+
+    // Emergency contact validation
+    if (!formData.emergencyName.trim()) {
+      errors.emergencyName = 'Emergency contact name is required'
+    }
+
+    if (!formData.emergencyPhone.trim()) {
+      errors.emergencyPhone = 'Emergency contact phone is required'
+    } else if (!/^[6-9]\d{9}$/.test(formData.emergencyPhone.trim())) {
+      errors.emergencyPhone = 'Emergency phone must be exactly 10 digits and start with 6, 7, 8, or 9'
+    }
+
+    if (!formData.emergencyRelation.trim()) {
+      errors.emergencyRelation = 'Emergency contact relation is required'
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSaveRider = async () => {
+    setValidationEnabled(true)
+
+    if (!validateForm()) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix the validation errors before submitting',
+        severity: 'error'
+      })
+      return
+    }
+
     try {
+      // Clean the form data before submission
+      const cleanedData = {
+        ...formData,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim() || undefined,
+        address1: formData.address1.trim(),
+        address2: formData.address2.trim() || undefined,
+        city: formData.city.trim(),
+        state: formData.state.trim(),
+        pincode: formData.pincode.trim(),
+        aadharNumber: formData.aadharNumber.trim(),
+        panNumber: formData.panNumber.trim().toUpperCase(),
+        drivingLicenseNumber: formData.drivingLicenseNumber.trim(),
+        emergencyName: formData.emergencyName.trim(),
+        emergencyPhone: formData.emergencyPhone.trim(),
+        emergencyRelation: formData.emergencyRelation.trim(),
+      }
+
       if (editingRider) {
-        await riderService.updateRider(editingRider.id, formData)
+        await riderService.updateRider(editingRider.id, cleanedData)
         setSnackbar({ open: true, message: 'Rider updated successfully', severity: 'success' })
       } else {
-        await riderService.createRider(formData)
+        await riderService.createRider(cleanedData)
         setSnackbar({ open: true, message: 'Rider created successfully', severity: 'success' })
       }
       handleCloseDialog()
@@ -738,133 +904,13 @@ const RiderManagement: React.FC = () => {
           {editingRider ? 'Edit Rider' : 'Add New Rider'}
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={3} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Full Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Phone Number"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Date of Birth"
-                type="date"
-                value={formData.dob}
-                onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Address Line 1"
-                value={formData.address1}
-                onChange={(e) => setFormData({ ...formData, address1: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Address Line 2"
-                value={formData.address2}
-                onChange={(e) => setFormData({ ...formData, address2: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="City"
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="State"
-                value={formData.state}
-                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="PIN Code"
-                value={formData.pincode}
-                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Aadhar Number"
-                value={formData.aadharNumber}
-                onChange={(e) => setFormData({ ...formData, aadharNumber: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="PAN Number"
-                value={formData.panNumber}
-                onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Driving License Number"
-                value={formData.drivingLicenseNumber}
-                onChange={(e) => setFormData({ ...formData, drivingLicenseNumber: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Emergency Contact Name"
-                value={formData.emergencyName}
-                onChange={(e) => setFormData({ ...formData, emergencyName: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Emergency Contact Phone"
-                value={formData.emergencyPhone}
-                onChange={(e) => setFormData({ ...formData, emergencyPhone: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Emergency Contact Relation"
-                value={formData.emergencyRelation}
-                onChange={(e) => setFormData({ ...formData, emergencyRelation: e.target.value })}
-              />
-            </Grid>
-          </Grid>
+          <RiderForm
+            formData={formData}
+            formErrors={formErrors}
+            validationEnabled={validationEnabled}
+            onFormDataChange={setFormData}
+            onErrorsChange={setFormErrors}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>

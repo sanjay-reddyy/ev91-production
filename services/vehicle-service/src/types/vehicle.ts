@@ -142,6 +142,7 @@ export interface VehicleResponse extends Vehicle {
     hubCode: string;
     address: string;
     city: {
+      id: string;
       name: string;
       displayName: string;
     };

@@ -303,6 +303,7 @@ export class VehicleService {
                 hubCode: result.hub.code,
                 address: result.hub.address,
                 city: {
+                  id: result.hub.city.id,
                   name: result.hub.city.name,
                   displayName: result.hub.city.displayName,
                 },
@@ -507,6 +508,7 @@ export class VehicleService {
               hubCode: vehicle.hub.code,
               address: vehicle.hub.address,
               city: {
+                id: vehicle.hub.city.id,
                 name: vehicle.hub.city.name,
                 displayName: vehicle.hub.city.displayName,
               },
@@ -1004,6 +1006,7 @@ export class VehicleService {
     if (params.serviceStatus) where.serviceStatus = params.serviceStatus;
     if (params.assignedRider) where.currentRiderId = params.assignedRider;
     if (params.fleetOperatorId) where.fleetOperatorId = params.fleetOperatorId;
+    if (params.hubId) where.hubId = params.hubId;
     if (params.location)
       where.location = { contains: params.location, mode: "insensitive" };
 

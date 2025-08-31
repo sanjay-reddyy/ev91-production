@@ -1,0 +1,181 @@
+// Prisma schema for Auth Service - PostgreSQL Single Schema Version
+// This version uses a single schema for easier management
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String?
+  lastName      String?
+  role          String    @default("user") // Deprecated - use roles relationship
+  isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Enhanced relationships
+  employee      Employee?
+  sessions      Session[]
+  userRoles     UserRole[]
+
+  @@map("users")
+}
+
+// Department model
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  code        String?  @unique // Department code (e.g., "IT", "HR", "FIN")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  teams       Team[]
+  employees   Employee[]
+
+  @@map("departments")
+}
+
+// Team model
+model Team {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  departmentId String
+  managerId    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  manager      Employee?    @relation("TeamManager", fields: [managerId], references: [id])
+  employees    Employee[]
+
+  @@unique([name, departmentId])
+  @@map("teams")
+}
+
+// Employee model - Enhanced user profile for organizational structure
+model Employee {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  employeeId   String    @unique // Employee number/ID
+  firstName    String
+  lastName     String
+  email        String    @unique
+  phone        String?
+  departmentId String
+  teamId       String?
+  managerId    String?
+  position     String? // Job title/position
+  hireDate     DateTime
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relationships
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   Department   @relation(fields: [departmentId], references: [id])
+  team         Team?        @relation(fields: [teamId], references: [id])
+  manager      Employee?    @relation("EmployeeManager", fields: [managerId], references: [id])
+  subordinates Employee[]   @relation("EmployeeManager")
+  managedTeams Team[]       @relation("TeamManager")
+
+  @@map("employees")
+}
+
+// Role model for RBAC
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  level       Int      @default(1) // 1=lowest, 10=highest
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+// Permission model for fine-grained access control
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  service     String   // auth, vehicle, rider, client-store, etc.
+  resource    String   // users, vehicles, reports, etc.
+  action      String   // create, read, update, delete, approve, etc.
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  rolePermissions RolePermission[]
+
+  @@unique([service, resource, action])
+  @@map("permissions")
+}
+
+// Junction table for Role-Permission many-to-many
+model RolePermission {
+  id           String @id @default(cuid())
+  roleId       String
+  permissionId String
+
+  // Relationships
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// Junction table for User-Role many-to-many
+model UserRole {
+  id        String    @id @default(cuid())
+  userId    String
+  roleId    String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  createdBy String?
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// Session model for managing user sessions
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  refreshToken String? @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
