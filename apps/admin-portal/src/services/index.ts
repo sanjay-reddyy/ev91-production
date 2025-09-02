@@ -21,3 +21,5 @@ export type {
   RiderPerformanceMetrics,
   APIResponse,
 } from "./riderService";
+
+export type { Vehicle, Hub, City, MediaFile } from "./vehicleService";

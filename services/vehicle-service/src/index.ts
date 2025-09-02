@@ -9,6 +9,7 @@ import { PrismaClient } from "@prisma/client";
 // Import routes
 import vehicleRoutes from "./routes/vehicles";
 import serviceRoutes from "./routes/services";
+import unifiedServiceRoutes from "./routes/unifiedService";
 import damageRoutes from "./routes/damage";
 import handoverRoutes from "./routes/handover";
 import mediaRoutes from "./routes/media";
@@ -103,6 +104,7 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 // API Routes - vehicles route temporarily without auth for testing
 app.use("/api/v1/vehicles", vehicleRoutes);
 app.use("/api/v1/service", authMiddleware, serviceRoutes);
+app.use("/api/v1/unified-service", authMiddleware, unifiedServiceRoutes);
 app.use("/api/v1/damage", authMiddleware, damageRoutes);
 app.use("/api/v1/handover", authMiddleware, handoverRoutes);
 app.use("/api/v1/media", authMiddleware, mediaRoutes);

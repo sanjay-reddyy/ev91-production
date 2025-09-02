@@ -285,6 +285,7 @@ model Vehicle {
   rcDetails        RCDetails?
   insuranceDetails InsuranceDetails[]
   serviceHistory   ServiceRecord[]
+  serviceRequests  ServiceRequest[]
   damageRecords    DamageRecord[]
   mediaFiles       VehicleMedia[]
   handoverRecords  HandoverRecord[]
@@ -396,8 +397,9 @@ model ServiceRecord {
   updatedAt DateTime @updatedAt
 
   // Relationships
-  vehicle    Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  mediaFiles ServiceMedia[]
+  vehicle        Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  mediaFiles     ServiceMedia[]
+  serviceRequests ServiceRequest[]
 
   @@map("service_records")
   @@schema("vehicle")
@@ -662,6 +664,327 @@ model FleetAnalytics {
 
   @@unique([periodType, periodDate])
   @@map("fleet_analytics")
+  @@schema("vehicle")
+}
+
+// Unified Service Request System
+// Main service request model that integrates scheduling and parts management
+model ServiceRequest {
+  id           String @id @default(cuid())
+  ticketNumber String @unique
+  vehicleId    String
+  requestedBy  String // User ID who created the request
+  assignedTo   String? // Technician ID assigned to the service
+
+  // Service Details
+  serviceType ServiceRequestType
+  priority    ServiceRequestPriority
+  status      ServiceRequestStatus @default(DRAFT)
+  title       String
+  description String
+  issueReported String?
+  symptoms    String? // JSON array
+
+  // Scheduling Information
+  requestedDate    DateTime?
+  scheduledDate    DateTime?
+  estimatedDuration Int? // in hours
+  actualStartTime  DateTime?
+  actualEndTime    DateTime?
+
+  // Location and Resources
+  serviceLocation String?
+  serviceCenter   String?
+  serviceBay      String?
+
+  // Cost Information
+  estimatedLaborCost Float?
+  estimatedPartsCost Float?
+  estimatedTotalCost Float?
+  actualLaborCost    Float?
+  actualPartsCost    Float?
+  actualTotalCost    Float?
+
+  // Work Details
+  workPerformed           String?
+  completionNotes         String?
+  qualityCheckNotes       String?
+  customerApprovalRequired Boolean @default(false)
+  customerApproved        Boolean?
+  customerComments        String?
+
+  // Service Record Integration
+  serviceRecordId String? // Links to actual service record when work is completed
+
+  // Additional Metadata
+  tags  String? // JSON array
+  notes String?
+
+  // Audit Trail
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String
+  lastModifiedBy String
+
+  // Relationships
+  vehicle         Vehicle               @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  serviceRecord   ServiceRecord?        @relation(fields: [serviceRecordId], references: [id])
+  partsRequests   ServicePartsRequest[]
+  partsUsed       ServicePartsUsed[]
+  approvals       ServiceApproval[]
+  attachments     ServiceAttachment[]
+  workflowSteps   ServiceWorkflowStep[]
+
+  @@map("service_requests")
+  @@schema("vehicle")
+}
+
+// Parts requests within a service request
+model ServicePartsRequest {
+  id               String @id @default(cuid())
+  serviceRequestId String
+  sparePartId      String
+  partName         String
+  partNumber       String
+  requestedQuantity Int
+  approvedQuantity Int?
+  issuedQuantity   Int?
+  unitCost         Float?
+  totalCost        Float?
+  urgency          PartUrgency @default(Normal)
+  justification    String
+  status           PartRequestStatus @default(Pending)
+  requestedBy      String
+  approvedBy       String?
+  issuedBy         String?
+  requestedAt      DateTime @default(now())
+  approvedAt       DateTime?
+  issuedAt         DateTime?
+  notes            String?
+
+  // Cross-service integration fields
+  sparePartsRequestId String? // Links to spare-parts-service SparePartRequest
+  storeId            String? // Store where part should be sourced from
+  externalRequestStatus String? // Status from spare-parts-service
+
+  // Relationships
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@map("service_parts_requests")
+  @@schema("vehicle")
+}
+
+// Parts actually used during service
+model ServicePartsUsed {
+  id               String @id @default(cuid())
+  serviceRequestId String
+  sparePartId      String
+  partName         String
+  partNumber       String
+  quantity         Int
+  unitCost         Float
+  totalCost        Float
+  batchNumber      String?
+  serialNumber     String?
+  installedBy      String
+  installedAt      DateTime @default(now())
+  warrantyPeriod   Int? // in months
+  warrantyExpiry   DateTime?
+  notes            String?
+
+  // Cross-service integration fields
+  installedPartId   String? // Links to spare-parts-service InstalledPart
+  storeId          String? // Store where part was sourced from
+  supplierBatch    String? // Supplier batch information
+
+  // Relationships
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@map("service_parts_used")
+  @@schema("vehicle")
+}
+
+// Approval workflow for service requests
+model ServiceApproval {
+  id               String @id @default(cuid())
+  serviceRequestId String
+  approvalType     ApprovalType
+  requiredFor      String // What this approval is for
+  status           ApprovalStatus @default(Pending)
+  approverRole     String
+  approvedBy       String?
+  approvedAt       DateTime?
+  comments         String?
+  conditions       String?
+
+  // Relationships
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceRequestId, approverRole])
+  @@map("service_approvals")
+  @@schema("vehicle")
+}
+
+// File attachments for service requests
+model ServiceAttachment {
+  id               String @id @default(cuid())
+  serviceRequestId String
+  fileName         String
+  fileType         String
+  fileSize         Int
+  filePath         String
+  uploadedBy       String
+  uploadedAt       DateTime @default(now())
+  description      String?
+  category         AttachmentCategory
+
+  // Relationships
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@map("service_attachments")
+  @@schema("vehicle")
+}
+
+// Workflow steps for service requests
+model ServiceWorkflowStep {
+  id               String @id @default(cuid())
+  serviceRequestId String
+  stepName         String
+  stepType         WorkflowStepType
+  status           WorkflowStepStatus @default(Pending)
+  assignedTo       String?
+  dueDate          DateTime?
+  completedAt      DateTime?
+  completedBy      String?
+  notes            String?
+  order            Int
+
+  // Relationships
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@map("service_workflow_steps")
+  @@schema("vehicle")
+}
+
+// Service request templates for common requests
+model ServiceRequestTemplate {
+  id                String @id @default(cuid())
+  name              String
+  description       String
+  serviceType       ServiceRequestType
+  defaultPriority   ServiceRequestPriority
+  estimatedDuration Int
+  requiredParts     String? // JSON array
+  workSteps         String? // JSON array
+  checklistItems    String? // JSON array
+  isActive          Boolean @default(true)
+  createdBy         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("service_request_templates")
+  @@schema("vehicle")
+}
+
+// Enums for the unified service system
+enum ServiceRequestType {
+  SCHEDULED_MAINTENANCE @map("Scheduled Maintenance")
+  CORRECTIVE_REPAIR     @map("Corrective Repair")
+  EMERGENCY_REPAIR      @map("Emergency Repair")
+  INSPECTION            @map("Inspection")
+  RECALL_SERVICE        @map("Recall Service")
+
+  @@schema("vehicle")
+}
+
+enum ServiceRequestStatus {
+  DRAFT         @map("Draft")
+  SUBMITTED     @map("Submitted")
+  APPROVED      @map("Approved")
+  PARTS_ORDERED @map("Parts Ordered")
+  SCHEDULED     @map("Scheduled")
+  IN_PROGRESS   @map("In Progress")
+  AWAITING_PARTS @map("Awaiting Parts")
+  COMPLETED     @map("Completed")
+  CANCELLED     @map("Cancelled")
+  ON_HOLD       @map("On Hold")
+
+  @@schema("vehicle")
+}
+
+enum ServiceRequestPriority {
+  LOW       @map("Low")
+  MEDIUM    @map("Medium")
+  HIGH      @map("High")
+  CRITICAL  @map("Critical")
+  EMERGENCY @map("Emergency")
+
+  @@schema("vehicle")
+}
+
+enum PartUrgency {
+  Normal    @map("Normal")
+  Urgent    @map("Urgent")
+  Emergency @map("Emergency")
+
+  @@schema("vehicle")
+}
+
+enum PartRequestStatus {
+  Pending  @map("Pending")
+  Approved @map("Approved")
+  Rejected @map("Rejected")
+  Ordered  @map("Ordered")
+  Received @map("Received")
+  Issued   @map("Issued")
+
+  @@schema("vehicle")
+}
+
+enum ApprovalType {
+  Customer   @map("Customer")
+  Manager    @map("Manager")
+  Technical  @map("Technical")
+  Financial  @map("Financial")
+
+  @@schema("vehicle")
+}
+
+enum ApprovalStatus {
+  Pending  @map("Pending")
+  Approved @map("Approved")
+  Rejected @map("Rejected")
+
+  @@schema("vehicle")
+}
+
+enum AttachmentCategory {
+  Photo     @map("Photo")
+  Document  @map("Document")
+  Video     @map("Video")
+  Audio     @map("Audio")
+  Report    @map("Report")
+  Other     @map("Other")
+
+  @@schema("vehicle")
+}
+
+enum WorkflowStepType {
+  Approval     @map("Approval")
+  Task         @map("Task")
+  Checkpoint   @map("Checkpoint")
+  Notification @map("Notification")
+
+  @@schema("vehicle")
+}
+
+enum WorkflowStepStatus {
+  Pending     @map("Pending")
+  InProgress  @map("In Progress")
+  Completed   @map("Completed")
+  Skipped     @map("Skipped")
+  Failed      @map("Failed")
+
   @@schema("vehicle")
 }
 

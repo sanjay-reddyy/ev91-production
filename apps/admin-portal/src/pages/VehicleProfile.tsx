@@ -16,6 +16,7 @@ import {
   Tabs,
   Tab,
   Avatar,
+  Link,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -29,6 +30,20 @@ import {
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { vehicleService, Vehicle, MediaFile } from '../services/vehicleService';
+import { riderService } from '../services';
+
+interface ServiceRecord {
+  id: string;
+  serviceType: string;
+  serviceDate: string;
+  description: string;
+  workPerformed?: string;
+  serviceStatus: string;
+  cost?: number;
+  serviceCenter?: string;
+  technicianName?: string;
+  nextServiceDate?: string;
+}
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -58,8 +73,11 @@ const VehicleProfile: React.FC = () => {
 
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [serviceHistory, setServiceHistory] = useState<ServiceRecord[]>([]);
+  const [currentRiderName, setCurrentRiderName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [serviceLoading, setServiceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
@@ -68,6 +86,7 @@ const VehicleProfile: React.FC = () => {
     if (id) {
       fetchVehicleData();
       fetchMediaFiles();
+      fetchServiceHistory();
     }
   }, [id]);
 
@@ -79,11 +98,52 @@ const VehicleProfile: React.FC = () => {
       console.log('Hub data:', response.data.hub);
       console.log('Insurance data:', response.data.insuranceDetails);
       setVehicle(response.data);
+
+      // Fetch rider name if there's a currentRiderId
+      if (response.data.currentRiderId) {
+        fetchCurrentRiderName(response.data.currentRiderId);
+      }
     } catch (error: any) {
       console.error('Error fetching vehicle:', error);
       setError('Failed to fetch vehicle data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchServiceHistory = async () => {
+    try {
+      setServiceLoading(true);
+      const response = await vehicleService.getVehicleServiceHistory(id!);
+      console.log('Service history received:', response.data);
+      setServiceHistory(response.data?.serviceHistory || []);
+    } catch (error: any) {
+      console.error('Error fetching service history:', error);
+      // Don't set a general error for service history, just log it
+      setServiceHistory([]);
+    } finally {
+      setServiceLoading(false);
+    }
+  };
+
+  const fetchCurrentRiderName = async (riderId: string) => {
+    try {
+      console.log('Fetching rider data for ID:', riderId);
+      const response = await riderService.getRiderById(riderId);
+      console.log('Rider data received:', response);
+
+      if (response.success && response.data) {
+        const riderName = response.data.name || `${response.data.phone}`;
+        console.log('Setting rider name:', riderName);
+        setCurrentRiderName(riderName);
+      } else {
+        console.log('Rider API call failed or no data, using fallback:', riderId);
+        setCurrentRiderName(riderId);
+      }
+    } catch (error: any) {
+      console.error('Error fetching rider:', error);
+      // Keep the riderId as fallback
+      setCurrentRiderName(riderId);
     }
   };
 
@@ -283,7 +343,7 @@ const VehicleProfile: React.FC = () => {
         {process.env.NODE_ENV === 'development' && (
           <Box sx={{ p: 2, bgcolor: 'grey.100', borderBottom: 1, borderColor: 'divider' }}>
             <Typography variant="caption" color="text.secondary">
-              Debug Info: Hub Data Available: {vehicle.hub ? 'Yes' : 'No'} | 
+              Debug Info: Hub Data Available: {vehicle.hub ? 'Yes' : 'No'} |
               Insurance Data Available: {vehicle.insuranceDetails && vehicle.insuranceDetails.length > 0 ? 'Yes' : 'No'}
             </Typography>
             {vehicle.hub && (
@@ -293,7 +353,7 @@ const VehicleProfile: React.FC = () => {
             )}
           </Box>
         )}
-        
+
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="vehicle profile tabs">
             <Tab label="Basic Information" />
@@ -601,7 +661,7 @@ const VehicleProfile: React.FC = () => {
                             <Typography variant="caption" color="text.secondary">Verification</Typography>
                             <Chip
                               label={insurance.verificationStatus}
-                              color={insurance.verificationStatus === 'Verified' ? 'success' : 
+                              color={insurance.verificationStatus === 'Verified' ? 'success' :
                                      insurance.verificationStatus === 'Rejected' ? 'error' : 'warning'}
                               size="small"
                             />
@@ -667,7 +727,31 @@ const VehicleProfile: React.FC = () => {
                   </Grid>
                   <Grid item xs={6} sm={4}>
                     <Typography variant="caption" color="text.secondary">Current Rider</Typography>
-                    <Typography variant="body2" fontWeight="medium">{vehicle.currentRiderId || 'Not assigned'}</Typography>
+                    <Box sx={{ mt: 0.5 }}>
+                      {vehicle.currentRiderId ? (
+                        <Link
+                          component="button"
+                          variant="body2"
+                          fontWeight="medium"
+                          onClick={() => navigate(`/rider-management/${vehicle.currentRiderId}`)}
+                          sx={{
+                            textDecoration: 'none',
+                            '&:hover': { textDecoration: 'underline' },
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            p: 0,
+                            border: 'none',
+                            background: 'none'
+                          }}
+                        >
+                          {currentRiderName || vehicle.currentRiderId}
+                        </Link>
+                      ) : (
+                        <Typography variant="body2" fontWeight="medium">
+                          Not assigned
+                        </Typography>
+                      )}
+                    </Box>
                   </Grid>
                 </Grid>
               </CardContent>
@@ -679,7 +763,93 @@ const VehicleProfile: React.FC = () => {
         <TabPanel value={tabValue} index={1}>
           <CardContent>
             <Typography variant="h6" gutterBottom>Service History</Typography>
-            <Typography>Service history information will be displayed here.</Typography>
+            {serviceLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : serviceHistory.length > 0 ? (
+              <Box>
+                {serviceHistory.map((service, index) => (
+                  <Card key={service.id || index} variant="outlined" sx={{ mb: 2 }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Box>
+                          <Typography variant="h6" color="primary" gutterBottom>
+                            {service.serviceType}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {service.description}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={service.serviceStatus}
+                          color={
+                            service.serviceStatus === 'Completed' ? 'success' :
+                            service.serviceStatus === 'In Progress' ? 'warning' :
+                            service.serviceStatus === 'Scheduled' ? 'info' : 'default'
+                          }
+                          size="small"
+                        />
+                      </Box>
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Service Date</Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {service.serviceDate ? new Date(service.serviceDate).toLocaleDateString() : 'N/A'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Cost</Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {service.cost ? `₹${service.cost.toLocaleString()}` : 'N/A'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Service Center</Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {service.serviceCenter || 'N/A'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Technician</Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {service.technicianName || 'N/A'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+
+                      {service.workPerformed && (
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="caption" color="text.secondary">Work Performed</Typography>
+                          <Typography variant="body2">
+                            {service.workPerformed}
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {service.nextServiceDate && (
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="caption" color="text.secondary">Next Service Due</Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {new Date(service.nextServiceDate).toLocaleDateString()}
+                          </Typography>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  No service history available for this vehicle
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Service records will appear here once maintenance activities are logged
+                </Typography>
+              </Box>
+            )}
           </CardContent>
         </TabPanel>
 
