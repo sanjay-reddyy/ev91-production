@@ -324,6 +324,14 @@ export const inventoryService = {
     return response.data;
   },
 
+  // Get all inventory levels for a specific spare part
+  getBySparePartId: async (sparePartId: string) => {
+    const response = await sparePartsApi.get(
+      `/spare-parts/inventory/stock-levels/part/${sparePartId}`
+    );
+    return response.data;
+  },
+
   // Update stock level
   updateStock: async (
     storeId: string,

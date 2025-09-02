@@ -133,6 +133,7 @@ export interface Hub {
   code: string;
   hubCode?: string; // Backend also provides this
   cityId: string;
+  cityName?: string; // Direct city name from backend
   address: string;
   pinCode: string;
   landmark?: string;
@@ -152,7 +153,7 @@ export interface Hub {
   hasServiceCenter: boolean;
   createdAt: Date;
   updatedAt: Date;
-  city?: City;
+  city?: City; // Nested city object (when populated)
 }
 
 export interface OEM {
@@ -1012,6 +1013,38 @@ export const vehicleService = {
     } catch (error: any) {
       console.error("Error fetching city:", error);
       throw error;
+    }
+  },
+
+  // Service History operations
+  async getVehicleServiceHistory(vehicleId: string) {
+    try {
+      const response = await vehicleApi.get(
+        `/services/vehicles/${vehicleId}/history`
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("Error fetching vehicle service history:", error);
+      return {
+        data: { serviceHistory: [] },
+        message: error.message || "Error fetching service history",
+      };
+    }
+  },
+
+  async getRiderById(riderId: string) {
+    try {
+      // This would need to call the rider service through API gateway
+      const response = await axios.get(
+        `http://localhost:8000/api/v1/riders/${riderId}`
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("Error fetching rider:", error);
+      return {
+        data: null,
+        message: error.message || "Error fetching rider",
+      };
     }
   },
 };

@@ -82,6 +82,10 @@ export interface VehicleAssignment {
   vehicleType: string;
   fuelType: string;
   assignedDate: string;
+  status?: string;
+  operationalStatus?: string;
+  hubId?: string;
+  hubName?: string;
 }
 
 export interface RiderKYC {
@@ -494,17 +498,97 @@ class RiderService {
   async getAvailableVehicles(
     hubId?: string
   ): Promise<APIResponse<VehicleAssignment[]>> {
-    const queryParams = hubId ? `?hubId=${hubId}` : "";
-    const response = await api.get(`/vehicles/available${queryParams}`);
-    return response.data;
+    try {
+      // Call vehicle service directly
+      const vehicleServiceUrl = "http://localhost:4004/api/v1/vehicles";
+      const params = new URLSearchParams();
+
+      // Filter by operational status
+      params.append("operationalStatus", "Available");
+
+      // Filter by hub if provided
+      if (hubId) {
+        params.append("hubId", hubId);
+      }
+
+      const response = await axios.get(
+        `${vehicleServiceUrl}?${params.toString()}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Transform the response to match VehicleAssignment interface
+      console.log("getAvailableVehicles - API response:", response.data);
+      const vehicles = response.data.data || [];
+      console.log("getAvailableVehicles - vehicles to transform:", vehicles);
+      const transformedVehicles = vehicles.map((vehicle: any) => ({
+        id: vehicle.id,
+        make: vehicle.model?.oem?.name || "Unknown",
+        model: vehicle.model?.name || "Unknown",
+        registrationNumber: vehicle.registrationNumber,
+        vehicleType: vehicle.vehicleType || "Unknown",
+        fuelType: vehicle.model?.fuelType || "Unknown",
+        assignedDate: vehicle.assignedDate || "",
+        status: vehicle.serviceStatus,
+        operationalStatus: vehicle.operationalStatus,
+        hubId: vehicle.hubId,
+        hubName: vehicle.hub?.name,
+      }));
+
+      console.log(
+        "getAvailableVehicles - transformed vehicles:",
+        transformedVehicles
+      );
+
+      return {
+        success: true,
+        message: "Available vehicles fetched successfully",
+        data: transformedVehicles,
+      };
+    } catch (error: any) {
+      console.error("Error fetching available vehicles:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to fetch available vehicles",
+        data: [],
+      };
+    }
   }
 
   /**
    * Get available hubs for dropdown
    */
   async getHubs(): Promise<APIResponse<any[]>> {
-    const response = await api.get(`/hubs`);
-    return response.data;
+    try {
+      // Call vehicle service directly since it has optionalAuth
+      const vehicleServiceUrl = "http://localhost:4004/api/v1/hubs";
+
+      const response = await axios.get(vehicleServiceUrl, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log("Raw hub response:", response.data);
+      const hubsData = response.data.data || [];
+      console.log("Processed hubs data:", hubsData);
+
+      return {
+        success: true,
+        message: "Hubs fetched successfully",
+        data: hubsData,
+      };
+    } catch (error: any) {
+      console.error("Error fetching hubs:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to fetch hubs",
+        data: [],
+      };
+    }
   }
 
   // ==========================================

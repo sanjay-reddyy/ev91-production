@@ -106,6 +106,7 @@ const SpareParts: React.FC = () => {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [stockFilter, setStockFilter] = useState('')
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const [selectedPart, setSelectedPart] = useState<SparePart | null>(null)
 
   // Fetch spare parts data
   const {
@@ -159,12 +160,28 @@ const SpareParts: React.FC = () => {
     setPage(0)
   }
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, part: SparePart) => {
     setAnchorEl(event.currentTarget)
+    setSelectedPart(part)
   }
 
   const handleMenuClose = () => {
     setAnchorEl(null)
+    setSelectedPart(null)
+  }
+
+  const handleEditPart = () => {
+    if (selectedPart) {
+      navigate(`/spare-parts/edit/${selectedPart.id}`)
+    }
+    handleMenuClose()
+  }
+
+  const handleViewStock = () => {
+    if (selectedPart) {
+      navigate(`/spare-parts/view/${selectedPart.id}`)
+    }
+    handleMenuClose()
   }
 
   const getStockStatus = (stockLevels: StockLevel[]) => {
@@ -475,7 +492,7 @@ const SpareParts: React.FC = () => {
                           <TableCell>
                             <IconButton
                               size="small"
-                              onClick={handleMenuOpen}
+                              onClick={(event) => handleMenuOpen(event, part)}
                             >
                               <MoreVertIcon />
                             </IconButton>
@@ -505,11 +522,11 @@ const SpareParts: React.FC = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={handleEditPart}>
           <EditIcon sx={{ mr: 1 }} />
           Edit Part
         </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={handleViewStock}>
           <InventoryIcon sx={{ mr: 1 }} />
           View Stock
         </MenuItem>

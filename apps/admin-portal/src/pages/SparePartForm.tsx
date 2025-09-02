@@ -320,18 +320,18 @@ const SparePartFormPage: React.FC = () => {
   const [activeStep, setActiveStep] = useState(0);
 
   // Helper: get fields for each step
-  const getStepFields = (step: number): string[] => {
-    switch (step) {
-      case 0:
-        return ['name', 'displayName', 'partNumber', 'oemPartNumber', 'internalCode', 'description', 'categoryId', 'supplierId'];
-      case 1:
-        return ['costPrice', 'sellingPrice', 'mrp', 'markupPercent', 'unitOfMeasure', 'minimumStock', 'maximumStock', 'reorderLevel', 'reorderQuantity', 'leadTimeDays'];
-      case 2:
-        return ['dimensions', 'weight', 'material', 'color', 'warranty', 'qualityGrade', 'isOemApproved', 'isActive', 'isHazardous', 'compatibility'];
-      default:
-        return [];
-    }
-  };
+  // const getStepFields = (step: number): string[] => {
+  //   switch (step) {
+  //     case 0:
+  //       return ['name', 'displayName', 'partNumber', 'oemPartNumber', 'internalCode', 'description', 'categoryId', 'supplierId'];
+  //     case 1:
+  //       return ['costPrice', 'sellingPrice', 'mrp', 'markupPercent', 'unitOfMeasure', 'minimumStock', 'maximumStock', 'reorderLevel', 'reorderQuantity', 'leadTimeDays'];
+  //     case 2:
+  //       return ['dimensions', 'weight', 'material', 'color', 'warranty', 'qualityGrade', 'isOemApproved', 'isActive', 'isHazardous', 'compatibility'];
+  //     default:
+  //       return [];
+  //   }
+  // };
 
   // Navigation handlers
   const handleNext = async () => {
@@ -360,6 +360,19 @@ const SparePartFormPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isEdit = Boolean(id);
+
+  // Fetch existing spare part data for editing
+  const {
+    data: existingSparePartData,
+    isLoading: existingSparePartLoading,
+  } = useQuery(
+    ['spare-part', id],
+    () => sparePartsService.getById(id!),
+    {
+      enabled: isEdit,
+      staleTime: 5 * 60 * 1000,
+    }
+  )
 
   const [loading, setLoading] = useState(false);
   // Stepper state removed
@@ -438,9 +451,55 @@ const SparePartFormPage: React.FC = () => {
     technical: 'spare-part-form-technical',
   };
 
-  // Load saved data for each form
+  // Load saved data for each form (only for new parts) or existing part data (for editing)
   useEffect(() => {
-    if (!isEdit) {
+    if (isEdit && existingSparePartData && !existingSparePartLoading) {
+      // Populate forms with existing spare part data
+      const sparePart = existingSparePartData.data;
+
+      console.log('📝 Loading existing spare part data for editing:', sparePart);
+
+      // Populate basic info form
+      basicInfoForm.reset({
+        name: sparePart.name || '',
+        displayName: sparePart.displayName || '',
+        partNumber: sparePart.partNumber || '',
+        oemPartNumber: sparePart.oemPartNumber || '',
+        internalCode: sparePart.internalCode || '',
+        description: sparePart.description || '',
+        categoryId: sparePart.categoryId || '',
+        supplierId: sparePart.supplierId || '',
+      });
+
+      // Populate pricing & inventory form
+      pricingInventoryForm.reset({
+        costPrice: sparePart.costPrice || undefined,
+        sellingPrice: sparePart.sellingPrice || undefined,
+        mrp: sparePart.mrp || undefined,
+        markupPercent: sparePart.markupPercent || undefined,
+        unitOfMeasure: sparePart.unitOfMeasure || '',
+        minimumStock: sparePart.minimumStock || undefined,
+        maximumStock: sparePart.maximumStock || undefined,
+        reorderLevel: sparePart.reorderLevel || undefined,
+        reorderQuantity: sparePart.reorderQuantity || undefined,
+        leadTimeDays: sparePart.leadTimeDays || undefined,
+      });
+
+      // Populate technical form
+      technicalForm.reset({
+        dimensions: sparePart.dimensions || '',
+        weight: sparePart.weight || undefined,
+        material: sparePart.material || '',
+        color: sparePart.color || '',
+        warranty: sparePart.warranty || undefined,
+        qualityGrade: sparePart.qualityGrade || '',
+        isOemApproved: sparePart.isOemApproved || false,
+        isActive: sparePart.isActive !== undefined ? sparePart.isActive : true,
+        isHazardous: sparePart.isHazardous || false,
+        compatibility: sparePart.compatibility || '[]',
+      });
+    } else if (!isEdit) {
+      // Load saved data from localStorage for new parts
       try {
         const savedBasicInfo = localStorage.getItem(STORAGE_KEYS.basicInfo);
         const savedPricingInventory = localStorage.getItem(STORAGE_KEYS.pricingInventory);
@@ -467,7 +526,7 @@ const SparePartFormPage: React.FC = () => {
         console.error('Error loading saved form data:', error);
       }
     }
-  }, [isEdit, basicInfoForm, pricingInventoryForm, technicalForm]);
+  }, [isEdit, existingSparePartData, existingSparePartLoading, basicInfoForm, pricingInventoryForm, technicalForm]);
 
   // Auto-save each form's data separately
   useEffect(() => {
@@ -537,6 +596,7 @@ const SparePartFormPage: React.FC = () => {
           severity: 'success',
         });
         queryClient.invalidateQueries(['spare-parts']);
+        clearAllSavedData();
         // Navigate back to spare parts list after successful submission
         setTimeout(() => {
           navigate('/spare-parts');
@@ -546,6 +606,33 @@ const SparePartFormPage: React.FC = () => {
         setSnackbar({
           open: true,
           message: error.response?.data?.message || 'Failed to create spare part',
+          severity: 'error',
+        });
+      },
+    }
+  );
+
+  // Update spare part mutation
+  const updateSparePartMutation = useMutation(
+    (data: any) => sparePartsService.update(id!, data),
+    {
+      onSuccess: () => {
+        setSnackbar({
+          open: true,
+          message: 'Spare part updated successfully',
+          severity: 'success',
+        });
+        queryClient.invalidateQueries(['spare-parts']);
+        queryClient.invalidateQueries(['spare-part', id]);
+        // Navigate back to spare parts list after successful submission
+        setTimeout(() => {
+          navigate('/spare-parts');
+        }, 2000);
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: error.response?.data?.message || 'Failed to update spare part',
           severity: 'error',
         });
       },
@@ -627,9 +714,13 @@ const SparePartFormPage: React.FC = () => {
 
       console.log('📤 Sending API data:', apiData);
 
-      await createSparePartMutation.mutateAsync(apiData);
-
-      console.log('✅ Spare part created successfully');
+      if (isEdit) {
+        await updateSparePartMutation.mutateAsync(apiData);
+        console.log('✅ Spare part updated successfully');
+      } else {
+        await createSparePartMutation.mutateAsync(apiData);
+        console.log('✅ Spare part created successfully');
+      }
 
     } catch (error: any) {
       // Log full error details for debugging
@@ -639,7 +730,7 @@ const SparePartFormPage: React.FC = () => {
       console.error('❌ Error creating spare part:', error);
 
       // Show backend error message if available
-      const errorMessage = error?.response?.data?.message || error.message || 'Failed to create spare part';
+      const errorMessage = error?.response?.data?.message || error.message || `Failed to ${isEdit ? 'update' : 'create'} spare part`;
       setSnackbar({
         open: true,
         message: `Submission failed: ${errorMessage}`,
@@ -780,10 +871,10 @@ const SparePartFormPage: React.FC = () => {
               type="submit"
               variant="contained"
               color="primary"
-              disabled={loading}
+              disabled={loading || existingSparePartLoading}
               startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
             >
-              {loading ? 'Creating...' : 'Create Part'}
+              {loading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Part' : 'Create Part')}
             </Button>
           ) : (
             <Button

@@ -46,6 +46,7 @@ import {
   CheckCircle as ApprovalIcon,
   Build as InstallationIcon,
   AttachMoney as CostTrackingIcon,
+  MergeType as UnifiedServiceIcon,
 } from '@mui/icons-material'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useAuth } from '../../contexts/AuthContext'
@@ -220,6 +221,16 @@ const menuItems: MenuItem[] = [
           resource: 'maintenance',
           action: 'read'
         }
+      },
+      {
+        text: 'Unified Service Management',
+        icon: <UnifiedServiceIcon />,
+        path: '/unified-service',
+        anyOfPermissions: [
+          { service: 'vehicle', resource: 'maintenance', action: 'read' },
+          { service: 'spare-parts', resource: 'service-requests', action: 'read' },
+          { service: 'vehicle', resource: 'service-requests', action: 'read' }
+        ]
       },
       {
         text: 'Damage Management',

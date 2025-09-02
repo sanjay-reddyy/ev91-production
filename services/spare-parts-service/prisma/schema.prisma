@@ -298,77 +298,87 @@ model GoodsReceivingItem {
 }
 
 model ServiceRequest {
-  id                String                @id @default(cuid())
-  ticketNumber      String                @unique
-  vehicleId         String
-  vehicleNumber     String?
-  technicianId      String
-  technicianName    String?
-  serviceType       String
-  priority          String                @default("Medium")
-  status            String                @default("Open")
-  description       String?
-  storeId           String
-  storeName         String?
-  serviceAdvisorId  String?
-  estimatedCost     Float?                @default(0)
-  actualCost        Float?                @default(0)
-  partsCost         Float?                @default(0)
-  laborCost         Float?                @default(0)
-  scheduledDate     DateTime?
-  startedAt         DateTime?
-  completedAt       DateTime?
-  externalServiceId String?
-  jobCardNumber     String?
-  customerName      String?
-  customerPhone     String?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  installedParts    InstalledPart[]
-  costBreakdowns    ServiceCostBreakdown?
-  partRequests      SparePartRequest[]
+  id                     String                @id @default(cuid())
+  ticketNumber           String                @unique
+  vehicleId              String
+  vehicleNumber          String?
+  technicianId           String
+  technicianName         String?
+  serviceType            String
+  priority               String                @default("Medium")
+  status                 String                @default("Open")
+  description            String?
+  storeId                String
+  storeName              String?
+  serviceAdvisorId       String?
+  estimatedCost          Float?                @default(0)
+  actualCost             Float?                @default(0)
+  partsCost              Float?                @default(0)
+  laborCost              Float?                @default(0)
+  scheduledDate          DateTime?
+  startedAt              DateTime?
+  completedAt            DateTime?
+  externalServiceId      String?
+  jobCardNumber          String?
+  customerName           String?
+  customerPhone          String?
+
+  // Cross-service integration fields
+  vehicleServiceRequestId String? // Links to vehicle-service ServiceRequest
+  vehicleServiceStatus    String? // Status from vehicle-service
+
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  installedParts         InstalledPart[]
+  costBreakdowns         ServiceCostBreakdown?
+  partRequests           SparePartRequest[]
 
   @@map("service_requests")
   @@schema("spare_parts")
 }
 
 model SparePartRequest {
-  id                String             @id @default(cuid())
-  serviceRequestId  String
-  sparePartId       String
-  storeId           String
-  requestedBy       String
-  requestedQuantity Int
-  urgency           String             @default("Normal")
-  justification     String
-  estimatedCost     Float?
-  status            String             @default("Pending")
-  approvalLevel     Int                @default(1)
-  currentApprover   String?
-  approvedBy        String?
-  approvedAt        DateTime?
-  rejectedBy        String?
-  rejectedAt        DateTime?
-  rejectionReason   String?
-  issuedQuantity    Int?               @default(0)
-  issuedBy          String?
-  issuedAt          DateTime?
-  issuedCost        Float?
-  batchNumbers      String?
-  returnedQuantity  Int?               @default(0)
-  returnedBy        String?
-  returnedAt        DateTime?
-  returnReason      String?
-  returnCondition   String?
-  technicianNotes   String?
-  approverNotes     String?
-  issuerNotes       String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  approvalHistory   ApprovalHistory[]
-  serviceRequest    ServiceRequest     @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
-  sparePart         SparePart          @relation(fields: [sparePartId], references: [id])
-  stockReservations StockReservation[]
+  id                     String             @id @default(cuid())
+  serviceRequestId       String
+  sparePartId            String
+  storeId                String
+  requestedBy            String
+  requestedQuantity      Int
+  urgency                String             @default("Normal")
+  justification          String
+  estimatedCost          Float?
+  status                 String             @default("Pending")
+  approvalLevel          Int                @default(1)
+  currentApprover        String?
+  approvedBy             String?
+  approvedAt             DateTime?
+  rejectedBy             String?
+  rejectedAt             DateTime?
+  rejectionReason        String?
+  issuedQuantity         Int?               @default(0)
+  issuedBy               String?
+  issuedAt               DateTime?
+  issuedCost             Float?
+  batchNumbers           String?
+  returnedQuantity       Int?               @default(0)
+  returnedBy             String?
+  returnedAt             DateTime?
+  returnReason           String?
+  returnCondition        String?
+  technicianNotes        String?
+  approverNotes          String?
+  issuerNotes            String?
+
+  // Cross-service integration fields
+  vehicleServiceRequestId     String? // Links to vehicle-service ServiceRequest
+  vehicleServicePartsRequestId String? // Links to vehicle-service ServicePartsRequest
+
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  approvalHistory        ApprovalHistory[]
+  serviceRequest         ServiceRequest     @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  sparePart              SparePart          @relation(fields: [sparePartId], references: [id])
+  stockReservations      StockReservation[]
 
   @@map("spare_part_requests")
   @@schema("spare_parts")
@@ -423,40 +433,45 @@ model StockReservation {
 }
 
 model InstalledPart {
-  id                  String         @id @default(cuid())
-  serviceRequestId    String
-  sparePartId         String
-  technicianId        String
-  storeId             String
-  batchNumber         String?
-  serialNumber        String?
-  quantity            Int
-  unitCost            Float
-  totalCost           Float
-  sellingPrice        Float?
-  totalRevenue        Float?
-  installedAt         DateTime       @default(now())
-  installationNotes   String?
-  replacedPartId      String?
-  replacementReason   String?
-  warrantyMonths      Int?
-  warrantyExpiry      DateTime?
-  warrantyTerms       String?
-  warrantyProvider    String?
-  removalDate         DateTime?
-  removalReason       String?
-  removedBy           String?
-  removalNotes        String?
-  expectedLife        Int?
-  actualLife          Int?
-  failureReason       String?
-  qualityChecked      Boolean        @default(false)
-  qualityRating       Int?
-  complianceCertified Boolean        @default(false)
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  serviceRequest      ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
-  sparePart           SparePart      @relation(fields: [sparePartId], references: [id])
+  id                       String         @id @default(cuid())
+  serviceRequestId         String
+  sparePartId              String
+  technicianId             String
+  storeId                  String
+  batchNumber              String?
+  serialNumber             String?
+  quantity                 Int
+  unitCost                 Float
+  totalCost                Float
+  sellingPrice             Float?
+  totalRevenue             Float?
+  installedAt              DateTime       @default(now())
+  installationNotes        String?
+  replacedPartId           String?
+  replacementReason        String?
+  warrantyMonths           Int?
+  warrantyExpiry           DateTime?
+  warrantyTerms            String?
+  warrantyProvider         String?
+  removalDate              DateTime?
+  removalReason            String?
+  removedBy                String?
+  removalNotes             String?
+  expectedLife             Int?
+  actualLife               Int?
+  failureReason            String?
+  qualityChecked           Boolean        @default(false)
+  qualityRating            Int?
+  complianceCertified      Boolean        @default(false)
+
+  // Cross-service integration fields
+  vehicleServiceRequestId       String? // Links to vehicle-service ServiceRequest
+  vehicleServicePartsUsedId     String? // Links to vehicle-service ServicePartsUsed
+
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  serviceRequest           ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  sparePart                SparePart      @relation(fields: [sparePartId], references: [id])
 
   @@map("installed_parts")
   @@schema("spare_parts")

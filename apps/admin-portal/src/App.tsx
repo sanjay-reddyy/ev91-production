@@ -41,10 +41,12 @@ import VehicleModelForm from './pages/VehicleModelForm'
 // Hub Management Pages
 import HubManagement from './pages/HubManagement'
 import HubForm from './pages/HubForm'
+import HubDetails from './pages/HubDetails'
 
 // Service Management Pages
 import ServiceManagement from './pages/ServiceManagement'
 import ServiceScheduleForm from './pages/ServiceScheduleForm'
+import UnifiedServiceDashboard from './pages/UnifiedServiceDashboard'
 
 // Spare Parts Management Pages
 import SpareParts from './pages/SpareParts'
@@ -53,6 +55,7 @@ import SparePartsAnalytics from './pages/SparePartsAnalytics'
 import StockManagement from './pages/StockManagement'
 import Suppliers from './pages/Suppliers'
 import PurchaseOrders from './pages/PurchaseOrders'
+import SparePartDetails from './pages/SparePartDetails'
 import SparePartsDashboard from './pages/SparePartsDashboard'
 
 // Spare Parts Outward Flow Pages
@@ -180,6 +183,7 @@ const App: React.FC = () => {
                 <Route path="/vehicles/edit/:id" element={<VehicleForm />} />
                 <Route path="/vehicles/view/:id" element={<VehicleProfile />} />
                 <Route path="/vehicles/:id" element={<VehicleProfile />} />
+                <Route path="/vehicle-profile/:id" element={<VehicleProfile />} />
                 <Route path="/damage" element={<DamageManagement />} />
                 <Route path="/damage/new" element={<DamageForm />} />
                 <Route path="/damage/:id/edit" element={<DamageForm />} />
@@ -187,6 +191,7 @@ const App: React.FC = () => {
                 {/* Hub Management Routes */}
                 <Route path="/hubs" element={<HubManagement />} />
                 <Route path="/hubs/new" element={<HubForm />} />
+                <Route path="/hubs/:id" element={<HubDetails />} />
                 <Route path="/hubs/:id/edit" element={<HubForm />} />
 
                 {/* OEM Management Routes */}
@@ -202,11 +207,13 @@ const App: React.FC = () => {
                 {/* Service Management Routes */}
                 <Route path="/services" element={<ServiceManagement />} />
                 <Route path="/services/schedule" element={<ServiceScheduleForm />} />
+                <Route path="/unified-service" element={<UnifiedServiceDashboard />} />
 
                 {/* Spare Parts Management Routes */}
                 <Route path="/spare-parts" element={<SpareParts />} />
                 <Route path="/spare-parts/add" element={<SparePartForm />} />
                 <Route path="/spare-parts/edit/:id" element={<SparePartForm />} />
+                <Route path="/spare-parts/view/:id" element={<SparePartDetails />} />
                 <Route path="/spare-parts/analytics" element={<SparePartsAnalytics />} />
                 <Route path="/spare-parts/analytics" element={<SparePartsAnalytics />} />
                 <Route path="/spare-parts/stock" element={<StockManagement />} />

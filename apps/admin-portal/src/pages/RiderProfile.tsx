@@ -32,6 +32,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Link,
 } from '@mui/material'
 import {
   ArrowBack as ArrowBackIcon,
@@ -47,7 +48,7 @@ import {
   Visibility as VisibilityIcon,
 } from '@mui/icons-material'
 import { useParams, useNavigate } from 'react-router-dom'
-import { riderService, Rider, RiderKYC, RiderOrder, RiderEarning, RiderEarningsSummary, VehicleAssignment } from '../services'
+import { riderService, Rider, RiderKYC, RiderOrder, RiderEarning, RiderEarningsSummary, VehicleAssignment, Hub } from '../services'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -85,10 +86,11 @@ const RiderProfile: React.FC = () => {
   const [earnings, setEarnings] = useState<RiderEarning[]>([])
   const [earningsSummary, setEarningsSummary] = useState<RiderEarningsSummary | null>(null)
   const [availableVehicles, setAvailableVehicles] = useState<VehicleAssignment[]>([])
-  const [availableHubs, setAvailableHubs] = useState<any[]>([])
+  const [availableHubs, setAvailableHubs] = useState<Hub[]>([])
   const [selectedHub, setSelectedHub] = useState('')
 
   const [loading, setLoading] = useState(true)
+  const [vehiclesLoading, setVehiclesLoading] = useState(false)
   const [tabValue, setTabValue] = useState(0)
   const [earningsPeriod, setEarningsPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly')
 
@@ -180,23 +182,46 @@ const RiderProfile: React.FC = () => {
 
   const loadAvailableVehicles = useCallback(async (hubId?: string) => {
     try {
+      // Only load vehicles if a hub is selected, or if no hubId is provided, clear the vehicles
+      if (!hubId) {
+        setAvailableVehicles([])
+        return
+      }
+
+      setVehiclesLoading(true)
+      console.log("loadAvailableVehicles - Loading vehicles for hubId:", hubId);
       const response = await riderService.getAvailableVehicles(hubId)
+      console.log("loadAvailableVehicles - API response:", response);
       if (response.success) {
-        setAvailableVehicles(response.data)
+        // No need to filter again since the API already filters by operationalStatus=Available
+        const availableVehicles = response.data;
+        console.log("loadAvailableVehicles - Setting vehicles:", availableVehicles);
+        setAvailableVehicles(availableVehicles)
       }
     } catch (error) {
       console.error('Error loading available vehicles:', error)
+      setAvailableVehicles([])
+    } finally {
+      setVehiclesLoading(false)
     }
   }, [])
 
   const loadAvailableHubs = useCallback(async () => {
     try {
+      console.log('Loading available hubs...')
       const response = await riderService.getHubs()
+      console.log('Hubs response:', response)
       if (response.success) {
+        console.log('Setting available hubs:', response.data)
+        console.log('First hub sample:', response.data[0]) // Log first hub to see structure
         setAvailableHubs(response.data)
+      } else {
+        console.error('Failed to load hubs:', response.message)
+        setSnackbar({ open: true, message: `Failed to load hubs: ${response.message}`, severity: 'error' })
       }
     } catch (error) {
       console.error('Error loading available hubs:', error)
+      setSnackbar({ open: true, message: 'Failed to load hubs', severity: 'error' })
     }
   }, [])
 
@@ -205,9 +230,9 @@ const RiderProfile: React.FC = () => {
     loadKYCDocuments()
     loadOrders()
     loadEarnings()
-    loadAvailableVehicles()
+    // Don't load vehicles initially - only load after hub selection
     loadAvailableHubs()
-  }, [loadRiderData, loadKYCDocuments, loadOrders, loadEarnings, loadAvailableVehicles, loadAvailableHubs])
+  }, [loadRiderData, loadKYCDocuments, loadOrders, loadEarnings, loadAvailableHubs])
 
   useEffect(() => {
     loadEarnings()
@@ -227,9 +252,13 @@ const RiderProfile: React.FC = () => {
       setSnackbar({ open: true, message: 'Vehicle assigned successfully', severity: 'success' })
       setVehicleAssignDialog(false)
       setSelectedVehicle('')
+      const currentHubId = selectedHub
       setSelectedHub('')
       loadRiderData()
-      loadAvailableVehicles()
+      // Reload vehicles for the current hub if there was one selected
+      if (currentHubId) {
+        loadAvailableVehicles(currentHubId)
+      }
     } catch (error) {
       console.error('Error assigning vehicle:', error)
       setSnackbar({ open: true, message: 'Failed to assign vehicle', severity: 'error' })
@@ -243,7 +272,8 @@ const RiderProfile: React.FC = () => {
       await riderService.unassignVehicle(riderId)
       setSnackbar({ open: true, message: 'Vehicle unassigned successfully', severity: 'success' })
       loadRiderData()
-      loadAvailableVehicles()
+      // Clear available vehicles since no hub is selected now
+      setAvailableVehicles([])
     } catch (error) {
       console.error('Error unassigning vehicle:', error)
       setSnackbar({ open: true, message: 'Failed to unassign vehicle', severity: 'error' })
@@ -532,23 +562,26 @@ const RiderProfile: React.FC = () => {
                   <Stack spacing={2}>
                     <Box>
                       <Typography variant="body2" color="textSecondary">Registration Number</Typography>
-                      <Typography variant="body1" fontWeight="medium">
+                      <Link
+                        component="button"
+                        variant="body1"
+                        fontWeight="medium"
+                        onClick={() => navigate(`/vehicle-profile/${rider.assignedVehicle?.id}`)}
+                        sx={{
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
                         {rider.assignedVehicle.registrationNumber}
-                      </Typography>
+                      </Link>
                     </Box>
                     <Box>
                       <Typography variant="body2" color="textSecondary">Vehicle</Typography>
                       <Typography variant="body1">
                         {rider.assignedVehicle.make} {rider.assignedVehicle.model}
                       </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" color="textSecondary">Type</Typography>
-                      <Typography variant="body1">{rider.assignedVehicle.vehicleType}</Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" color="textSecondary">Fuel Type</Typography>
-                      <Typography variant="body1">{rider.assignedVehicle.fuelType}</Typography>
                     </Box>
                     <Box>
                       <Typography variant="body2" color="textSecondary">Assigned Date</Typography>
@@ -876,13 +909,13 @@ const RiderProfile: React.FC = () => {
               >
                 {availableHubs.map((hub) => (
                   <MenuItem key={hub.id} value={hub.id}>
-                    {hub.name} - {hub.city?.name || 'Unknown City'}
+                    {hub.name} - {hub.cityName || hub.city?.name || 'Unknown City'}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            <FormControl fullWidth disabled={!selectedHub}>
+            <FormControl fullWidth disabled={!selectedHub || vehiclesLoading}>
               <InputLabel>Select Vehicle</InputLabel>
               <Select
                 value={selectedVehicle}
@@ -891,15 +924,33 @@ const RiderProfile: React.FC = () => {
               >
                 {availableVehicles.map((vehicle) => (
                   <MenuItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.registrationNumber} - {vehicle.make} {vehicle.model} ({vehicle.fuelType})
+                    {vehicle.registrationNumber} - {vehicle.make} {vehicle.model}
+                    {vehicle.operationalStatus && (
+                      <Chip size="small" label={vehicle.operationalStatus} sx={{ ml: 1 }} />
+                    )}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            {selectedHub && availableVehicles.length === 0 && (
+            {vehiclesLoading && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading available vehicles...
+                </Typography>
+              </Box>
+            )}
+
+            {!selectedHub && !vehiclesLoading && (
               <Alert severity="info">
-                No available vehicles found in the selected hub.
+                Please select a hub first to view available vehicles for that location.
+              </Alert>
+            )}
+
+            {selectedHub && !vehiclesLoading && availableVehicles.length === 0 && (
+              <Alert severity="warning">
+                No available vehicles found in the selected hub. All vehicles may be currently assigned or under maintenance.
               </Alert>
             )}
           </Stack>
