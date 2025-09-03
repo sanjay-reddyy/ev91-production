@@ -21,6 +21,11 @@ export interface City {
   launchDate: Date | null;
   estimatedPopulation: number | null;
   marketPotential: string | null;
+  // Event Sourcing Fields
+  version: number;
+  lastModifiedBy: string | null;
+  eventSequence: number;
+  lastSyncAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -98,16 +103,16 @@ export interface CityFilters {
 
 // City enums
 export enum CityMarketPotential {
-  HIGH = 'High',
-  MEDIUM = 'Medium',
-  LOW = 'Low'
+  HIGH = "High",
+  MEDIUM = "Medium",
+  LOW = "Low",
 }
 
 export enum CityRegion {
-  NORTH = 'North',
-  SOUTH = 'South',
-  EAST = 'East',
-  WEST = 'West',
-  CENTRAL = 'Central',
-  NORTHEAST = 'Northeast'
+  NORTH = "North",
+  SOUTH = "South",
+  EAST = "East",
+  WEST = "West",
+  CENTRAL = "Central",
+  NORTHEAST = "Northeast",
 }

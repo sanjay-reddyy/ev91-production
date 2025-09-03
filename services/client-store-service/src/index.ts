@@ -8,6 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import clientRoutes from "./routes/clientRoutes";
 import storeRoutes from "./routes/storeRoutes";
 import riderEarningsRoutes from "./routes/riderEarningsRoutes";
+import citySyncRoutes from "./routes/citySyncRoutes";
 
 // Import middleware
 import { authMiddleware } from "./middleware/auth";
@@ -89,6 +90,9 @@ app.use("/api/clients", clientRoutes);
 app.use("/api/stores", storeRoutes);
 app.use("/api/rider-earnings", riderEarningsRoutes);
 
+// Internal sync routes (no auth required for service-to-service communication)
+app.use("/internal", citySyncRoutes);
+
 // 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({
@@ -126,3 +130,4 @@ app.listen(PORT, () => {
 });
 
 export default app;
+export { prisma };

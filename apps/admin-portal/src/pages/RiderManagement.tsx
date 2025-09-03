@@ -6,10 +6,6 @@ import {
   Card,
   CardContent,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
   MenuItem,
   Chip,
@@ -51,7 +47,7 @@ import {
 } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
 import { riderService, Rider } from '../services'
-import RiderForm from '../components/RiderForm'
+import EnhancedRiderForm from '../components/EnhancedRiderForm'
 
 const REGISTRATION_STATUSES = [
   { value: 'pending', label: 'Pending', color: 'warning' },
@@ -126,8 +122,6 @@ const RiderManagement: React.FC = () => {
     emergencyPhone: '',
     emergencyRelation: '',
   })
-  const [formErrors, setFormErrors] = useState<FormErrors>({})
-  const [validationEnabled, setValidationEnabled] = useState(false)
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -202,26 +196,75 @@ const RiderManagement: React.FC = () => {
     navigate(`/rider-management/${riderId}`)
   }
 
-  const handleOpenDialog = (rider?: Rider) => {
+  const handleOpenDialog = async (rider?: Rider) => {
     if (rider) {
-      setEditingRider(rider)
-      setFormData({
-        name: rider.name || '',
-        phone: rider.phone,
-        email: rider.email || '',
-        dob: rider.dob || '',
-        address1: rider.address1 || '',
-        address2: rider.address2 || '',
-        city: rider.city || '',
-        state: rider.state || '',
-        pincode: rider.pincode || '',
-        aadharNumber: rider.aadharNumber || '',
-        panNumber: rider.panNumber || '',
-        drivingLicenseNumber: rider.drivingLicenseNumber || '',
-        emergencyName: rider.emergencyName || '',
-        emergencyPhone: rider.emergencyPhone || '',
-        emergencyRelation: rider.emergencyRelation || '',
-      })
+      try {
+        // Fetch full rider details to ensure we have all fields
+        const response = await riderService.getRiderById(rider.id)
+        if (response.success) {
+          const fullRiderData = response.data
+          setEditingRider(fullRiderData)
+          setFormData({
+            name: fullRiderData.name || '',
+            phone: fullRiderData.phone,
+            email: fullRiderData.email || '',
+            dob: fullRiderData.dob || '',
+            address1: fullRiderData.address1 || '',
+            address2: fullRiderData.address2 || '',
+            city: fullRiderData.city || '',
+            state: fullRiderData.state || '',
+            pincode: fullRiderData.pincode || '',
+            aadharNumber: fullRiderData.aadharNumber || '',
+            panNumber: fullRiderData.panNumber || '',
+            drivingLicenseNumber: fullRiderData.drivingLicenseNumber || '',
+            emergencyName: fullRiderData.emergencyName || '',
+            emergencyPhone: fullRiderData.emergencyPhone || '',
+            emergencyRelation: fullRiderData.emergencyRelation || '',
+          })
+        } else {
+          console.error('Failed to fetch rider details:', response.message)
+          // Fallback to existing rider data
+          setEditingRider(rider)
+          setFormData({
+            name: rider.name || '',
+            phone: rider.phone,
+            email: rider.email || '',
+            dob: rider.dob || '',
+            address1: rider.address1 || '',
+            address2: rider.address2 || '',
+            city: rider.city || '',
+            state: rider.state || '',
+            pincode: rider.pincode || '',
+            aadharNumber: rider.aadharNumber || '',
+            panNumber: rider.panNumber || '',
+            drivingLicenseNumber: rider.drivingLicenseNumber || '',
+            emergencyName: rider.emergencyName || '',
+            emergencyPhone: rider.emergencyPhone || '',
+            emergencyRelation: rider.emergencyRelation || '',
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching rider details:', error)
+        // Fallback to existing rider data
+        setEditingRider(rider)
+        setFormData({
+          name: rider.name || '',
+          phone: rider.phone,
+          email: rider.email || '',
+          dob: rider.dob || '',
+          address1: rider.address1 || '',
+          address2: rider.address2 || '',
+          city: rider.city || '',
+          state: rider.state || '',
+          pincode: rider.pincode || '',
+          aadharNumber: rider.aadharNumber || '',
+          panNumber: rider.panNumber || '',
+          drivingLicenseNumber: rider.drivingLicenseNumber || '',
+          emergencyName: rider.emergencyName || '',
+          emergencyPhone: rider.emergencyPhone || '',
+          emergencyRelation: rider.emergencyRelation || '',
+        })
+      }
     } else {
       setEditingRider(null)
       setFormData({
@@ -899,26 +942,12 @@ const RiderManagement: React.FC = () => {
       </Card>
 
       {/* Add/Edit Rider Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {editingRider ? 'Edit Rider' : 'Add New Rider'}
-        </DialogTitle>
-        <DialogContent>
-          <RiderForm
-            formData={formData}
-            formErrors={formErrors}
-            validationEnabled={validationEnabled}
-            onFormDataChange={setFormData}
-            onErrorsChange={setFormErrors}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveRider} variant="contained">
-            {editingRider ? 'Update' : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <EnhancedRiderForm
+        open={openDialog}
+        rider={editingRider}
+        onClose={handleCloseDialog}
+        onSave={handleSaveRider}
+      />
 
       {/* Snackbar */}
       <Snackbar

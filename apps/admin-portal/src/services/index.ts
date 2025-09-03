@@ -1,7 +1,7 @@
 export { default as riderService } from "./riderService";
 export { default as vehicleService } from "./vehicleService";
 export { default as sparePartsService } from "./sparePartsService";
-export { default as clientStoreService } from "./clientStore";
+export { default as clientStoreService } from "./clientStoreService";
 export { oemService } from "./oemService";
 export { vehicleModelService } from "./vehicleModelService";
 export { default as hubService } from "./hubService";
@@ -23,3 +23,5 @@ export type {
 } from "./riderService";
 
 export type { Vehicle, Hub, City, MediaFile } from "./vehicleService";
+
+export type { Client, Store, City as ClientCity } from "./clientStoreService";

@@ -118,7 +118,7 @@ model VehicleModel {
   @@schema("vehicle")
 }
 
-// City Master Data
+// City Master Data - MASTER SOURCE for all services
 model City {
   id String @id @default(cuid())
 
@@ -148,6 +148,12 @@ model City {
   // Business Information
   estimatedPopulation Int?
   marketPotential     String? // High, Medium, Low
+
+  // Event Sourcing Fields (for cross-service synchronization)
+  version           Int     @default(1) // For optimistic locking
+  lastModifiedBy    String? // User ID who last modified
+  eventSequence     Int     @default(0) // Auto-increment for event ordering
+  lastSyncAt        DateTime @default(now()) // Last sync timestamp
 
   // Timestamps
   createdAt DateTime @default(now())
