@@ -4,16 +4,16 @@
  * Handles all city-related operations
  */
 
-import { prisma } from '../index';
-import { 
-  City, 
+import { prisma } from "../index";
+import {
+  City,
   CreateCityRequest,
-  UpdateCityRequest, 
-  CityFilters, 
+  UpdateCityRequest,
+  CityFilters,
   CityResponse,
-  CityWithHubCount 
-} from '../types/city';
-import { ErrorHandler, Logger } from '../utils';
+  CityWithHubCount,
+} from "../types/city";
+import { ErrorHandler, Logger } from "../utils";
 
 export class CityService {
   /**
@@ -21,36 +21,52 @@ export class CityService {
    */
   static async createCity(data: CreateCityRequest): Promise<City> {
     try {
-      Logger.info('Creating new city', { cityName: data.name, cityCode: data.code });
+      Logger.info("Creating new city", {
+        cityName: data.name,
+        cityCode: data.code,
+      });
 
       // Check if city with same name or code already exists
       const existingCity = await prisma.city.findFirst({
         where: {
-          OR: [
-            { name: data.name },
-            { code: data.code }
-          ]
-        }
+          OR: [{ name: data.name }, { code: data.code }],
+        },
       });
 
       if (existingCity) {
-        throw ErrorHandler.createError('City with this name or code already exists', 'CITY_EXISTS', 400);
+        throw ErrorHandler.createError(
+          "City with this name or code already exists",
+          "CITY_EXISTS",
+          400
+        );
       }
 
       const city = await prisma.city.create({
         data: {
           ...data,
-          country: data.country || 'India',
-          timezone: data.timezone || 'Asia/Kolkata',
+          country: data.country || "India",
+          timezone: data.timezone || "Asia/Kolkata",
           isActive: data.isActive ?? true,
-          isOperational: data.isOperational ?? true
-        }
+          isOperational: data.isOperational ?? true,
+        },
       });
 
-      Logger.info('City created successfully', { cityId: city.id, cityName: city.name });
-      return city;
+      // Add event sourcing fields for return type compatibility
+      const cityWithEventFields = {
+        ...city,
+        version: 1,
+        lastModifiedBy: "system",
+        eventSequence: 0,
+        lastSyncAt: new Date(),
+      };
+
+      Logger.info("City created successfully", {
+        cityId: city.id,
+        cityName: city.name,
+      });
+      return cityWithEventFields;
     } catch (error) {
-      Logger.error('Error creating city', error);
+      Logger.error("Error creating city", error);
       if ((error as any)?.error) throw error;
       throw ErrorHandler.handlePrismaError(error);
     }
@@ -62,12 +78,12 @@ export class CityService {
   static async getCityById(id: string): Promise<City | null> {
     try {
       const city = await prisma.city.findUnique({
-        where: { id }
+        where: { id },
       });
 
       return city;
     } catch (error) {
-      Logger.error('Error fetching city by ID', { cityId: id, error });
+      Logger.error("Error fetching city by ID", { cityId: id, error });
       throw ErrorHandler.handlePrismaError(error);
     }
   }
@@ -78,12 +94,12 @@ export class CityService {
   static async getCityByCode(code: string): Promise<City | null> {
     try {
       const city = await prisma.city.findUnique({
-        where: { code }
+        where: { code },
       });
 
       return city;
     } catch (error) {
-      Logger.error('Error fetching city by code', { cityCode: code, error });
+      Logger.error("Error fetching city by code", { cityCode: code, error });
       throw ErrorHandler.handlePrismaError(error);
     }
   }
@@ -99,22 +115,23 @@ export class CityService {
         state,
         regionCode,
         marketPotential,
-        search
+        search,
       } = filters;
 
       const whereClause: any = {};
 
       if (isActive !== undefined) whereClause.isActive = isActive;
-      if (isOperational !== undefined) whereClause.isOperational = isOperational;
+      if (isOperational !== undefined)
+        whereClause.isOperational = isOperational;
       if (state) whereClause.state = state;
       if (regionCode) whereClause.regionCode = regionCode;
       if (marketPotential) whereClause.marketPotential = marketPotential;
 
       if (search) {
         whereClause.OR = [
-          { name: { contains: search, mode: 'insensitive' } },
-          { displayName: { contains: search, mode: 'insensitive' } },
-          { code: { contains: search, mode: 'insensitive' } }
+          { name: { contains: search, mode: "insensitive" } },
+          { displayName: { contains: search, mode: "insensitive" } },
+          { code: { contains: search, mode: "insensitive" } },
         ];
       }
 
@@ -123,15 +140,15 @@ export class CityService {
         include: {
           _count: {
             select: {
-              hubs: true
-            }
-          }
+              hubs: true,
+            },
+          },
         },
         orderBy: [
-          { isOperational: 'desc' },
-          { isActive: 'desc' },
-          { name: 'asc' }
-        ]
+          { isOperational: "desc" },
+          { isActive: "desc" },
+          { name: "asc" },
+        ],
       });
 
       return cities.map((city: any) => ({
@@ -145,10 +162,10 @@ export class CityService {
         longitude: city.longitude,
         isActive: city.isActive,
         isOperational: city.isOperational,
-        hubCount: city._count.hubs
+        hubCount: city._count.hubs,
       }));
     } catch (error) {
-      Logger.error('Error fetching cities', { filters, error });
+      Logger.error("Error fetching cities", { filters, error });
       throw ErrorHandler.handlePrismaError(error);
     }
   }
@@ -164,27 +181,31 @@ export class CityService {
             include: {
               _count: {
                 select: {
-                  vehicles: true
-                }
-              }
-            }
-          }
+                  vehicles: true,
+                },
+              },
+            },
+          },
         },
         orderBy: [
-          { isOperational: 'desc' },
-          { isActive: 'desc' },
-          { name: 'asc' }
-        ]
+          { isOperational: "desc" },
+          { isActive: "desc" },
+          { name: "asc" },
+        ],
       });
 
       return cities.map((city: any) => ({
         ...city,
         hubCount: city.hubs.length,
-        activeHubCount: city.hubs.filter((hub: any) => hub.status === 'Active').length,
-        totalVehicles: city.hubs.reduce((total: number, hub: any) => total + hub._count.vehicles, 0)
+        activeHubCount: city.hubs.filter((hub: any) => hub.status === "Active")
+          .length,
+        totalVehicles: city.hubs.reduce(
+          (total: number, hub: any) => total + hub._count.vehicles,
+          0
+        ),
       }));
     } catch (error) {
-      Logger.error('Error fetching cities with counts', error);
+      Logger.error("Error fetching cities with counts", error);
       throw ErrorHandler.handlePrismaError(error);
     }
   }
@@ -194,15 +215,15 @@ export class CityService {
    */
   static async updateCity(id: string, data: UpdateCityRequest): Promise<City> {
     try {
-      Logger.info('Updating city', { cityId: id });
+      Logger.info("Updating city", { cityId: id });
 
       // Check if city exists
       const existingCity = await prisma.city.findUnique({
-        where: { id }
+        where: { id },
       });
 
       if (!existingCity) {
-        throw ErrorHandler.createError('City not found', 'CITY_NOT_FOUND', 404);
+        throw ErrorHandler.createError("City not found", "CITY_NOT_FOUND", 404);
       }
 
       // Check if updating to a name/code that already exists (excluding current city)
@@ -212,29 +233,30 @@ export class CityService {
             AND: [
               { id: { not: id } },
               {
-                OR: [
-                  { name: data.name },
-                  { code: data.code }
-                ].filter(Boolean)
-              }
-            ]
-          }
+                OR: [{ name: data.name }, { code: data.code }].filter(Boolean),
+              },
+            ],
+          },
         });
 
         if (conflictingCity) {
-          throw ErrorHandler.createError('City with this name or code already exists', 'CITY_EXISTS', 400);
+          throw ErrorHandler.createError(
+            "City with this name or code already exists",
+            "CITY_EXISTS",
+            400
+          );
         }
       }
 
       const updatedCity = await prisma.city.update({
         where: { id },
-        data
+        data,
       });
 
-      Logger.info('City updated successfully', { cityId: id });
+      Logger.info("City updated successfully", { cityId: id });
       return updatedCity;
     } catch (error) {
-      Logger.error('Error updating city', { cityId: id, error });
+      Logger.error("Error updating city", { cityId: id, error });
       if ((error as any)?.error) throw error;
       throw ErrorHandler.handlePrismaError(error);
     }
@@ -245,7 +267,7 @@ export class CityService {
    */
   static async deleteCity(id: string): Promise<void> {
     try {
-      Logger.info('Deleting city', { cityId: id });
+      Logger.info("Deleting city", { cityId: id });
 
       // Check if city exists
       const existingCity = await prisma.city.findUnique({
@@ -253,25 +275,25 @@ export class CityService {
         include: {
           hubs: {
             include: {
-              vehicles: true
-            }
-          }
-        }
+              vehicles: true,
+            },
+          },
+        },
       });
 
       if (!existingCity) {
-        throw ErrorHandler.createError('City not found', 'CITY_NOT_FOUND', 404);
+        throw ErrorHandler.createError("City not found", "CITY_NOT_FOUND", 404);
       }
 
       // Check if city has active hubs with vehicles
       const activeHubsWithVehicles = existingCity.hubs.filter(
-        (hub: any) => hub.status === 'Active' && hub.vehicles.length > 0
+        (hub: any) => hub.status === "Active" && hub.vehicles.length > 0
       );
 
       if (activeHubsWithVehicles.length > 0) {
         throw ErrorHandler.createError(
-          'Cannot delete city with active hubs that have vehicles assigned', 
-          'CITY_HAS_ACTIVE_VEHICLES', 
+          "Cannot delete city with active hubs that have vehicles assigned",
+          "CITY_HAS_ACTIVE_VEHICLES",
           400
         );
       }
@@ -279,15 +301,15 @@ export class CityService {
       // Soft delete by setting isActive to false
       await prisma.city.update({
         where: { id },
-        data: { 
+        data: {
           isActive: false,
-          isOperational: false
-        }
+          isOperational: false,
+        },
       });
 
-      Logger.info('City deleted successfully', { cityId: id });
+      Logger.info("City deleted successfully", { cityId: id });
     } catch (error) {
-      Logger.error('Error deleting city', { cityId: id, error });
+      Logger.error("Error deleting city", { cityId: id, error });
       if ((error as any)?.error) throw error;
       throw ErrorHandler.handlePrismaError(error);
     }
@@ -301,9 +323,9 @@ export class CityService {
       const cities = await prisma.city.findMany({
         where: {
           isActive: true,
-          isOperational: true
+          isOperational: true,
         },
-        orderBy: { name: 'asc' }
+        orderBy: { name: "asc" },
       });
 
       return cities.map((city: any) => ({
@@ -316,10 +338,10 @@ export class CityService {
         latitude: city.latitude,
         longitude: city.longitude,
         isActive: city.isActive,
-        isOperational: city.isOperational
+        isOperational: city.isOperational,
       }));
     } catch (error) {
-      Logger.error('Error fetching operational cities', error);
+      Logger.error("Error fetching operational cities", error);
       throw ErrorHandler.handlePrismaError(error);
     }
   }

@@ -303,6 +303,10 @@ router.get("/riders/:riderId", async (req: Request, res: Response) => {
       panNumber: rider.pan,
       drivingLicenseNumber: rider.dl,
       assignedVehicleId: rider.assignedVehicleId,
+      assignedStoreId: rider.assignedStoreId,
+      assignedClientId: rider.assignedClientId,
+      storeAssignmentDate: rider.storeAssignmentDate?.toISOString(),
+      storeAssignmentNotes: rider.storeAssignmentNotes,
     };
 
     // If rider has an assigned vehicle, fetch vehicle details
@@ -815,6 +819,90 @@ router.delete(
       res.status(500).json({
         success: false,
         message: "Failed to unassign vehicle",
+      });
+    }
+  }
+);
+
+/**
+ * Assign rider to store
+ */
+router.post(
+  "/riders/:riderId/assign-store",
+  async (req: Request, res: Response) => {
+    try {
+      const { riderId } = req.params;
+      const { storeId, clientId, notes } = req.body;
+
+      if (!storeId || !clientId) {
+        return res.status(400).json({
+          success: false,
+          message: "Store ID and Client ID are required",
+        });
+      }
+
+      // Update rider with store assignment
+      const rider = await prisma.rider.update({
+        where: { id: riderId },
+        data: {
+          assignedStoreId: storeId,
+          assignedClientId: clientId,
+          storeAssignmentDate: new Date(),
+          storeAssignmentNotes: notes || null,
+        },
+      });
+
+      res.json({
+        success: true,
+        data: {
+          ...rider,
+          isActive: rider.registrationStatus === "COMPLETED",
+        },
+        message: "Store assigned successfully",
+      });
+    } catch (error) {
+      console.error("Error assigning store:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to assign store",
+      });
+    }
+  }
+);
+
+/**
+ * Unassign store from rider
+ */
+router.delete(
+  "/riders/:riderId/assign-store",
+  async (req: Request, res: Response) => {
+    try {
+      const { riderId } = req.params;
+
+      // Update rider to remove store assignment
+      const rider = await prisma.rider.update({
+        where: { id: riderId },
+        data: {
+          assignedStoreId: null,
+          assignedClientId: null,
+          storeAssignmentDate: null,
+          storeAssignmentNotes: null,
+        },
+      });
+
+      res.json({
+        success: true,
+        data: {
+          ...rider,
+          isActive: rider.registrationStatus === "COMPLETED",
+        },
+        message: "Store unassigned successfully",
+      });
+    } catch (error) {
+      console.error("Error unassigning store:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to unassign store",
       });
     }
   }

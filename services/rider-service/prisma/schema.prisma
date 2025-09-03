@@ -12,6 +12,51 @@ datasource db {
   schemas  = ["rider"]
 }
 
+// City model - Synchronized from vehicle-service
+model City {
+  id String @id @default(cuid())
+
+  // Basic Information
+  name        String @unique // Mumbai, Delhi, Bangalore, etc.
+  displayName String // Mumbai, New Delhi, Bengaluru, etc.
+  code        String @unique // MUM, DEL, BLR, etc.
+
+  // Location Details
+  state    String // Maharashtra, Delhi, Karnataka, etc.
+  country  String @default("India")
+  timezone String @default("Asia/Kolkata")
+
+  // Geographic Coordinates (City Center)
+  latitude  Float
+  longitude Float
+
+  // Administrative Details
+  pinCodeRange String? // JSON array of pin codes served
+  regionCode   String? // North, South, East, West
+
+  // Operational Details
+  isActive      Boolean   @default(true)
+  isOperational Boolean   @default(true) // City operational for services
+  launchDate    DateTime?
+
+  // Business Information
+  estimatedPopulation Int?
+  marketPotential     String? // High, Medium, Low
+
+  // Event Sourcing Fields (for cross-service synchronization)
+  version           Int     @default(1) // For optimistic locking
+  lastModifiedBy    String? // User ID who last modified
+  eventSequence     Int     @default(0) // Auto-increment for event ordering
+  lastSyncAt        DateTime @default(now()) // Last sync timestamp
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cities")
+  @@schema("rider")
+}
+
 model Rider {
   id            String   @id @default(uuid())
   phone         String   @unique
@@ -41,6 +86,12 @@ model Rider {
   assignedVehicleId String?
   assignmentDate    DateTime?
   hubId             String? // Hub where rider is based
+
+  // Store Assignment
+  assignedStoreId   String?
+  assignedClientId  String?
+  storeAssignmentDate DateTime?
+  storeAssignmentNotes String?
 
   // Compliance
   consent       Boolean  @default(false)

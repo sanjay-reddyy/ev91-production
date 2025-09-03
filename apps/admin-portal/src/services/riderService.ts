@@ -67,6 +67,13 @@ export interface Rider {
   // Vehicle Assignment
   assignedVehicleId: string | null;
   assignedVehicle?: VehicleAssignment;
+  // Store Assignment
+  assignedStoreId: string | null;
+  assignedClientId: string | null;
+  storeAssignmentDate: string | null;
+  storeAssignmentNotes: string | null;
+  assignedStore?: StoreAssignment;
+  assignedClient?: ClientAssignment;
   // Rider Performance Metrics
   totalOrders?: number;
   averageRating?: number;
@@ -86,6 +93,26 @@ export interface VehicleAssignment {
   operationalStatus?: string;
   hubId?: string;
   hubName?: string;
+}
+
+export interface StoreAssignment {
+  id: string;
+  storeName: string;
+  storeCode: string;
+  storeType: string;
+  city: string;
+  state: string;
+  completeAddress: string;
+  assignedDate: string;
+}
+
+export interface ClientAssignment {
+  id: string;
+  name: string;
+  clientCode: string;
+  clientType: string;
+  city?: string;
+  state?: string;
 }
 
 export interface RiderKYC {
@@ -493,7 +520,41 @@ class RiderService {
   }
 
   /**
-   * Get available vehicles for assignment
+   * Assign vehicle to rider
+   */
+  async assignVehicleToRider(
+    riderId: string,
+    assignmentData: { vehicleId: string; hubId?: string }
+  ): Promise<APIResponse<Rider>> {
+    try {
+      const response = await api.post(
+        `/admin/riders/${riderId}/assign-vehicle`,
+        assignmentData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error assigning vehicle to rider:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unassign vehicle from rider
+   */
+  async unassignVehicleFromRider(riderId: string): Promise<APIResponse<Rider>> {
+    try {
+      const response = await api.delete(
+        `/admin/riders/${riderId}/assign-vehicle`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error unassigning vehicle from rider:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get available vehicles (existing method - keeping for reference)
    */
   async getAvailableVehicles(
     hubId?: string
@@ -641,6 +702,44 @@ class RiderService {
       responseType: "blob",
     });
     return response.data;
+  }
+
+  /**
+   * Assign store to rider
+   */
+  async assignStoreToRider(
+    riderId: string,
+    storeData: {
+      storeId: string;
+      clientId: string;
+      notes?: string;
+    }
+  ): Promise<APIResponse<Rider>> {
+    try {
+      const response = await api.post(
+        `/admin/riders/${riderId}/assign-store`,
+        storeData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error assigning store to rider:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unassign store from rider
+   */
+  async unassignStoreFromRider(riderId: string): Promise<APIResponse<Rider>> {
+    try {
+      const response = await api.delete(
+        `/admin/riders/${riderId}/assign-store`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error unassigning store from rider:", error);
+      throw error;
+    }
   }
 
   /**

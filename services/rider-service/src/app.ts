@@ -7,6 +7,7 @@ import { riderRegistrationRouter } from "./routes/riderRegistration";
 import bookingRoutes from "./routes/booking";
 import healthRoutes from "./routes/health";
 import adminRidersRoutes from "./routes/adminRiders";
+import citySyncRoutes from "./routes/citySyncRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import {
   requestId,
@@ -36,6 +37,9 @@ v1Router.use("/booking", bookingRoutes);
 v1Router.use("/", adminRidersRoutes); // Admin rider management routes
 
 app.use("/api/v1", v1Router);
+
+// Internal sync routes (no auth required for service-to-service communication)
+app.use("/internal", citySyncRoutes);
 
 // Swagger API documentation
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));

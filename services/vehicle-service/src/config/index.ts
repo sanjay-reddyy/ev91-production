@@ -30,7 +30,6 @@ export const config = {
   // Service URLs
   services: {
     auth: process.env.AUTH_SERVICE_URL || "http://localhost:3001",
-    team: process.env.TEAM_SERVICE_URL || "http://localhost:3002",
     clientStore:
       process.env.CLIENT_STORE_SERVICE_URL || "http://localhost:3004",
     rider: process.env.RIDER_SERVICE_URL || "http://localhost:3005",
