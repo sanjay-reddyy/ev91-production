@@ -81,47 +81,12 @@ interface RiderFormData {
   emergencyRelation: string
 }
 
-interface FormErrors {
-  name?: string
-  phone?: string
-  email?: string
-  dob?: string
-  address1?: string
-  address2?: string
-  city?: string
-  state?: string
-  pincode?: string
-  aadharNumber?: string
-  panNumber?: string
-  drivingLicenseNumber?: string
-  emergencyName?: string
-  emergencyPhone?: string
-  emergencyRelation?: string
-}
-
 const RiderManagement: React.FC = () => {
   const navigate = useNavigate()
   const [riders, setRiders] = useState<Rider[]>([])
   const [loading, setLoading] = useState(true)
   const [openDialog, setOpenDialog] = useState(false)
   const [editingRider, setEditingRider] = useState<Rider | null>(null)
-  const [formData, setFormData] = useState<RiderFormData>({
-    name: '',
-    phone: '',
-    email: '',
-    dob: '',
-    address1: '',
-    address2: '',
-    city: '',
-    state: '',
-    pincode: '',
-    aadharNumber: '',
-    panNumber: '',
-    drivingLicenseNumber: '',
-    emergencyName: '',
-    emergencyPhone: '',
-    emergencyRelation: '',
-  })
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -204,86 +169,18 @@ const RiderManagement: React.FC = () => {
         if (response.success) {
           const fullRiderData = response.data
           setEditingRider(fullRiderData)
-          setFormData({
-            name: fullRiderData.name || '',
-            phone: fullRiderData.phone,
-            email: fullRiderData.email || '',
-            dob: fullRiderData.dob || '',
-            address1: fullRiderData.address1 || '',
-            address2: fullRiderData.address2 || '',
-            city: fullRiderData.city || '',
-            state: fullRiderData.state || '',
-            pincode: fullRiderData.pincode || '',
-            aadharNumber: fullRiderData.aadharNumber || '',
-            panNumber: fullRiderData.panNumber || '',
-            drivingLicenseNumber: fullRiderData.drivingLicenseNumber || '',
-            emergencyName: fullRiderData.emergencyName || '',
-            emergencyPhone: fullRiderData.emergencyPhone || '',
-            emergencyRelation: fullRiderData.emergencyRelation || '',
-          })
         } else {
           console.error('Failed to fetch rider details:', response.message)
           // Fallback to existing rider data
           setEditingRider(rider)
-          setFormData({
-            name: rider.name || '',
-            phone: rider.phone,
-            email: rider.email || '',
-            dob: rider.dob || '',
-            address1: rider.address1 || '',
-            address2: rider.address2 || '',
-            city: rider.city || '',
-            state: rider.state || '',
-            pincode: rider.pincode || '',
-            aadharNumber: rider.aadharNumber || '',
-            panNumber: rider.panNumber || '',
-            drivingLicenseNumber: rider.drivingLicenseNumber || '',
-            emergencyName: rider.emergencyName || '',
-            emergencyPhone: rider.emergencyPhone || '',
-            emergencyRelation: rider.emergencyRelation || '',
-          })
         }
       } catch (error) {
         console.error('Error fetching rider details:', error)
         // Fallback to existing rider data
         setEditingRider(rider)
-        setFormData({
-          name: rider.name || '',
-          phone: rider.phone,
-          email: rider.email || '',
-          dob: rider.dob || '',
-          address1: rider.address1 || '',
-          address2: rider.address2 || '',
-          city: rider.city || '',
-          state: rider.state || '',
-          pincode: rider.pincode || '',
-          aadharNumber: rider.aadharNumber || '',
-          panNumber: rider.panNumber || '',
-          drivingLicenseNumber: rider.drivingLicenseNumber || '',
-          emergencyName: rider.emergencyName || '',
-          emergencyPhone: rider.emergencyPhone || '',
-          emergencyRelation: rider.emergencyRelation || '',
-        })
       }
     } else {
       setEditingRider(null)
-      setFormData({
-        name: '',
-        phone: '',
-        email: '',
-        dob: '',
-        address1: '',
-        address2: '',
-        city: '',
-        state: '',
-        pincode: '',
-        aadharNumber: '',
-        panNumber: '',
-        drivingLicenseNumber: '',
-        emergencyName: '',
-        emergencyPhone: '',
-        emergencyRelation: '',
-      })
     }
     setOpenDialog(true)
   }
@@ -291,135 +188,9 @@ const RiderManagement: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false)
     setEditingRider(null)
-    setValidationEnabled(false)
-    setFormErrors({})
-    setFormData({
-      name: '',
-      phone: '',
-      email: '',
-      dob: '',
-      address1: '',
-      address2: '',
-      city: '',
-      state: '',
-      pincode: '',
-      aadharNumber: '',
-      panNumber: '',
-      drivingLicenseNumber: '',
-      emergencyName: '',
-      emergencyPhone: '',
-      emergencyRelation: '',
-    })
   }
 
-  const validateForm = (): boolean => {
-    const errors: FormErrors = {}
-
-    // Name validation
-    if (!formData.name.trim()) {
-      errors.name = 'Full name is required'
-    } else if (formData.name.trim().length < 2) {
-      errors.name = 'Name must be at least 2 characters long'
-    }
-
-    // Phone validation - exactly 10 digits
-    if (!formData.phone.trim()) {
-      errors.phone = 'Phone number is required'
-    } else if (!/^[6-9]\d{9}$/.test(formData.phone.trim())) {
-      errors.phone = 'Phone number must be exactly 10 digits and start with 6, 7, 8, or 9'
-    }
-
-    // Email validation (optional but if provided should be valid)
-    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Please enter a valid email address'
-    }
-
-    // Date of birth validation
-    if (!formData.dob) {
-      errors.dob = 'Date of birth is required'
-    } else {
-      const dobDate = new Date(formData.dob)
-      const today = new Date()
-      const age = today.getFullYear() - dobDate.getFullYear()
-      if (age < 18 || age > 65) {
-        errors.dob = 'Rider must be between 18 and 65 years old'
-      }
-    }
-
-    // Address validation
-    if (!formData.address1.trim()) {
-      errors.address1 = 'Address is required'
-    }
-
-    // City validation
-    if (!formData.city.trim()) {
-      errors.city = 'City is required'
-    }
-
-    // State validation
-    if (!formData.state.trim()) {
-      errors.state = 'State is required'
-    }
-
-    // PIN code validation - exactly 6 digits
-    if (!formData.pincode.trim()) {
-      errors.pincode = 'PIN code is required'
-    } else if (!/^\d{6}$/.test(formData.pincode.trim())) {
-      errors.pincode = 'PIN code must be exactly 6 digits'
-    }
-
-    // Aadhar validation - 12 digits
-    if (!formData.aadharNumber.trim()) {
-      errors.aadharNumber = 'Aadhar number is required'
-    } else if (!/^\d{12}$/.test(formData.aadharNumber.trim())) {
-      errors.aadharNumber = 'Aadhar number must be exactly 12 digits'
-    }
-
-    // PAN validation - standard PAN format
-    if (!formData.panNumber.trim()) {
-      errors.panNumber = 'PAN number is required'
-    } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber.trim().toUpperCase())) {
-      errors.panNumber = 'PAN number must be in format ABCDE1234F'
-    }
-
-    // Driving license validation
-    if (!formData.drivingLicenseNumber.trim()) {
-      errors.drivingLicenseNumber = 'Driving license number is required'
-    } else if (formData.drivingLicenseNumber.trim().length < 8) {
-      errors.drivingLicenseNumber = 'Driving license number must be at least 8 characters'
-    }
-
-    // Emergency contact validation
-    if (!formData.emergencyName.trim()) {
-      errors.emergencyName = 'Emergency contact name is required'
-    }
-
-    if (!formData.emergencyPhone.trim()) {
-      errors.emergencyPhone = 'Emergency contact phone is required'
-    } else if (!/^[6-9]\d{9}$/.test(formData.emergencyPhone.trim())) {
-      errors.emergencyPhone = 'Emergency phone must be exactly 10 digits and start with 6, 7, 8, or 9'
-    }
-
-    if (!formData.emergencyRelation.trim()) {
-      errors.emergencyRelation = 'Emergency contact relation is required'
-    }
-
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleSaveRider = async () => {
-    setValidationEnabled(true)
-
-    if (!validateForm()) {
-      setSnackbar({
-        open: true,
-        message: 'Please fix the validation errors before submitting',
-        severity: 'error'
-      })
-      return
-    }
-
+  const handleSaveRider = async (formData: RiderFormData) => {
     try {
       // Clean the form data before submission
       const cleanedData = {

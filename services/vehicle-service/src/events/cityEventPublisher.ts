@@ -17,18 +17,18 @@ export class CityEventPublisher {
   private serviceEndpoints: ServiceEndpoint[] = [
     {
       name: "client-store-service",
-      url: process.env.CLIENT_STORE_SERVICE_URL || "http://localhost:4005",
+      url: process.env.CLIENT_STORE_SERVICE_URL || "http://localhost:3006",
       isActive: true,
     },
     {
       name: "rider-service",
-      url: process.env.RIDER_SERVICE_URL || "http://localhost:4006",
+      url: process.env.RIDER_SERVICE_URL || "http://localhost:4005",
       isActive: true,
     },
     {
       name: "auth-service",
-      url: process.env.AUTH_SERVICE_URL || "http://localhost:3001",
-      isActive: false, // Disable auth service for now since it's not running
+      url: process.env.AUTH_SERVICE_URL || "http://localhost:4001",
+      isActive: true,
     },
     // Add more services as needed
   ];

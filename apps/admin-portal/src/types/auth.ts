@@ -80,9 +80,9 @@ export interface Team {
   description?: string;
   isActive: boolean;
   departmentId: string;
-  teamLeadId?: string;
+  managerId?: string;
   city?: string;
-  country?: string;
+  state?: string;
   memberCount?: number;
   maxMembers?: number;
   skills?: string[];
@@ -242,7 +242,7 @@ export interface TeamFormData {
   departmentId: string;
   teamLeadId?: string;
   city: string;
-  country: string;
+  state: string;
   maxMembers: number;
   skills: string[];
 }

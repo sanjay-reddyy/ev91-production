@@ -48,6 +48,34 @@ export const authMiddleware = async (
 };
 
 /**
+ * Require employee context middleware - checks if authenticated user has employee record
+ */
+export const requireEmployee = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: "Authentication required",
+    });
+    return;
+  }
+
+  // Check if user has employee context
+  if (!(req.user as any).employee) {
+    res.status(403).json({
+      success: false,
+      error: "Employee access required - user must have an employee record",
+    });
+    return;
+  }
+
+  next();
+};
+
+/**
  * Permission check middleware factory
  */
 export const requirePermission = (

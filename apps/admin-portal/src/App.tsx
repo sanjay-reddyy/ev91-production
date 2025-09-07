@@ -73,7 +73,6 @@ import DebugVehicleAPI from './pages/DebugVehicleAPI'
 
 // Auth Management Pages
 import Users from './pages/Users'
-import Departments from './pages/Departments'
 import Roles from './pages/Roles'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
@@ -169,7 +168,6 @@ const App: React.FC = () => {
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/teams/create" element={<CreateTeam />} />
                 <Route path="/teams/edit/:id" element={<EditTeam />} />
-                <Route path="/departments" element={<Departments />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/stores" element={<Stores />} />
                 <Route path="/rider-earnings" element={<RiderEarnings />} />

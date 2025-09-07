@@ -162,6 +162,35 @@ export class AuthService {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
+        employee: {
+          include: {
+            department: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+            team: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            manager: {
+              select: {
+                id: true,
+                // Note: firstName, lastName now come from user relation
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         userRoles: {
           include: {
             role: {
@@ -284,28 +313,64 @@ export class AuthService {
    * Format user data for API response
    */
   private static formatUserData(user: any): AuthUser {
-    return {
+    const baseUser = {
       id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone,
       isActive: user.isActive,
+      emailVerified: user.emailVerified,
+      lastLoginAt: user.lastLoginAt,
       roles: user.userRoles.map((userRole: any) => ({
         id: userRole.role.id,
         name: userRole.role.name,
-        level: userRole.role.level || 1, // Add level with default
-        isActive: userRole.role.isActive, // Add this crucial property!
+        level: userRole.role.level || 1,
+        isActive: userRole.role.isActive,
         permissions: userRole.role.permissions.map((rp: any) => ({
           id: rp.permission.id,
           name: rp.permission.name,
           service: rp.permission.service,
           resource: rp.permission.resource,
           action: rp.permission.action,
-          isActive: rp.permission.isActive, // Also add this for permissions
+          isActive: rp.permission.isActive,
         })),
       })),
     };
+
+    // Add employee context if exists (new schema - no duplicate data)
+    if (user.employee) {
+      (baseUser as any).employee = {
+        id: user.employee.id,
+        employeeId: user.employee.employeeId,
+        position: user.employee.position,
+        phone: user.employee.phone, // Work phone
+        hireDate: user.employee.hireDate,
+        department: user.employee.department
+          ? {
+              id: user.employee.department.id,
+              name: user.employee.department.name,
+              code: user.employee.department.code,
+            }
+          : null,
+        team: user.employee.team
+          ? {
+              id: user.employee.team.id,
+              name: user.employee.team.name,
+            }
+          : null,
+        manager: user.employee.manager
+          ? {
+              id: user.employee.manager.id,
+              name: user.employee.manager.user
+                ? `${user.employee.manager.user.firstName} ${user.employee.manager.user.lastName}`
+                : "Unknown",
+            }
+          : null,
+      };
+    }
+
+    return baseUser as AuthUser;
   }
 
   /**

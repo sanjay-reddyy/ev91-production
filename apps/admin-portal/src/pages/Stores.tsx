@@ -127,7 +127,7 @@ const StoresPage: React.FC = () => {
     storeStatus: 'active',
   })
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
-  
+
   // Filters and pagination
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -152,7 +152,7 @@ const StoresPage: React.FC = () => {
         sortBy: 'createdAt',
         sortOrder: 'desc' as const,
       }
-      
+
       const response = await clientStoreService.getStores(params)
       if (response.success) {
         setStores(response.data)
@@ -274,7 +274,7 @@ const StoresPage: React.FC = () => {
 
   const handleDeleteStore = async (storeId: string) => {
     if (!window.confirm('Are you sure you want to delete this store?')) return
-    
+
     try {
       await clientStoreService.deleteStore(storeId)
       setSnackbar({ open: true, message: 'Store deleted successfully', severity: 'success' })
@@ -633,7 +633,7 @@ const StoresPage: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
-          
+
           <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50]}
             component="div"

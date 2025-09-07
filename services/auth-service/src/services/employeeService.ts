@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import * as jwt from "jsonwebtoken";
 import {
   Employee,
   CreateEmployeeDto,
@@ -13,9 +13,11 @@ import { EmailService } from "./emailService";
 
 export class EmployeeService {
   private prisma: PrismaClient;
+  private emailService: EmailService;
 
   constructor() {
     this.prisma = new PrismaClient();
+    this.emailService = new EmailService();
   }
 
   /**
@@ -54,372 +56,798 @@ export class EmployeeService {
     if (data.teamId) {
       const team = await this.prisma.team.findUnique({
         where: { id: data.teamId },
+        include: { department: true },
       });
 
-      if (!team || !team.isActive || team.departmentId !== data.departmentId) {
-        throw new Error(
-          "Invalid team or team does not belong to the specified department"
-        );
+      if (!team || !team.isActive) {
+        throw new Error("Invalid or inactive team");
+      }
+
+      if (team.departmentId !== data.departmentId) {
+        throw new Error("Team does not belong to the specified department");
       }
     }
 
-    // Validate manager if specified
+    // Validate manager if provided
     if (data.managerId) {
       const manager = await this.prisma.employee.findUnique({
         where: { id: data.managerId },
+        include: { user: true },
       });
 
-      if (!manager || !manager.isActive) {
+      if (!manager || !manager.user.isActive) {
         throw new Error("Invalid or inactive manager");
       }
     }
 
-    // Hash temporary password
-    const hashedPassword = await bcrypt.hash(data.temporaryPassword, 12);
+    // Hash the temporary password
+    const hashedPassword = await bcrypt.hash(data.temporaryPassword, 10);
 
     // Create user and employee in transaction
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create user
+      // Create the user first
       const user = await tx.user.create({
         data: {
-          email: data.email,
-          password: hashedPassword,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          isActive: true,
-          emailVerified: false, // Employee will need to verify email and change password
-        },
-      });
-
-      // Create employee
-      const employee = await tx.employee.create({
-        data: {
-          userId: user.id,
-          employeeId: data.employeeId,
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
           phone: data.phone,
+          password: hashedPassword,
+          isActive: true,
+          emailVerified: false,
+        },
+      });
+
+      // Create the employee
+      const employee = await tx.employee.create({
+        data: {
+          userId: user.id,
+          employeeId: data.employeeId,
           departmentId: data.departmentId,
-          teamId: data.teamId,
-          managerId: data.managerId,
+          teamId: data.teamId === "" ? null : data.teamId,
+          managerId: data.managerId === "" ? null : data.managerId,
           position: data.position,
           hireDate: data.hireDate,
-          isActive: true,
         },
         include: {
-          user: true,
-          department: true,
-          team: true,
-          manager: {
+          user: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
               email: true,
+              phone: true,
+              isActive: true,
+              emailVerified: true,
+              lastLoginAt: true,
+            },
+          },
+          department: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          manager: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
             },
           },
         },
       });
 
-      // Assign roles
+      // Assign roles to user
       if (data.roleIds && data.roleIds.length > 0) {
-        // First, validate that all role IDs exist
-        const existingRoles = await tx.role.findMany({
-          where: {
-            id: {
-              in: data.roleIds,
-            },
-          },
-          select: {
-            id: true,
-            name: true,
-          },
+        await tx.userRole.createMany({
+          data: data.roleIds.map((roleId) => ({
+            userId: user.id,
+            roleId,
+            createdBy: createdBy || "system",
+          })),
         });
-
-        console.log("📝 Role validation:");
-        console.log("  Requested role IDs:", data.roleIds);
-        console.log("  Found roles:", existingRoles);
-
-        const existingRoleIds = existingRoles.map((role) => role.id);
-        const invalidRoleIds = data.roleIds.filter(
-          (roleId) => !existingRoleIds.includes(roleId)
-        );
-
-        if (invalidRoleIds.length > 0) {
-          throw new Error(
-            `Invalid role IDs: ${invalidRoleIds.join(
-              ", "
-            )}. Available roles: ${existingRoles
-              .map((r) => `${r.name} (${r.id})`)
-              .join(", ")}`
-          );
-        }
-
-        // Create user role assignments
-        await Promise.all(
-          data.roleIds.map((roleId) =>
-            tx.userRole.create({
-              data: {
-                userId: user.id,
-                roleId: roleId,
-                createdBy: createdBy,
-              },
-            })
-          )
-        );
       }
 
       return employee;
     });
 
-    // Send welcome email (optional)
-    if (data.sendWelcomeEmail !== false) {
-      await this.sendWelcomeEmail(
-        result.email,
-        data.temporaryPassword,
-        result.employeeId
-      );
+    // Send welcome email if requested
+    if (data.sendWelcomeEmail) {
+      try {
+        // Get the user details from the created user
+        const createdUser = await this.prisma.user.findUnique({
+          where: { id: result.userId },
+        });
+
+        if (createdUser) {
+          await this.emailService.sendEmployeeWelcomeEmail(
+            createdUser.email,
+            `${createdUser.firstName} ${createdUser.lastName}`,
+            data.temporaryPassword
+          );
+        }
+      } catch (error) {
+        console.error("Failed to send welcome email:", error);
+        // Don't throw here, just log the error
+      }
     }
 
-    // Transform result to match Employee type
-    return {
-      id: result.id,
-      userId: result.userId,
-      employeeId: result.employeeId,
-      firstName: result.firstName,
-      lastName: result.lastName,
-      email: result.email,
-      phone: result.phone || undefined,
-      departmentId: result.departmentId,
-      teamId: result.teamId || undefined,
-      managerId: result.managerId || undefined,
-      position: result.position || undefined,
-      hireDate: result.hireDate,
-      isActive: result.isActive,
-      createdAt: result.createdAt,
-      updatedAt: result.updatedAt,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        isActive: result.user.isActive,
-        emailVerified: result.user.emailVerified,
-        lastLoginAt: result.user.lastLoginAt || undefined,
-      },
-      department: result.department
-        ? {
-            id: result.department.id,
-            name: result.department.name,
-            description: result.department.description || undefined,
-            code: result.department.code || undefined,
-            isActive: result.department.isActive,
-            createdAt: result.department.createdAt,
-            updatedAt: result.department.updatedAt,
-          }
-        : undefined,
-      team: result.team
-        ? {
-            id: result.team.id,
-            name: result.team.name,
-            description: result.team.description || undefined,
-            departmentId: result.team.departmentId,
-            managerId: result.team.managerId || undefined,
-            isActive: result.team.isActive,
-            createdAt: result.team.createdAt,
-            updatedAt: result.team.updatedAt,
-          }
-        : undefined,
-      manager: result.manager
-        ? ({
-            id: result.manager.id,
-            firstName: result.manager.firstName,
-            lastName: result.manager.lastName,
-            email: result.manager.email,
-          } as any)
-        : undefined,
-    } as Employee;
+    return this.transformToEmployeeResponse(result);
   }
 
   /**
-   * Employee login with enhanced authentication
-   */
-  async loginEmployee(
-    credentials: EmployeeLoginCredentials
-  ): Promise<EmployeeLoginResponse> {
-    let employee;
-
-    // Find employee by email or employeeId
-    if (credentials.employeeId) {
-      employee = await this.prisma.employee.findUnique({
-        where: { employeeId: credentials.employeeId },
-        include: {
-          user: {
-            include: {
-              userRoles: {
-                include: {
-                  role: {
-                    include: {
-                      permissions: {
-                        include: {
-                          permission: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          department: true,
-          team: true,
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-      });
-    } else {
-      employee = await this.prisma.employee.findUnique({
-        where: { email: credentials.email },
-        include: {
-          user: {
-            include: {
-              userRoles: {
-                include: {
-                  role: {
-                    include: {
-                      permissions: {
-                        include: {
-                          permission: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          department: true,
-          team: true,
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-      });
-    }
-
-    if (!employee || !employee.isActive) {
-      throw new Error("Employee not found or inactive");
-    }
-
-    if (!employee.user.isActive) {
-      throw new Error("User account is inactive");
-    }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(
-      credentials.password,
-      employee.user.password
-    );
-    if (!isValidPassword) {
-      throw new Error("Invalid credentials");
-    }
-
-    // Extract roles and permissions
-    const roles = employee.user.userRoles.map((ur) => ({
-      id: ur.role.id,
-      name: ur.role.name,
-      level: ur.role.level,
-    }));
-
-    const permissions = employee.user.userRoles.flatMap((ur) =>
-      ur.role.permissions.map((rp) => ({
-        service: rp.permission.service,
-        resource: rp.permission.resource,
-        action: rp.permission.action,
-      }))
-    );
-
-    // Create JWT payload
-    const payload: JwtPayload = {
-      userId: employee.user.id,
-      email: employee.email,
-      roles: roles,
-      permissions: permissions,
-      employee: {
-        id: employee.id,
-        employeeId: employee.employeeId,
-        departmentId: employee.departmentId,
-        teamId: employee.teamId || undefined,
-        managerId: employee.managerId || undefined,
-      },
-    };
-
-    // Generate tokens
-    const token = jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: "8h",
-    });
-    const refreshToken = jwt.sign(
-      { userId: employee.user.id, type: "refresh" },
-      process.env.JWT_REFRESH_SECRET!,
-      { expiresIn: "7d" }
-    );
-
-    // Update last login
-    await this.prisma.user.update({
-      where: { id: employee.user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
-    // Store session
-    await this.prisma.session.create({
-      data: {
-        userId: employee.user.id,
-        token: token,
-        refreshToken: refreshToken,
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours
-      },
-    });
-
-    return {
-      token,
-      refreshToken,
-      employee: {
-        id: employee.id,
-        employeeId: employee.employeeId,
-        name: `${employee.firstName} ${employee.lastName}`,
-        email: employee.email,
-        position: employee.position || undefined,
-        department: {
-          id: employee.department.id,
-          name: employee.department.name,
-          code: employee.department.code || undefined,
-        },
-        team: employee.team
-          ? {
-              id: employee.team.id,
-              name: employee.team.name,
-            }
-          : undefined,
-        roles: roles,
-        permissions: permissions,
-      },
-    };
-  }
-
-  /**
-   * Get employee by ID with full context
+   * Get employee by ID with full details
    */
   async getEmployeeById(id: string): Promise<Employee | null> {
-    const result = await this.prisma.employee.findUnique({
+    const employee = await this.prisma.employee.findUnique({
       where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            departmentId: true,
+            managerId: true,
+            city: true,
+            state: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        manager: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!employee) {
+      return null;
+    }
+
+    return this.transformToEmployeeResponse(employee);
+  }
+
+  /**
+   * Get employee by employee ID
+   */
+  async getEmployeeByEmployeeId(employeeId: string): Promise<Employee | null> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { employeeId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            departmentId: true,
+            managerId: true,
+            city: true,
+            state: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        manager: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!employee) {
+      return null;
+    }
+
+    return this.transformToEmployeeResponse(employee);
+  }
+
+  /**
+   * Get employee by user email
+   */
+  async getEmployeeByEmail(email: string): Promise<Employee | null> {
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        user: {
+          email,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            departmentId: true,
+            managerId: true,
+            city: true,
+            state: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        manager: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!employee) {
+      return null;
+    }
+
+    return this.transformToEmployeeResponse(employee);
+  }
+
+  /**
+   * Update employee information
+   */
+  async updateEmployee(
+    id: string,
+    data: UpdateEmployeeDto,
+    updatedBy?: string
+  ): Promise<Employee> {
+    // Check if employee exists
+    const existingEmployee = await this.prisma.employee.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!existingEmployee) {
+      throw new Error("Employee not found");
+    }
+
+    // Check email uniqueness if being updated
+    if (data.email && data.email !== existingEmployee.user.email) {
+      const emailExists = await this.prisma.user.findUnique({
+        where: {
+          email: data.email,
+          NOT: { id: existingEmployee.userId },
+        },
+      });
+
+      if (emailExists) {
+        throw new Error("Email already exists");
+      }
+    }
+
+    // Check employee ID uniqueness if being updated
+    if (data.employeeId && data.employeeId !== existingEmployee.employeeId) {
+      const employeeIdExists = await this.prisma.employee.findUnique({
+        where: {
+          employeeId: data.employeeId,
+          NOT: { id },
+        },
+      });
+
+      if (employeeIdExists) {
+        throw new Error("Employee ID already exists");
+      }
+    }
+
+    // Validate department if being updated
+    if (data.departmentId) {
+      const department = await this.prisma.department.findUnique({
+        where: { id: data.departmentId },
+      });
+
+      if (!department || !department.isActive) {
+        throw new Error("Invalid or inactive department");
+      }
+    }
+
+    // Validate team if being updated
+    if (data.teamId !== undefined) {
+      if (data.teamId) {
+        const team = await this.prisma.team.findUnique({
+          where: { id: data.teamId },
+        });
+
+        if (!team || !team.isActive) {
+          throw new Error("Invalid or inactive team");
+        }
+
+        // Validate team belongs to department
+        const departmentId = data.departmentId || existingEmployee.departmentId;
+        if (team.departmentId !== departmentId) {
+          throw new Error("Team does not belong to the specified department");
+        }
+      }
+    }
+
+    // Validate manager if being updated
+    if (data.managerId) {
+      const manager = await this.prisma.employee.findUnique({
+        where: { id: data.managerId },
+        include: { user: true },
+      });
+
+      if (!manager || !manager.user.isActive) {
+        throw new Error("Invalid or inactive manager");
+      }
+
+      // Prevent self-management
+      if (data.managerId === id) {
+        throw new Error("Employee cannot be their own manager");
+      }
+    }
+
+    // Update in transaction
+    const updatedEmployee = await this.prisma.$transaction(async (tx) => {
+      // Update user fields
+      const userUpdateData: any = {};
+      if (data.firstName !== undefined)
+        userUpdateData.firstName = data.firstName;
+      if (data.lastName !== undefined) userUpdateData.lastName = data.lastName;
+      if (data.email !== undefined) userUpdateData.email = data.email;
+      if (data.phone !== undefined) userUpdateData.phone = data.phone;
+      if (data.isActive !== undefined) userUpdateData.isActive = data.isActive;
+
+      if (Object.keys(userUpdateData).length > 0) {
+        await tx.user.update({
+          where: { id: existingEmployee.userId },
+          data: userUpdateData,
+        });
+      }
+
+      // Update employee fields
+      const employeeUpdateData: any = {};
+      if (data.employeeId !== undefined)
+        employeeUpdateData.employeeId = data.employeeId;
+      if (data.departmentId !== undefined)
+        employeeUpdateData.departmentId = data.departmentId;
+      if (data.teamId !== undefined) {
+        // Handle empty string as null for optional team assignment
+        employeeUpdateData.teamId = data.teamId === "" ? null : data.teamId;
+      }
+      if (data.managerId !== undefined) {
+        // Handle empty string as null for optional manager assignment
+        employeeUpdateData.managerId =
+          data.managerId === "" ? null : data.managerId;
+      }
+      if (data.position !== undefined)
+        employeeUpdateData.position = data.position;
+      if (data.hireDate !== undefined) {
+        // Convert ISO string back to Date object if needed
+        employeeUpdateData.hireDate =
+          typeof data.hireDate === "string"
+            ? new Date(data.hireDate)
+            : data.hireDate;
+      }
+
+      const employee = await tx.employee.update({
+        where: { id },
+        data: employeeUpdateData,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              isActive: true,
+              emailVerified: true,
+              lastLoginAt: true,
+            },
+          },
+          department: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              code: true,
+              isActive: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              departmentId: true,
+              managerId: true,
+              city: true,
+              state: true,
+              isActive: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          manager: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Update roles if provided
+      if (data.roleIds !== undefined) {
+        // Remove existing roles
+        await tx.userRole.deleteMany({
+          where: { userId: existingEmployee.userId },
+        });
+
+        // Add new roles
+        if (data.roleIds.length > 0) {
+          await tx.userRole.createMany({
+            data: data.roleIds.map((roleId) => ({
+              userId: existingEmployee.userId,
+              roleId,
+              createdBy: updatedBy || "system",
+            })),
+          });
+        }
+      }
+
+      return employee;
+    });
+
+    return this.transformToEmployeeResponse(updatedEmployee);
+  }
+
+  /**
+   * Delete employee (soft delete by deactivating user)
+   */
+  async deleteEmployee(id: string): Promise<void> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!employee) {
+      throw new Error("Employee not found");
+    }
+
+    // Soft delete by deactivating the user
+    await this.prisma.user.update({
+      where: { id: employee.userId },
+      data: { isActive: false },
+    });
+  }
+
+  /**
+   * Search employees with filters and pagination
+   */
+  async searchEmployees(options: EmployeeSearchOptions): Promise<{
+    employees: Employee[];
+    total: number;
+    page: number;
+    totalPages: number;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    const {
+      departmentId,
+      teamId,
+      roleId,
+      isActive, // Remove default value to show both active and inactive
+      search,
+      page = 1,
+      limit = 50,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = options;
+
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = {};
+
+    // Only filter by isActive if explicitly provided
+    if (isActive !== undefined) {
+      where.user = {
+        isActive: isActive,
+      };
+    }
+
+    if (departmentId) {
+      where.departmentId = departmentId;
+    }
+
+    if (teamId) {
+      where.teamId = teamId;
+    }
+
+    if (search) {
+      where.OR = [
+        {
+          user: {
+            firstName: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          user: {
+            lastName: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          user: {
+            email: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          employeeId: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+      ];
+    }
+
+    if (roleId) {
+      // Ensure user object exists in where clause for role filtering
+      if (!where.user) {
+        where.user = {};
+      }
+      where.user = {
+        ...where.user,
+        userRoles: {
+          some: {
+            roleId: roleId,
+          },
+        },
+      };
+    }
+
+    // Build order by clause
+    let orderBy: any = {};
+
+    if (sortBy === "name") {
+      orderBy = [
+        { user: { firstName: sortOrder } },
+        { user: { lastName: sortOrder } },
+      ];
+    } else if (sortBy === "email") {
+      orderBy = { user: { email: sortOrder } };
+    } else if (sortBy === "department") {
+      orderBy = { department: { name: sortOrder } };
+    } else if (sortBy === "team") {
+      orderBy = { team: { name: sortOrder } };
+    } else {
+      orderBy = { [sortBy]: sortOrder };
+    }
+
+    // Get total count
+    const total = await this.prisma.employee.count({
+      where,
+    });
+
+    // Get employees
+    const employees = await this.prisma.employee.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: true,
+            userRoles: {
+              include: {
+                role: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    level: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            departmentId: true,
+            managerId: true,
+            city: true,
+            state: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        manager: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: Array.isArray(orderBy) ? orderBy : [orderBy],
+      skip,
+      take: limit,
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      employees: employees.map((emp) => this.transformToEmployeeResponse(emp)),
+      total,
+      page,
+      totalPages,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Employee login
+   */
+  async login(
+    credentials: EmployeeLoginCredentials
+  ): Promise<EmployeeLoginResponse> {
+    const { email, password, employeeId } = credentials;
+
+    // Find employee by email or employee ID
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        OR: [{ user: { email } }, ...(employeeId ? [{ employeeId }] : [])],
+      },
       include: {
         user: {
           include: {
@@ -441,458 +869,8 @@ export class EmployeeService {
         department: true,
         team: true,
         manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            position: true,
-          },
-        },
-        subordinates: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            position: true,
-          },
-        },
-        managedTeams: {
-          include: {
-            department: true,
-          },
-        },
-      },
-    });
-
-    if (!result) return null;
-
-    // Transform result to match Employee type
-    return {
-      id: result.id,
-      userId: result.userId,
-      employeeId: result.employeeId,
-      firstName: result.firstName,
-      lastName: result.lastName,
-      email: result.email,
-      phone: result.phone || undefined,
-      departmentId: result.departmentId,
-      teamId: result.teamId || undefined,
-      managerId: result.managerId || undefined,
-      position: result.position || undefined,
-      hireDate: result.hireDate,
-      isActive: result.isActive,
-      createdAt: result.createdAt,
-      updatedAt: result.updatedAt,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        isActive: result.user.isActive,
-        emailVerified: result.user.emailVerified,
-        lastLoginAt: result.user.lastLoginAt || undefined,
-      },
-      department: result.department
-        ? {
-            id: result.department.id,
-            name: result.department.name,
-            description: result.department.description || undefined,
-            code: result.department.code || undefined,
-            isActive: result.department.isActive,
-            createdAt: result.department.createdAt,
-            updatedAt: result.department.updatedAt,
-          }
-        : undefined,
-      team: result.team
-        ? {
-            id: result.team.id,
-            name: result.team.name,
-            description: result.team.description || undefined,
-            departmentId: result.team.departmentId,
-            managerId: result.team.managerId || undefined,
-            isActive: result.team.isActive,
-            createdAt: result.team.createdAt,
-            updatedAt: result.team.updatedAt,
-          }
-        : undefined,
-      manager: result.manager
-        ? ({
-            id: result.manager.id,
-            firstName: result.manager.firstName,
-            lastName: result.manager.lastName,
-            email: result.manager.email,
-            position: result.manager.position || undefined,
-          } as any)
-        : undefined,
-      roles:
-        result.user.userRoles?.map((userRole) => ({
-          id: userRole.role.id,
-          name: userRole.role.name,
-          level: userRole.role.level,
-          permissions:
-            userRole.role.permissions?.map((rp) => ({
-              id: rp.permission.id,
-              name: rp.permission.name,
-              resource: rp.permission.resource,
-              action: rp.permission.action,
-              service: rp.permission.service,
-            })) || [],
-        })) || [],
-    } as Employee;
-  }
-
-  /**
-   * Search employees with filters and pagination
-   */
-  async searchEmployees(options: EmployeeSearchOptions) {
-    const {
-      departmentId,
-      teamId,
-      roleId,
-      isActive,
-      search,
-      page = 1,
-      limit = 10,
-      sortBy = "name",
-      sortOrder = "asc",
-    } = options;
-
-    const skip = (page - 1) * limit;
-
-    const where: any = {};
-
-    // Apply filters
-    if (departmentId) where.departmentId = departmentId;
-    if (teamId) where.teamId = teamId;
-    if (isActive !== undefined) where.isActive = isActive;
-
-    if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-        { employeeId: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    if (roleId) {
-      where.user = {
-        userRoles: {
-          some: {
-            roleId: roleId,
-          },
-        },
-      };
-    }
-
-    // Build orderBy
-    let orderBy: any = {};
-    switch (sortBy) {
-      case "name":
-        orderBy = [{ firstName: sortOrder }, { lastName: sortOrder }];
-        break;
-      case "email":
-        orderBy = { email: sortOrder };
-        break;
-      case "hireDate":
-        orderBy = { hireDate: sortOrder };
-        break;
-      case "department":
-        orderBy = { department: { name: sortOrder } };
-        break;
-      case "team":
-        orderBy = { team: { name: sortOrder } };
-        break;
-      default:
-        orderBy = { createdAt: sortOrder };
-    }
-
-    const [employees, total] = await Promise.all([
-      this.prisma.employee.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              isActive: true,
-              emailVerified: true,
-              lastLoginAt: true,
-              userRoles: {
-                include: {
-                  role: {
-                    select: {
-                      id: true,
-                      name: true,
-                      level: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          department: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
-          team: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      this.prisma.employee.count({ where }),
-    ]);
-
-    return {
-      employees: employees.map((emp) => ({
-        id: emp.id,
-        userId: emp.userId,
-        employeeId: emp.employeeId,
-        firstName: emp.firstName,
-        lastName: emp.lastName,
-        email: emp.email,
-        phone: emp.phone || undefined,
-        departmentId: emp.departmentId,
-        teamId: emp.teamId || undefined,
-        managerId: emp.managerId || undefined,
-        position: emp.position || undefined,
-        hireDate: emp.hireDate,
-        isActive: emp.isActive,
-        createdAt: emp.createdAt,
-        updatedAt: emp.updatedAt,
-        user: {
-          id: emp.user.id,
-          email: emp.email, // Use employee email since user.email is missing from select
-          isActive: emp.user.isActive,
-          emailVerified: emp.user.emailVerified,
-          lastLoginAt: emp.user.lastLoginAt || undefined,
-        },
-        department: emp.department
-          ? ({
-              id: emp.department.id,
-              name: emp.department.name,
-              code: emp.department.code || undefined,
-            } as any)
-          : undefined,
-        team: emp.team
-          ? ({
-              id: emp.team.id,
-              name: emp.team.name,
-            } as any)
-          : undefined,
-        manager: emp.manager
-          ? ({
-              id: emp.manager.id,
-              firstName: emp.manager.firstName,
-              lastName: emp.manager.lastName,
-            } as any)
-          : undefined,
-        roles:
-          emp.user.userRoles?.map((userRole) => ({
-            id: userRole.role.id,
-            name: userRole.role.name,
-            level: userRole.role.level,
-          })) || [],
-      })) as Employee[],
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNext: page * limit < total,
-        hasPrev: page > 1,
-      },
-    };
-  }
-
-  /**
-   * Update employee information
-   */
-  async updateEmployee(id: string, data: UpdateEmployeeDto): Promise<Employee> {
-    const employee = await this.prisma.employee.findUnique({
-      where: { id },
-    });
-
-    if (!employee) {
-      throw new Error("Employee not found");
-    }
-
-    // Validate department if changing
-    if (data.departmentId && data.departmentId !== employee.departmentId) {
-      const department = await this.prisma.department.findUnique({
-        where: { id: data.departmentId },
-      });
-
-      if (!department || !department.isActive) {
-        throw new Error("Invalid or inactive department");
-      }
-
-      // If changing department, clear team if it doesn't belong to new department
-      if (employee.teamId) {
-        const team = await this.prisma.team.findUnique({
-          where: { id: employee.teamId },
-        });
-
-        if (team && team.departmentId !== data.departmentId) {
-          data.teamId = null;
-        }
-      }
-    }
-
-    // Validate team if changing
-    if (data.teamId) {
-      const team = await this.prisma.team.findUnique({
-        where: { id: data.teamId },
-      });
-
-      if (!team || !team.isActive) {
-        throw new Error("Invalid or inactive team");
-      }
-
-      const departmentId = data.departmentId || employee.departmentId;
-      if (team.departmentId !== departmentId) {
-        throw new Error("Team does not belong to the specified department");
-      }
-    }
-
-    // Update employee and handle role updates in transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Update employee basic information
-      const updatedEmployee = await tx.employee.update({
-        where: { id },
-        data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-          departmentId: data.departmentId,
-          teamId: data.teamId === null ? null : data.teamId,
-          managerId: data.managerId,
-          position: data.position,
-          isActive: data.isActive,
-        },
-        include: {
-          user: {
-            include: {
-              userRoles: {
-                include: {
-                  role: {
-                    select: {
-                      id: true,
-                      name: true,
-                      level: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          department: true,
-          team: true,
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      // Handle role updates if provided
-      if (data.roleIds !== undefined) {
-        console.log("📝 Updating employee roles:");
-        console.log("  Employee ID:", id);
-        console.log("  New role IDs:", data.roleIds);
-
-        // Validate that all role IDs exist
-        if (data.roleIds.length > 0) {
-          const existingRoles = await tx.role.findMany({
-            where: {
-              id: {
-                in: data.roleIds,
-              },
-            },
-            select: {
-              id: true,
-              name: true,
-            },
-          });
-
-          const existingRoleIds = existingRoles.map((role) => role.id);
-          const invalidRoleIds = data.roleIds.filter(
-            (roleId) => !existingRoleIds.includes(roleId)
-          );
-
-          if (invalidRoleIds.length > 0) {
-            throw new Error(
-              `Invalid role IDs: ${invalidRoleIds.join(
-                ", "
-              )}. Available roles: ${existingRoles
-                .map((r) => `${r.name} (${r.id})`)
-                .join(", ")}`
-            );
-          }
-        }
-
-        // Remove existing roles
-        await tx.userRole.deleteMany({
-          where: {
-            userId: employee.userId,
-          },
-        });
-
-        // Add new roles
-        if (data.roleIds.length > 0) {
-          await Promise.all(
-            data.roleIds.map((roleId: string) =>
-              tx.userRole.create({
-                data: {
-                  userId: employee.userId,
-                  roleId: roleId,
-                },
-              })
-            )
-          );
-        }
-
-        // Fetch updated employee with new roles
-        return await tx.employee.findUnique({
-          where: { id },
           include: {
             user: {
-              include: {
-                userRoles: {
-                  include: {
-                    role: {
-                      select: {
-                        id: true,
-                        name: true,
-                        level: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            department: true,
-            team: true,
-            manager: {
               select: {
                 id: true,
                 firstName: true,
@@ -901,139 +879,297 @@ export class EmployeeService {
               },
             },
           },
-        });
-      }
-
-      return updatedEmployee;
+        },
+      },
     });
 
-    // Check if result is null
-    if (!result) {
-      throw new Error("Failed to update employee");
+    if (!employee) {
+      throw new Error("Invalid credentials");
     }
 
-    // Transform result to match Employee type
+    if (!employee.user.isActive) {
+      throw new Error("Account is inactive");
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(
+      password,
+      employee.user.password
+    );
+
+    if (!isValidPassword) {
+      throw new Error("Invalid credentials");
+    }
+
+    // Update last login
+    await this.prisma.user.update({
+      where: { id: employee.user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate JWT token
+    const tokenPayload: JwtPayload = {
+      userId: employee.user.id,
+      email: employee.user.email,
+      roles: employee.user.userRoles.map((ur) => ({
+        id: ur.role.id,
+        name: ur.role.name,
+        level: ur.role.level,
+      })),
+      permissions: employee.user.userRoles.flatMap((ur) =>
+        ur.role.permissions.map((rp) => ({
+          service: rp.permission.service,
+          resource: rp.permission.resource,
+          action: rp.permission.action,
+        }))
+      ),
+      employee: {
+        id: employee.id,
+        employeeId: employee.employeeId,
+        departmentId: employee.departmentId,
+        teamId: employee.teamId,
+        managerId: employee.managerId,
+      },
+    };
+
+    const jwtSecret = process.env.JWT_SECRET || "your-secret-key";
+    const jwtExpiry = process.env.JWT_EXPIRES_IN || "24h";
+
+    const token = (jwt as any).sign(tokenPayload, jwtSecret, {
+      expiresIn: jwtExpiry,
+    });
+
+    // Prepare response
+    const roles = employee.user.userRoles.map((userRole) => ({
+      id: userRole.role.id,
+      name: userRole.role.name,
+      description: userRole.role.description,
+      permissions: userRole.role.permissions.map((rp) => ({
+        id: rp.permission.id,
+        name: rp.permission.name,
+        description: rp.permission.description,
+      })),
+    }));
+
     return {
-      id: result.id,
-      userId: result.userId,
-      employeeId: result.employeeId,
-      firstName: result.firstName,
-      lastName: result.lastName,
-      email: result.email,
-      phone: result.phone || undefined,
-      departmentId: result.departmentId,
-      teamId: result.teamId || undefined,
-      managerId: result.managerId || undefined,
-      position: result.position || undefined,
-      hireDate: result.hireDate,
-      isActive: result.isActive,
-      createdAt: result.createdAt,
-      updatedAt: result.updatedAt,
-      user: result.user
-        ? {
-            id: result.user.id,
-            email: result.user.email,
-            isActive: result.user.isActive,
-            emailVerified: result.user.emailVerified,
-            lastLoginAt: result.user.lastLoginAt || undefined,
-          }
-        : undefined,
-      department: result.department
-        ? {
-            id: result.department.id,
-            name: result.department.name,
-            description: result.department.description || undefined,
-            code: result.department.code || undefined,
-            isActive: result.department.isActive,
-            createdAt: result.department.createdAt,
-            updatedAt: result.department.updatedAt,
-          }
-        : undefined,
-      team: result.team
-        ? {
-            id: result.team.id,
-            name: result.team.name,
-            description: result.team.description || undefined,
-            departmentId: result.team.departmentId,
-            managerId: result.team.managerId || undefined,
-            isActive: result.team.isActive,
-            createdAt: result.team.createdAt,
-            updatedAt: result.team.updatedAt,
-          }
-        : undefined,
-      manager: result.manager
-        ? ({
-            id: result.manager.id,
-            firstName: result.manager.firstName,
-            lastName: result.manager.lastName,
-            email: result.manager.email,
-          } as any)
-        : undefined,
-      roles:
-        result.user?.userRoles?.map((userRole) => ({
-          id: userRole.role.id,
-          name: userRole.role.name,
-          level: userRole.role.level,
-        })) || [],
-    } as Employee;
+      token,
+      employee: this.transformToEmployeeResponse(employee),
+      roles,
+    };
   }
 
   /**
-   * Deactivate employee (soft delete)
+   * Get all employees under a manager
+   */
+  async getSubordinates(managerId: string): Promise<Employee[]> {
+    const subordinates = await this.prisma.employee.findMany({
+      where: { managerId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            departmentId: true,
+            managerId: true,
+            city: true,
+            state: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    return subordinates.map((emp) => this.transformToEmployeeResponse(emp));
+  }
+
+  /**
+   * Get employees by department
+   */
+  async getEmployeesByDepartment(departmentId: string): Promise<Employee[]> {
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        departmentId,
+        user: { isActive: true },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            departmentId: true,
+            managerId: true,
+            city: true,
+            state: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        manager: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return employees.map((emp) => this.transformToEmployeeResponse(emp));
+  }
+
+  /**
+   * Get employees by team
+   */
+  async getEmployeesByTeam(teamId: string): Promise<Employee[]> {
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        teamId,
+        user: { isActive: true },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            departmentId: true,
+            managerId: true,
+            city: true,
+            state: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        manager: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return employees.map((emp) => this.transformToEmployeeResponse(emp));
+  }
+
+  /**
+   * Employee login (alias for login method for backward compatibility)
+   */
+  async loginEmployee(
+    credentials: EmployeeLoginCredentials
+  ): Promise<EmployeeLoginResponse> {
+    return this.login(credentials);
+  }
+
+  /**
+   * Deactivate employee (alias for deleteEmployee for backward compatibility)
    */
   async deactivateEmployee(id: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const employee = await tx.employee.findUnique({
-        where: { id },
-        include: { user: true },
-      });
-
-      if (!employee) {
-        throw new Error("Employee not found");
-      }
-
-      // Deactivate employee
-      await tx.employee.update({
-        where: { id },
-        data: { isActive: false },
-      });
-
-      // Deactivate user account
-      await tx.user.update({
-        where: { id: employee.userId },
-        data: { isActive: false },
-      });
-
-      // Invalidate all sessions
-      await tx.session.deleteMany({
-        where: { userId: employee.userId },
-      });
-    });
+    return this.deleteEmployee(id);
   }
 
   /**
-   * Check if employee has specific permission
+   * Check if user has a specific permission
    */
   async hasPermission(
-    employeeId: string,
+    userId: string,
     service: string,
     resource: string,
     action: string
   ): Promise<boolean> {
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: employeeId },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
       include: {
-        user: {
+        userRoles: {
           include: {
-            userRoles: {
+            role: {
               include: {
-                role: {
+                permissions: {
                   include: {
-                    permissions: {
-                      include: {
-                        permission: true,
-                      },
-                    },
+                    permission: true,
                   },
                 },
               },
@@ -1043,34 +1179,98 @@ export class EmployeeService {
       },
     });
 
-    if (!employee || !employee.isActive) {
+    if (!user || !user.isActive) {
       return false;
     }
 
-    return employee.user.userRoles.some((ur) =>
-      ur.role.permissions.some(
-        (rp) =>
-          rp.permission.service === service &&
-          rp.permission.resource === resource &&
-          rp.permission.action === action &&
-          rp.permission.isActive
-      )
+    // Check if user has the specific permission
+    return user.userRoles.some(
+      (userRole) =>
+        userRole.role.isActive &&
+        userRole.role.permissions.some(
+          (rolePermission) =>
+            rolePermission.permission.isActive &&
+            rolePermission.permission.service === service &&
+            rolePermission.permission.resource === resource &&
+            rolePermission.permission.action === action
+        )
     );
   }
 
   /**
-   * Send welcome email to new employee
+   * Transform database result to Employee response format
    */
-  private async sendWelcomeEmail(
-    email: string,
-    temporaryPassword: string,
-    employeeId: string
-  ): Promise<void> {
-    try {
-      await EmailService.sendWelcomeEmail(email, employeeId);
-    } catch (error) {
-      console.error("Failed to send welcome email:", error);
-      // Don't throw error as employee creation should still succeed
-    }
+  private transformToEmployeeResponse(dbEmployee: any): Employee {
+    return {
+      id: dbEmployee.id,
+      userId: dbEmployee.userId,
+      employeeId: dbEmployee.employeeId,
+      // Flatten user fields to root level for frontend compatibility
+      firstName: dbEmployee.user.firstName,
+      lastName: dbEmployee.user.lastName,
+      email: dbEmployee.user.email,
+      isActive: dbEmployee.user.isActive,
+      phone: dbEmployee.user.phone,
+      departmentId: dbEmployee.departmentId,
+      teamId: dbEmployee.teamId,
+      managerId: dbEmployee.managerId,
+      position: dbEmployee.position,
+      hireDate: dbEmployee.hireDate,
+      createdAt: dbEmployee.createdAt,
+      updatedAt: dbEmployee.updatedAt,
+      // Keep nested user object for backward compatibility
+      user: {
+        id: dbEmployee.user.id,
+        firstName: dbEmployee.user.firstName,
+        lastName: dbEmployee.user.lastName,
+        email: dbEmployee.user.email,
+        phone: dbEmployee.user.phone,
+        isActive: dbEmployee.user.isActive,
+        emailVerified: dbEmployee.user.emailVerified,
+        lastLoginAt: dbEmployee.user.lastLoginAt,
+      },
+      // Extract and transform roles
+      roles: dbEmployee.user.userRoles
+        ? dbEmployee.user.userRoles.map((userRole: any) => ({
+            id: userRole.role.id,
+            name: userRole.role.name,
+            description: userRole.role.description,
+            level: userRole.role.level,
+          }))
+        : [],
+      department: dbEmployee.department
+        ? {
+            id: dbEmployee.department.id,
+            name: dbEmployee.department.name,
+            description: dbEmployee.department.description,
+            code: dbEmployee.department.code,
+            isActive: dbEmployee.department.isActive,
+            createdAt: dbEmployee.department.createdAt,
+            updatedAt: dbEmployee.department.updatedAt,
+          }
+        : undefined,
+      team: dbEmployee.team
+        ? {
+            id: dbEmployee.team.id,
+            name: dbEmployee.team.name,
+            description: dbEmployee.team.description,
+            departmentId: dbEmployee.team.departmentId,
+            managerId: dbEmployee.team.managerId,
+            city: dbEmployee.team.city,
+            state: dbEmployee.team.state,
+            isActive: dbEmployee.team.isActive,
+            createdAt: dbEmployee.team.createdAt,
+            updatedAt: dbEmployee.team.updatedAt,
+          }
+        : undefined,
+      manager: dbEmployee.manager
+        ? {
+            id: dbEmployee.manager.user.id,
+            firstName: dbEmployee.manager.user.firstName,
+            lastName: dbEmployee.manager.user.lastName,
+            email: dbEmployee.manager.user.email,
+          }
+        : undefined,
+    };
   }
 }

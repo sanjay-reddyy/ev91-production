@@ -118,7 +118,7 @@ const ClientsPage: React.FC = () => {
     clientPriority: 'medium',
   })
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
-  
+
   // Filters and pagination
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -141,7 +141,7 @@ const ClientsPage: React.FC = () => {
         sortBy: 'createdAt',
         sortOrder: 'desc' as const,
       }
-      
+
       console.log('Loading clients with params:', params)
       const response = await clientStoreService.getClients(params)
       console.log('Get clients response:', response)
@@ -244,7 +244,7 @@ const ClientsPage: React.FC = () => {
 
   const handleDeleteClient = async (clientId: string) => {
     if (!window.confirm('Are you sure you want to delete this client?')) return
-    
+
     try {
       await clientStoreService.deleteClient(clientId)
       setSnackbar({ open: true, message: 'Client deleted successfully', severity: 'success' })
@@ -577,7 +577,7 @@ const ClientsPage: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
-          
+
           <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50]}
             component="div"

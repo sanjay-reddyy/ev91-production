@@ -19,6 +19,22 @@ export class TeamController {
     body("departmentId").notEmpty().withMessage("Department ID is required"),
     body("description").optional().isString(),
     body("managerId").optional().isString(),
+    body("city").optional().isString(),
+    body("state").optional().isString(),
+    body("maxMembers")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("Max members must be a positive integer"),
+    body("skills").optional().isArray().withMessage("Skills must be an array"),
+    body("status")
+      .optional()
+      .isIn(["Active", "Inactive"])
+      .withMessage("Status must be Active or Inactive"),
+    body("memberCount")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage("Member count must be a non-negative integer"),
+    body("isActive").optional().isBoolean(),
   ];
 
   /**
@@ -27,7 +43,19 @@ export class TeamController {
   static updateTeamValidation = [
     body("name").optional().notEmpty().withMessage("Team name cannot be empty"),
     body("description").optional().isString(),
+    body("departmentId").optional().isString(),
     body("managerId").optional().isString(),
+    body("city").optional().isString(),
+    body("state").optional().isString(),
+    body("maxMembers")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("Max members must be a positive integer"),
+    body("skills").optional().isArray().withMessage("Skills must be an array"),
+    body("status")
+      .optional()
+      .isIn(["Active", "Inactive"])
+      .withMessage("Status must be Active or Inactive"),
     body("isActive").optional().isBoolean(),
   ];
 

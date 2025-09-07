@@ -20,7 +20,6 @@ import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
   Groups as GroupsIcon,
-  Business as BusinessIcon,
   Security as SecurityIcon,
   AccountCircle as AccountCircleIcon,
   Settings as SettingsIcon,
@@ -97,19 +96,12 @@ const menuItems: MenuItem[] = [
     ]
   },
   {
-    text: 'Teams',
+    text: 'Teams & Departments',
     icon: <GroupsIcon />,
     path: '/teams',
     anyOfPermissions: [
       { service: 'auth', resource: 'teams', action: 'read' },
-      { service: 'auth', resource: 'teams', action: 'manage' }
-    ]
-  },
-  {
-    text: 'Departments',
-    icon: <BusinessIcon />,
-    path: '/departments',
-    anyOfPermissions: [
+      { service: 'auth', resource: 'teams', action: 'manage' },
       { service: 'auth', resource: 'departments', action: 'read' },
       { service: 'auth', resource: 'departments', action: 'manage' }
     ]

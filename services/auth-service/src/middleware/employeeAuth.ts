@@ -48,10 +48,14 @@ export const authenticateEmployee = async (
               },
             },
             manager: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
               },
             },
           },
@@ -75,51 +79,51 @@ export const authenticateEmployee = async (
     if (!user || !user.isActive) {
       res.status(401).json({
         success: false,
-        error: "User account not found or inactive",
+        error: "Invalid or inactive user",
       });
       return;
     }
 
-    // Check if user is an employee
-    if (!user.employee || !user.employee.isActive) {
+    if (!user.employee) {
       res.status(403).json({
         success: false,
-        error: "Employee access required",
+        error: "User is not an employee",
       });
       return;
     }
 
-    // Build enhanced user object
+    // Build AuthUser object
     const authUser: AuthUser = {
       id: user.id,
       email: user.email,
       firstName: user.firstName || "",
       lastName: user.lastName || "",
+      phone: user.phone,
       isActive: user.isActive,
       emailVerified: user.emailVerified,
-      lastLoginAt: user.lastLoginAt || undefined,
-      roles: user.userRoles.map((ur) => ({
-        id: ur.role.id,
-        name: ur.role.name,
-        level: ur.role.level || 1,
-        isActive: ur.role.isActive,
-        permissions: ur.role.permissions.map((rp) => ({
-          id: rp.permission.id,
-          name: rp.permission.name,
-          service: rp.permission.service,
-          resource: rp.permission.resource,
-          action: rp.permission.action,
-          isActive: rp.permission.isActive,
+      lastLoginAt: user.lastLoginAt,
+      roles: user.userRoles.map((userRole) => ({
+        id: userRole.role.id,
+        name: userRole.role.name,
+        level: userRole.role.level,
+        isActive: userRole.role.isActive,
+        permissions: userRole.role.permissions.map((rolePermission) => ({
+          id: rolePermission.permission.id,
+          name: rolePermission.permission.name,
+          service: rolePermission.permission.service,
+          resource: rolePermission.permission.resource,
+          action: rolePermission.permission.action,
+          isActive: rolePermission.permission.isActive,
         })),
       })),
       employee: {
         id: user.employee.id,
         employeeId: user.employee.employeeId,
-        position: user.employee.position || undefined,
+        position: user.employee.position,
         department: {
           id: user.employee.department.id,
           name: user.employee.department.name,
-          code: user.employee.department.code || undefined,
+          code: user.employee.department.code,
         },
         team: user.employee.team
           ? {
@@ -129,27 +133,27 @@ export const authenticateEmployee = async (
           : undefined,
         manager: user.employee.manager
           ? {
-              id: user.employee.manager.id,
-              name: `${user.employee.manager.firstName} ${user.employee.manager.lastName}`,
+              id: user.employee.manager.user.id,
+              name: `${user.employee.manager.user.firstName} ${user.employee.manager.user.lastName}`,
             }
           : undefined,
       },
     };
 
+    // Attach user to request
     req.user = authUser;
     next();
   } catch (error) {
     console.error("Authentication error:", error);
     res.status(401).json({
       success: false,
-      error: "Invalid authentication token",
+      error: "Invalid token",
     });
-    return;
   }
 };
 
 /**
- * Permission middleware factory - checks if user has specific permission
+ * Permission checking middleware
  */
 export const requirePermission = (
   service: string,
@@ -157,200 +161,57 @@ export const requirePermission = (
   action: string
 ) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as AuthUser;
-
-    if (!user) {
-      return res.status(401).json({
+    if (!req.user) {
+      res.status(401).json({
         success: false,
         error: "Authentication required",
       });
+      return;
     }
 
-    // Check if user has the required permission
-    const hasPermission = user.roles.some((role) =>
+    const hasPermission = req.user.roles.some((role) =>
       role.permissions.some(
         (permission) =>
-          // Super admin with admin:full has access to everything
-          (permission.resource === "admin" && permission.action === "full") ||
-          // Or exact permission match
-          (permission.service === service &&
-            permission.resource === resource &&
-            permission.action === action) ||
-          // Or manage action includes all other actions (create, read, update, delete)
-          (permission.service === service &&
-            permission.resource === resource &&
-            permission.action === "manage" &&
-            ["create", "read", "update", "delete"].includes(action))
+          permission.service === service &&
+          permission.resource === resource &&
+          permission.action === action &&
+          permission.isActive
       )
     );
 
     if (!hasPermission) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
-        error: `Access denied. Required permission: ${service}:${resource}:${action}`,
-        requiredPermission: {
-          service,
-          resource,
-          action,
-        },
+        error: "Insufficient permissions",
       });
-    }
-
-    next();
-  };
-};
-
-/**
- * Multiple permissions middleware - checks if user has ANY of the specified permissions
- */
-export const requireAnyPermission = (permissions: PermissionCheck[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as AuthUser;
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-      });
-    }
-
-    // Check if user has any of the required permissions
-    const hasAnyPermission = permissions.some((perm) =>
-      user.roles.some((role) =>
-        role.permissions.some(
-          (permission) =>
-            // Super admin with admin:full has access to everything
-            (permission.resource === "admin" && permission.action === "full") ||
-            // Or exact permission match
-            (permission.service === perm.service &&
-              permission.resource === perm.resource &&
-              permission.action === perm.action)
-        )
-      )
-    );
-
-    if (!hasAnyPermission) {
-      return res.status(403).json({
-        success: false,
-        error:
-          "Access denied. You do not have any of the required permissions.",
-        requiredPermissions: permissions,
-      });
-    }
-
-    next();
-  };
-};
-
-/**
- * All permissions middleware - checks if user has ALL of the specified permissions
- */
-export const requireAllPermissions = (permissions: PermissionCheck[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as AuthUser;
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-      });
-    }
-
-    // Check if user has all required permissions
-    const hasAllPermissions = permissions.every((perm) =>
-      user.roles.some((role) =>
-        role.permissions.some(
-          (permission) =>
-            permission.service === perm.service &&
-            permission.resource === perm.resource &&
-            permission.action === perm.action
-        )
-      )
-    );
-
-    if (!hasAllPermissions) {
-      const missingPermissions = permissions.filter(
-        (perm) =>
-          !user.roles.some((role) =>
-            role.permissions.some(
-              (permission) =>
-                permission.service === perm.service &&
-                permission.resource === perm.resource &&
-                permission.action === perm.action
-            )
-          )
-      );
-
-      return res.status(403).json({
-        success: false,
-        error: "Access denied. You are missing required permissions.",
-        missingPermissions,
-      });
-    }
-
-    next();
-  };
-};
-
-/**
- * Role level middleware - checks if user has a role with minimum level
- */
-export const requireMinimumRoleLevel = (minLevel: number) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as AuthUser;
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-      });
-    }
-
-    const hasMinimumLevel = user.roles.some(
-      (role) => (role.level || 1) >= minLevel
-    );
-
-    if (!hasMinimumLevel) {
-      return res.status(403).json({
-        success: false,
-        error: `Access denied. Minimum role level ${minLevel} required.`,
-        requiredLevel: minLevel,
-        userMaxLevel: Math.max(...user.roles.map((r) => r.level || 1)),
-      });
-    }
-
-    next();
-  };
-};
-
-/**
- * Department access middleware - checks if user belongs to specific department
- */
-export const requireDepartmentAccess = (departmentId?: string) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as AuthUser;
-
-    if (!user || !user.employee) {
-      return res.status(401).json({
-        success: false,
-        error: "Employee authentication required",
-      });
-    }
-
-    // If no specific department required, allow any department
-    if (!departmentId) {
-      next();
       return;
     }
 
-    // Check if user belongs to the required department
-    if (user.employee.department.id !== departmentId) {
-      return res.status(403).json({
+    next();
+  };
+};
+
+/**
+ * Role checking middleware
+ */
+export const requireRole = (roleName: string) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      res.status(401).json({
         success: false,
-        error: "Access denied. You do not belong to the required department.",
-        requiredDepartment: departmentId,
-        userDepartment: user.employee.department.id,
+        error: "Authentication required",
       });
+      return;
+    }
+
+    const hasRole = req.user.roles.some((role) => role.name === roleName);
+
+    if (!hasRole) {
+      res.status(403).json({
+        success: false,
+        error: `Role '${roleName}' required`,
+      });
+      return;
     }
 
     next();
@@ -358,33 +219,125 @@ export const requireDepartmentAccess = (departmentId?: string) => {
 };
 
 /**
- * Team access middleware - checks if user belongs to specific team
+ * Department access checking middleware
+ */
+export const requireDepartmentAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user?.employee) {
+    res.status(403).json({
+      success: false,
+      error: "Employee access required",
+    });
+    return;
+  }
+
+  // You can add department-specific logic here
+  // For now, just allow access if user is an employee
+  next();
+};
+
+/**
+ * Manager level access checking middleware
+ */
+export const requireManagerAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user?.employee) {
+    res.status(403).json({
+      success: false,
+      error: "Employee access required",
+    });
+    return;
+  }
+
+  // Check if user has manager role or manage permission
+  const hasManagerRole = req.user.roles.some(
+    (role) =>
+      role.name.toLowerCase().includes("manager") ||
+      role.name.toLowerCase().includes("lead")
+  );
+
+  const hasManagePermission = req.user.roles.some((role) =>
+    role.permissions.some(
+      (permission) => permission.action === "manage" && permission.isActive
+    )
+  );
+
+  if (!hasManagerRole && !hasManagePermission) {
+    res.status(403).json({
+      success: false,
+      error: "Manager level access required",
+    });
+    return;
+  }
+
+  next();
+};
+
+/**
+ * Admin level access checking middleware
+ */
+export const requireAdminAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: "Authentication required",
+    });
+    return;
+  }
+
+  const hasAdminRole = req.user.roles.some(
+    (role) =>
+      role.name.toLowerCase().includes("admin") ||
+      role.name.toLowerCase().includes("super")
+  );
+
+  if (!hasAdminRole) {
+    res.status(403).json({
+      success: false,
+      error: "Admin access required",
+    });
+    return;
+  }
+
+  next();
+};
+
+/**
+ * Team access checking middleware
  */
 export const requireTeamAccess = (teamId?: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as AuthUser;
-
-    if (!user || !user.employee) {
-      return res.status(401).json({
+    if (!req.user?.employee) {
+      res.status(403).json({
         success: false,
-        error: "Employee authentication required",
+        error: "Employee access required",
       });
+      return;
     }
 
-    // If no specific team required, allow any team
+    // If no specific team ID is provided, allow any team member
     if (!teamId) {
       next();
       return;
     }
 
-    // Check if user belongs to the required team
-    if (!user.employee.team || user.employee.team.id !== teamId) {
-      return res.status(403).json({
+    // Check if user belongs to the specific team
+    if (req.user.employee.team?.id !== teamId) {
+      res.status(403).json({
         success: false,
-        error: "Access denied. You do not belong to the required team.",
-        requiredTeam: teamId,
-        userTeam: user.employee.team?.id,
+        error: "Team access required",
       });
+      return;
     }
 
     next();
@@ -392,38 +345,129 @@ export const requireTeamAccess = (teamId?: string) => {
 };
 
 /**
- * Manager access middleware - checks if user is a manager
+ * Check multiple permissions (AND logic)
  */
-export const requireManagerAccess = () => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user as AuthUser;
-
-    if (!user || !user.employee) {
-      return res.status(401).json({
+export const requireAllPermissions = (permissions: PermissionCheck[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      res.status(401).json({
         success: false,
-        error: "Employee authentication required",
+        error: "Authentication required",
       });
+      return;
     }
 
-    // Check if user manages any teams or has subordinates
-    const employee = await prisma.employee.findUnique({
-      where: { id: user.employee.id },
-      include: {
-        managedTeams: true,
-        subordinates: true,
-      },
-    });
+    const hasAllPermissions = permissions.every((check) =>
+      req.user!.roles.some((role) =>
+        role.permissions.some(
+          (permission) =>
+            permission.service === check.service &&
+            permission.resource === check.resource &&
+            permission.action === check.action &&
+            permission.isActive
+        )
+      )
+    );
 
-    if (
-      !employee ||
-      (employee.managedTeams.length === 0 && employee.subordinates.length === 0)
-    ) {
-      return res.status(403).json({
+    if (!hasAllPermissions) {
+      res.status(403).json({
         success: false,
-        error: "Access denied. Manager privileges required.",
+        error: "Insufficient permissions",
       });
+      return;
     }
 
     next();
   };
+};
+
+/**
+ * Check any of multiple permissions (OR logic)
+ */
+export const requireAnyPermission = (permissions: PermissionCheck[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
+      });
+      return;
+    }
+
+    const hasAnyPermission = permissions.some((check) =>
+      req.user!.roles.some((role) =>
+        role.permissions.some(
+          (permission) =>
+            permission.service === check.service &&
+            permission.resource === check.resource &&
+            permission.action === check.action &&
+            permission.isActive
+        )
+      )
+    );
+
+    if (!hasAnyPermission) {
+      res.status(403).json({
+        success: false,
+        error: "Insufficient permissions",
+      });
+      return;
+    }
+
+    next();
+  };
+};
+
+/**
+ * Check minimum role level access
+ */
+export const requireMinimumRoleLevel = (minimumLevel: number) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: "Authentication required",
+      });
+      return;
+    }
+
+    const hasMinimumLevel = req.user.roles.some(
+      (role) => role.level && role.level >= minimumLevel
+    );
+
+    if (!hasMinimumLevel) {
+      res.status(403).json({
+        success: false,
+        error: `Minimum role level ${minimumLevel} required`,
+      });
+      return;
+    }
+
+    next();
+  };
+};
+
+/**
+ * Development/debug middleware to log user context
+ */
+export const logUserContext = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (process.env.NODE_ENV === "development" && req.user) {
+    console.log("User Context:", {
+      id: req.user.id,
+      email: req.user.email,
+      roles: req.user.roles.map((r) => r.name),
+      employee: req.user.employee
+        ? {
+            id: req.user.employee.id,
+            department: req.user.employee.department.name,
+            team: req.user.employee.team?.name,
+          }
+        : null,
+    });
+  }
+  next();
 };

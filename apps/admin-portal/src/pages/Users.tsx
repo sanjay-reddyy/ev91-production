@@ -32,11 +32,11 @@ import {
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
+  Archive as ArchiveIcon,
   Search as SearchIcon,
   Person as PersonIcon,
   Email as EmailIcon,
-  Phone as PhoneIcon,
+  Smartphone as MobileIcon,
   Business as BusinessIcon,
   Group as GroupIcon,
 } from '@mui/icons-material'
@@ -46,19 +46,25 @@ import * as yup from 'yup'
 import { User, Department, Team, Role, UserFormData } from '../types/auth'
 import { apiService } from '../services/api'
 
-const employeeSchema = yup.object({
+const createEmployeeSchema = (isEditing: boolean) => yup.object({
   employeeId: yup.string().required('Employee ID is required'),
   email: yup.string().email('Invalid email').required('Email is required'),
   firstName: yup.string().required('First name is required'),
   lastName: yup.string().required('Last name is required'),
-  phone: yup.string().optional(),
+  phone: yup.string().optional()
+    .matches(
+      /^\d{10}$/,
+      'Mobile number must be exactly 10 digits'
+    ),
   departmentId: yup.string().required('Department is required'),
   teamId: yup.string().optional(),
   roleIds: yup.array().of(yup.string()).min(1, 'At least one role is required').required('Roles are required'),
   hireDate: yup.date().required('Hire date is required'),
   position: yup.string().optional(),
   managerId: yup.string().optional(),
-  temporaryPassword: yup.string().min(8, 'Password must be at least 8 characters').required('Temporary password is required'),
+  temporaryPassword: isEditing
+    ? yup.string().optional()
+    : yup.string().min(8, 'Password must be at least 8 characters').required('Temporary password is required'),
 })
 
 export default function Users() {
@@ -82,6 +88,7 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterDepartment, setFilterDepartment] = useState('')
   const [filterTeam, setFilterTeam] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
 
   // Pagination
   const [page, setPage] = useState(0)
@@ -95,7 +102,7 @@ export default function Users() {
     setValue,
     watch,
   } = useForm<UserFormData>({
-    resolver: yupResolver(employeeSchema),
+    resolver: yupResolver(createEmployeeSchema(!!editingEmployee)),
     defaultValues: {
       employeeId: '',
       email: '',
@@ -131,30 +138,44 @@ export default function Users() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setError('') // Clear previous errors
+
       const [employeesRes, deptRes, teamsRes, rolesRes] = await Promise.all([
-        apiService.getEmployees(),
+        apiService.getEmployees({ limit: 100 }), // Request up to 100 employees to get all records
         apiService.getDepartments(),
         apiService.getTeams(),
         apiService.getRoles(),
       ])
 
       if (employeesRes.success && employeesRes.data) {
-        setEmployees(employeesRes.data.employees || [])
+        const employeesList = employeesRes.data.employees || [];
+        setEmployees(employeesList);
+      } else {
+        console.error('❌ Failed to load employees:', employeesRes.error || 'Unknown error');
+        setError(employeesRes.error || 'Failed to load employees');
       }
+
       if (deptRes.success && deptRes.data) {
         setDepartments(deptRes.data || [])
+      } else {
+        console.error('❌ Failed to load departments:', deptRes.error)
       }
+
       if (teamsRes.success && teamsRes.data) {
         setTeams(teamsRes.data.teams || [])
+      } else {
+        console.error('❌ Failed to load teams:', teamsRes.error)
       }
+
       if (rolesRes.success && rolesRes.data) {
         const loadedRoles = rolesRes.data.roles || [];
-        console.log('📝 Loaded roles in frontend:', loadedRoles);
         setRoles(loadedRoles);
+      } else {
+        console.error('❌ Failed to load roles:', rolesRes.error)
       }
     } catch (error: any) {
-      setError('Failed to load data')
-      console.error('Load data error:', error)
+      console.error('💥 Load data error:', error)
+      setError('Failed to load data: ' + (error.message || 'Unknown error'))
     } finally {
       setLoading(false)
     }
@@ -206,11 +227,15 @@ export default function Users() {
   }
 
   const onSubmit = async (data: UserFormData) => {
+    console.log('🔧 Form submission started', { editingEmployee: !!editingEmployee, data });
+
     try {
       setSubmitting(true)
       setFormError('') // Clear form errors at start of submission
 
       if (editingEmployee) {
+        console.log('🔄 Updating employee:', editingEmployee.id);
+
         // Update employee - exclude temporaryPassword from updates
         const updateData = {
           ...data,
@@ -218,7 +243,12 @@ export default function Users() {
         }
         delete (updateData as any).temporaryPassword // Don't update password during edit
 
+        console.log('📤 Sending update request with data:', updateData);
+
         const response = await apiService.updateEmployee(editingEmployee.id, updateData)
+
+        console.log('📥 Update response received:', response);
+
         if (response.success) {
           setSuccess('Employee updated successfully')
           loadData()
@@ -228,13 +258,20 @@ export default function Users() {
           setFormError(response.error || 'Failed to update employee')
         }
       } else {
+        console.log('➕ Creating new employee');
+
         // Create employee
         if (!data.temporaryPassword) {
           setFormError('Temporary password is required for new employees')
           return
         }
 
+        console.log('📤 Sending create request with data:', data);
+
         const response = await apiService.createEmployee(data)
+
+        console.log('📥 Create response received:', response);
+
         if (response.success) {
           setSuccess('Employee created successfully')
           loadData()
@@ -245,10 +282,12 @@ export default function Users() {
         }
       }
     } catch (error: any) {
+      console.error('❌ Form submission error:', error);
       // Show error on form instead of top-level alert
       setFormError(error.message || 'Failed to save employee')
     } finally {
       setSubmitting(false)
+      console.log('✅ Form submission completed');
     }
   }
 
@@ -281,14 +320,23 @@ export default function Users() {
   // Filter employees based on search and filters
   const filteredEmployees = employees.filter(employee => {
     const matchesSearch =
-      employee.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (employee.firstName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (employee.lastName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (employee.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
 
     const matchesDepartment = !filterDepartment || employee.department?.id === filterDepartment
     const matchesTeam = !filterTeam || employee.team?.id === filterTeam
 
-    return matchesSearch && matchesDepartment && matchesTeam
+    // Fix status filtering: show all when no filter, or match specific status
+    let matchesStatus = true
+    if (filterStatus === 'active') {
+      matchesStatus = employee.isActive === true
+    } else if (filterStatus === 'inactive') {
+      matchesStatus = employee.isActive === false
+    }
+    // When filterStatus is empty/undefined, matchesStatus stays true (show all)
+
+    return matchesSearch && matchesDepartment && matchesTeam && matchesStatus
   })
 
   // Get available teams for selected department
@@ -310,13 +358,22 @@ export default function Users() {
         <Typography variant="h4" component="h1">
           Employees Management
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Employee
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={loadData}
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : 'Refresh Data'}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add Employee
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -335,7 +392,7 @@ export default function Users() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
                 placeholder="Search employees..."
@@ -346,7 +403,7 @@ export default function Users() {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2.5}>
               <FormControl fullWidth>
                 <InputLabel>Department</InputLabel>
                 <Select
@@ -363,7 +420,7 @@ export default function Users() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2.5}>
               <FormControl fullWidth>
                 <InputLabel>Team</InputLabel>
                 <Select
@@ -381,6 +438,20 @@ export default function Users() {
               </FormControl>
             </Grid>
             <Grid item xs={12} md={2}>
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={filterStatus}
+                  label="Status"
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                  <MenuItem value="">All Status</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
               <Button
                 fullWidth
                 variant="outlined"
@@ -388,6 +459,7 @@ export default function Users() {
                   setSearchTerm('')
                   setFilterDepartment('')
                   setFilterTeam('')
+                  setFilterStatus('')
                 }}
               >
                 Clear Filters
@@ -424,10 +496,10 @@ export default function Users() {
                       </Avatar>
                       <Box>
                         <Typography variant="subtitle1">
-                          {employee.firstName} {employee.lastName}
+                          {employee.firstName || 'N/A'} {employee.lastName || ''}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          ID: {employee.id.slice(0, 8)}...
+                          ID: {employee.id?.slice(0, 8) || 'N/A'}...
                         </Typography>
                       </Box>
                     </Box>
@@ -436,11 +508,11 @@ export default function Users() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <EmailIcon fontSize="small" color="disabled" />
-                        <Typography variant="body2">{employee.email}</Typography>
+                        <Typography variant="body2">{employee.email || 'N/A'}</Typography>
                       </Box>
                       {employee.phone && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <PhoneIcon fontSize="small" color="disabled" />
+                          <MobileIcon fontSize="small" color="disabled" />
                           <Typography variant="body2">{employee.phone}</Typography>
                         </Box>
                       )}
@@ -496,13 +568,13 @@ export default function Users() {
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Delete Employee">
+                    <Tooltip title={employee.isActive ? "Archive Employee" : "Reactivate Employee"}>
                       <IconButton
                         onClick={() => handleDeleteEmployee(employee)}
                         size="small"
-                        color="error"
+                        color={employee.isActive ? "warning" : "success"}
                       >
-                        <DeleteIcon />
+                        <ArchiveIcon />
                       </IconButton>
                     </Tooltip>
                   </TableCell>
@@ -603,13 +675,25 @@ export default function Users() {
                 <Controller
                   name="phone"
                   control={control}
-                  render={({ field }) => (
+                  render={({ field: { onChange, value, ...field } }) => (
                     <TextField
                       {...field}
+                      value={value || ''}
+                      onChange={(e) => {
+                        // Only allow digits and limit to 10
+                        const numericValue = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        onChange(numericValue);
+                      }}
                       fullWidth
-                      label="Phone (Optional)"
+                      label="Mobile"
                       error={!!errors.phone}
                       helperText={errors.phone?.message}
+                      placeholder="Enter 10-digit mobile number (e.g., 9123456789)"
+                      inputProps={{
+                        maxLength: 10,
+                        inputMode: 'numeric',
+                        pattern: '[0-9]*'
+                      }}
                     />
                   )}
                 />
@@ -726,21 +810,40 @@ export default function Users() {
                 <Controller
                   name="managerId"
                   control={control}
-                  render={({ field }) => (
-                    <FormControl fullWidth>
-                      <InputLabel>Manager (Optional)</InputLabel>
-                      <Select {...field} label="Manager (Optional)">
-                        <MenuItem value="">None</MenuItem>
-                        {employees
-                          .filter(emp => emp.department?.id === watchDepartmentId)
-                          .map((manager) => (
+                  render={({ field }) => {
+                    // Get available managers from the selected department
+                    const departmentManagers = employees.filter(emp => emp.department?.id === watchDepartmentId)
+
+                    // If editing, ensure current manager is included even if from different department
+                    const currentManagerId = field.value
+                    let allManagerOptions = [...departmentManagers]
+
+                    if (currentManagerId && !allManagerOptions.some(emp => emp.id === currentManagerId)) {
+                      const currentManager = employees.find(emp => emp.id === currentManagerId)
+                      if (currentManager) {
+                        allManagerOptions.push(currentManager)
+                      }
+                    }
+
+                    return (
+                      <FormControl fullWidth>
+                        <InputLabel>Manager (Optional)</InputLabel>
+                        <Select {...field} label="Manager (Optional)">
+                          <MenuItem value="">None</MenuItem>
+                          {allManagerOptions.map((manager) => (
                             <MenuItem key={manager.id} value={manager.id}>
                               {manager.firstName} {manager.lastName} - {manager.position || 'N/A'}
+                              {manager.department?.id !== watchDepartmentId && (
+                                <span style={{ color: '#666', fontSize: '0.8em' }}>
+                                  {' '}(from {manager.department?.name})
+                                </span>
+                              )}
                             </MenuItem>
                           ))}
-                      </Select>
-                    </FormControl>
-                  )}
+                        </Select>
+                      </FormControl>
+                    )
+                  }}
                 />
               </Grid>
               {!editingEmployee && (
@@ -767,7 +870,16 @@ export default function Users() {
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button
-            onClick={handleSubmit(onSubmit)}
+            onClick={(e) => {
+              e.preventDefault();
+              console.log('🔲 Update button clicked');
+              console.log('📋 Current form values:', watch());
+              console.log('🚨 Form errors:', errors);
+              console.log('🔄 Submitting state:', submitting);
+              console.log('👤 Editing employee:', editingEmployee?.id);
+
+              handleSubmit(onSubmit)(e);
+            }}
             variant="contained"
             disabled={submitting}
           >
@@ -776,19 +888,31 @@ export default function Users() {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Archive/Deactivate Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogTitle>
+          {employeeToDelete?.isActive ? 'Confirm Archive' : 'Confirm Reactivate'}
+        </DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete employee "{employeeToDelete?.firstName} {employeeToDelete?.lastName}"?
-            This action cannot be undone.
+            {employeeToDelete?.isActive
+              ? `Are you sure you want to archive employee "${employeeToDelete?.firstName} ${employeeToDelete?.lastName}"? They will be deactivated and marked as inactive.`
+              : `Are you sure you want to reactivate employee "${employeeToDelete?.firstName} ${employeeToDelete?.lastName}"? They will be marked as active again.`
+            }
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={confirmDelete} color="error" disabled={submitting}>
-            {submitting ? <CircularProgress size={20} /> : 'Delete'}
+          <Button
+            onClick={confirmDelete}
+            color={employeeToDelete?.isActive ? "warning" : "success"}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <CircularProgress size={20} />
+            ) : (
+              employeeToDelete?.isActive ? 'Archive' : 'Reactivate'
+            )}
           </Button>
         </DialogActions>
       </Dialog>

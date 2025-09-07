@@ -73,21 +73,24 @@ app.use((req: Request, res: Response, next) => {
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Rate limiting - temporarily disabled for development
+// Rate limiting - disabled for development
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000"), // 1 minute
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "10000"), // Much higher limit for dev
   message: {
     success: false,
-    message: "Too many requests from this IP, please try again later.",
+    error: "Too many requests from this IP, please try again later.",
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "development", // Skip rate limiting in development
+  skip: () => {
+    console.log(`Rate limiter check - NODE_ENV: ${process.env.NODE_ENV}`);
+    return process.env.NODE_ENV === "development"; // Skip rate limiting in development
+  },
 });
 
 // Apply rate limiting only in production
-if (process.env.NODE_ENV !== "development") {
+if (process.env.NODE_ENV === "production") {
   app.use("/api/", limiter);
 }
 
@@ -211,6 +214,12 @@ app.get("/", (req: Request, res: Response) => {
       riders: "/api/riders/*",
       riderEarnings: "/api/rider-earnings/*",
       spareParts: "/api/spare-parts/*",
+      "v1-auth": "/api/v1/auth/*",
+      "v1-users": "/api/v1/users/*",
+      "v1-employees": "/api/v1/employees/*",
+      "v1-teams": "/api/v1/teams/*",
+      "v1-departments": "/api/v1/departments/*",
+      internal: "/api/internal/*",
     },
   });
 });
@@ -238,6 +247,15 @@ app.use("/api/users", authMiddleware);
 app.use("/api/employees", authMiddleware);
 app.use("/api/roles", authMiddleware);
 app.use("/api/permissions", authMiddleware);
+
+// Apply authentication middleware to v1 protected routes
+app.use("/api/v1/teams", authMiddleware);
+app.use("/api/v1/departments", authMiddleware);
+app.use("/api/v1/users", authMiddleware);
+app.use("/api/v1/employees", authMiddleware);
+app.use("/api/v1/roles", authMiddleware);
+app.use("/api/v1/permissions", authMiddleware);
+
 app.use("/api/vehicles", authMiddleware);
 app.use("/api/hubs", authMiddleware);
 app.use("/api/cities", authMiddleware);
@@ -255,6 +273,19 @@ app.use("/api/roles", authRoutes); // Roles handled by auth service
 app.use("/api/permissions", authRoutes); // Permissions handled by auth service
 app.use("/api/teams", authRoutes); // Teams now handled by auth service
 app.use("/api/departments", authRoutes); // Departments now handled by auth service
+
+// Support for v1 API endpoints (for admin portal compatibility)
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", authRoutes);
+app.use("/api/v1/employees", authRoutes);
+app.use("/api/v1/roles", authRoutes);
+app.use("/api/v1/permissions", authRoutes);
+app.use("/api/v1/teams", authRoutes);
+app.use("/api/v1/departments", authRoutes);
+
+// Internal API endpoints (for service-to-service and admin portal)
+app.use("/api/internal", authRoutes); // Internal endpoints handled by auth service
+
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/hubs", hubRoutes); // Dedicated hub routes
 app.use("/api/cities", hubRoutes); // Cities are handled by hub service

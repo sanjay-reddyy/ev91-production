@@ -4,30 +4,45 @@ export interface Employee {
   id: string;
   userId: string;
   employeeId: string;
+  // Flattened user fields for frontend compatibility
   firstName: string;
   lastName: string;
   email: string;
+  isActive: boolean;
   phone?: string;
   departmentId: string;
   teamId?: string;
   managerId?: string;
   position?: string;
   hireDate: Date;
-  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 
   // Populated relationships
-  user?: {
+  user: {
     id: string;
+    firstName: string;
+    lastName: string;
     email: string;
+    phone?: string;
     isActive: boolean;
     emailVerified: boolean;
     lastLoginAt?: Date;
   };
+  roles: {
+    id: string;
+    name: string;
+    description?: string;
+    level?: number;
+  }[];
   department?: Department;
   team?: Team;
-  manager?: Employee;
+  manager?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
   subordinates?: Employee[];
   managedTeams?: Team[];
 }
@@ -52,6 +67,8 @@ export interface Team {
   description?: string;
   departmentId: string;
   managerId?: string;
+  city?: string;
+  state?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -120,11 +137,14 @@ export interface CreateEmployeeDto {
 export interface UpdateEmployeeDto {
   firstName?: string;
   lastName?: string;
+  email?: string;
+  employeeId?: string;
   phone?: string;
   departmentId?: string;
   teamId?: string | null;
   managerId?: string;
   position?: string;
+  hireDate?: Date;
   isActive?: boolean;
   roleIds?: string[];
 }
@@ -147,12 +167,25 @@ export interface CreateTeamDto {
   description?: string;
   departmentId: string;
   managerId?: string;
+  city?: string;
+  state?: string;
+  maxMembers?: number;
+  skills?: string[];
+  status?: string;
+  memberCount?: number;
+  isActive?: boolean;
 }
 
 export interface UpdateTeamDto {
   name?: string;
   description?: string;
+  departmentId?: string;
   managerId?: string;
+  city?: string;
+  state?: string;
+  maxMembers?: number;
+  skills?: string[];
+  status?: string;
   isActive?: boolean;
 }
 
@@ -187,33 +220,17 @@ export interface UpdatePermissionDto {
 // Login response for employees
 export interface EmployeeLoginResponse {
   token: string;
-  refreshToken: string;
-  employee: {
+  employee: Employee;
+  roles: Array<{
     id: string;
-    employeeId: string;
     name: string;
-    email: string;
-    position?: string;
-    department: {
-      id: string;
-      name: string;
-      code?: string;
-    };
-    team?: {
-      id: string;
-      name: string;
-    };
-    roles: Array<{
-      id: string;
-      name: string;
-      level: number;
-    }>;
+    description?: string;
     permissions: Array<{
-      service: string;
-      resource: string;
-      action: string;
+      id: string;
+      name: string;
+      description?: string;
     }>;
-  };
+  }>;
 }
 
 // Permission check types
@@ -251,10 +268,11 @@ export interface EmployeeSearchOptions {
   departmentId?: string;
   teamId?: string;
   roleId?: string;
+  managerId?: string;
   isActive?: boolean;
   search?: string; // Search in name, email, employeeId
   page?: number;
   limit?: number;
-  sortBy?: "name" | "email" | "hireDate" | "department" | "team";
+  sortBy?: "name" | "email" | "hireDate" | "department" | "team" | "createdAt";
   sortOrder?: "asc" | "desc";
 }

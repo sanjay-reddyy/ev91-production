@@ -36,6 +36,7 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Archive as ArchiveIcon,
   Business as BusinessIcon,
   AccountTree as AccountTreeIcon,
   Description as DescriptionIcon,
@@ -83,6 +84,7 @@ export default function Departments() {
 
   // View mode
   const [viewMode, setViewMode] = useState<'table' | 'tree'>('table')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
   const {
     control,
@@ -106,9 +108,12 @@ export default function Departments() {
   const loadDepartments = async () => {
     try {
       setLoading(true)
-      const response = await apiService.getDepartments()
+      const response = await apiService.getDepartments(true) // Include inactive departments
       if (response.success && response.data) {
         setDepartments(response.data)
+        console.log('Departments fetched - Total:', response.data.length);
+        console.log('Active departments:', response.data.filter(d => d.isActive).length);
+        console.log('Inactive departments:', response.data.filter(d => !d.isActive).length);
       } else {
         setError('Failed to load departments - API response not successful')
       }
@@ -210,6 +215,32 @@ export default function Departments() {
     }
   }
 
+  // Filter departments based on status
+  console.log('=== DEPARTMENTS FILTERING DEBUG ===');
+  console.log('Total departments:', departments.length);
+  console.log('Status filter:', statusFilter);
+
+  // Check the raw data
+  departments.forEach((dept, index) => {
+    console.log(`Dept ${index + 1}: ${dept.name} - isActive: ${dept.isActive}`);
+  });
+
+  const filteredDepartments = departments.filter(department => {
+    let matches = false;
+    if (statusFilter === 'all') matches = true;
+    else if (statusFilter === 'active') matches = department.isActive;
+    else if (statusFilter === 'inactive') matches = !department.isActive;
+    else matches = true;
+
+    console.log(`Dept ${department.name}: statusFilter=${statusFilter}, isActive=${department.isActive}, matches=${matches}`);
+    return matches;
+  });
+
+  console.log('Filtered departments count:', filteredDepartments.length);
+  console.log('Active filtered departments:', filteredDepartments.filter(d => d.isActive).length);
+  console.log('Inactive filtered departments:', filteredDepartments.filter(d => !d.isActive).length);
+  console.log('=== END DEBUG ===');
+
   // Build department tree structure
   const buildDepartmentTree = (departments: Department[]): Department[] => {
     const map = new Map<string, Department & { children: Department[] }>()
@@ -260,13 +291,13 @@ export default function Departments() {
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Delete">
+          <Tooltip title="Archive">
             <IconButton
               size="small"
-              color="error"
+              color="warning"
               onClick={() => handleDeleteDepartment(department)}
             >
-              <DeleteIcon fontSize="small" />
+              <ArchiveIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
@@ -275,7 +306,7 @@ export default function Departments() {
     </Box>
   )
 
-  const departmentTree = buildDepartmentTree(departments)
+  const departmentTree = buildDepartmentTree(filteredDepartments)
 
   if (loading) {
     return (
@@ -305,6 +336,18 @@ export default function Departments() {
           >
             Tree View
           </Button>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Status"
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+            >
+              <MenuItem value="all">All Departments</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </Select>
+          </FormControl>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -438,7 +481,7 @@ export default function Departments() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {departments.map((department) => (
+                {filteredDepartments.map((department) => (
                   <TableRow
                     key={department.id}
                     hover
@@ -537,17 +580,17 @@ export default function Departments() {
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete Department">
+                        <Tooltip title="Archive Department">
                           <IconButton
                             onClick={() => handleDeleteDepartment(department)}
                             size="small"
                             sx={{
-                              bgcolor: 'error.light',
+                              bgcolor: 'warning.light',
                               color: 'white',
-                              '&:hover': { bgcolor: 'error.main' }
+                              '&:hover': { bgcolor: 'warning.main' }
                             }}
                           >
-                            <DeleteIcon fontSize="small" />
+                            <ArchiveIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </Box>
