@@ -1,12 +1,15 @@
 import { Router } from "express";
 import { DepartmentController } from "../controllers/departmentController";
-import { authMiddleware, requirePermission } from "../middleware/auth";
+import {
+  authenticateEmployee,
+  requirePermission,
+} from "../middleware/employeeAuth";
 
 const router = Router();
 const departmentController = new DepartmentController();
 
 // All department routes require authentication
-router.use(authMiddleware);
+router.use(authenticateEmployee);
 
 // GET /api/v1/departments - List departments
 router.get(

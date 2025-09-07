@@ -31,9 +31,20 @@ export class EmployeeController {
     body("temporaryPassword")
       .isLength({ min: 8 })
       .withMessage("Temporary password must be at least 8 characters"),
-    body("phone").optional().isMobilePhone("any"),
-    body("teamId").optional().isString(),
-    body("managerId").optional().isString(),
+    body("phone")
+      .optional()
+      .matches(/^\d{10}$/)
+      .withMessage("Mobile number must be exactly 10 digits"),
+    body("teamId")
+      .optional()
+      .customSanitizer((value) => (value === "" ? null : value))
+      .isString()
+      .optional({ nullable: true }),
+    body("managerId")
+      .optional()
+      .customSanitizer((value) => (value === "" ? null : value))
+      .isString()
+      .optional({ nullable: true }),
     body("position").optional().isString(),
   ];
 
@@ -192,7 +203,7 @@ export class EmployeeController {
           : undefined,
         search: req.query.search as string,
         page: req.query.page ? parseInt(req.query.page as string) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 50, // Increase default from 10 to 50
         sortBy: req.query.sortBy as any,
         sortOrder: req.query.sortOrder as any,
       };
@@ -225,12 +236,35 @@ export class EmployeeController {
       .optional()
       .notEmpty()
       .withMessage("Last name cannot be empty"),
-    body("phone").optional().isMobilePhone("any"),
+    body("phone")
+      .optional()
+      .matches(/^\d{10}$/)
+      .withMessage("Mobile number must be exactly 10 digits"),
     body("departmentId").optional().isString(),
-    body("teamId").optional().isString(),
-    body("managerId").optional().isString(),
+    body("teamId")
+      .optional()
+      .customSanitizer((value) => (value === "" ? null : value))
+      .isString()
+      .optional({ nullable: true }),
+    body("managerId")
+      .optional()
+      .customSanitizer((value) => (value === "" ? null : value))
+      .isString()
+      .optional({ nullable: true }),
     body("position").optional().isString(),
+    body("hireDate")
+      .optional()
+      .isISO8601()
+      .withMessage("Invalid hire date format"),
     body("isActive").optional().isBoolean(),
+    body("roleIds")
+      .optional()
+      .isArray()
+      .withMessage("Role IDs must be an array"),
+    body("roleIds.*")
+      .optional()
+      .isString()
+      .withMessage("Each role ID must be a string"),
   ];
 
   async updateEmployee(req: Request, res: Response): Promise<void> {

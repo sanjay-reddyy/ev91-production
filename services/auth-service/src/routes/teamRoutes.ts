@@ -1,12 +1,15 @@
 import { Router } from "express";
 import { TeamController } from "../controllers/teamController";
-import { authMiddleware, requirePermission } from "../middleware/auth";
+import {
+  authenticateEmployee,
+  requirePermission,
+} from "../middleware/employeeAuth";
 
 const router = Router();
 const teamController = new TeamController();
 
-// All team routes require authentication
-router.use(authMiddleware);
+// All team routes require authentication with employee context
+router.use(authenticateEmployee);
 
 // GET /api/v1/teams - List teams
 router.get("/", teamController.getAllTeams.bind(teamController));

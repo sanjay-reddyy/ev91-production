@@ -45,10 +45,11 @@ const schema = yup.object({
     .string()
     .required('City is required')
     .min(2, 'City must be at least 2 characters'),
-  country: yup
+  state: yup
     .string()
-    .required('Country is required'),
-  teamLeadId: yup
+    .required('State is required')
+    .min(2, 'State must be at least 2 characters'),
+  managerId: yup
     .string()
     .nullable(),
   maxMembers: yup
@@ -69,8 +70,8 @@ interface CreateTeamFormData {
   description: string
   departmentId: string
   city: string
-  country: string
-  teamLeadId?: string
+  state: string
+  managerId?: string
   maxMembers: number
   skills: string[]
   isActive: boolean
@@ -89,27 +90,10 @@ export default function CreateTeam() {
   const [success, setSuccess] = useState('')
   const [departments, setDepartments] = useState<Department[]>([])
   const [departmentsLoading, setDepartmentsLoading] = useState(true)
-
-  // Static data
-  const countries = [
-    'India',
-  ]
-
-  const cities = [
-    'Bangalore',
-    'Chennai',
-    'Delhi',
-    'Hyderabad',
-    'Mumbai',
-    'Mysore',
-  ]
-
-  const potentialTeamLeads = [
-    { id: '1', name: 'John Doe', email: 'john.doe@company.com', department: 'Engineering' },
-    { id: '2', name: 'Jane Smith', email: 'jane.smith@company.com', department: 'Marketing' },
-    { id: '3', name: 'Michael Johnson', email: 'michael.j@company.com', department: 'Sales' },
-    { id: '4', name: 'Sarah Wilson', email: 'sarah.wilson@company.com', department: 'HR' },
-  ]
+  const [cities, setCities] = useState<Array<{id: string, name: string, state: string, isActive: boolean}>>([])
+  const [citiesLoading, setCitiesLoading] = useState(true)
+  const [employees, setEmployees] = useState<any[]>([])
+  const [employeesLoading, setEmployeesLoading] = useState(true)
 
   const commonSkills = [
     'Marketing',
@@ -117,10 +101,9 @@ export default function CreateTeam() {
     'Customer Service',
     'Data Analysis',
     'EV Technician',
-
   ]
 
-  // Fetch departments on component mount
+  // Fetch departments and cities on component mount
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
@@ -128,7 +111,7 @@ export default function CreateTeam() {
         console.log('Fetching departments...')
         const response = await apiService.getDepartments()
         console.log('Departments API response:', response)
-        
+
         if (response.success && response.data) {
           console.log('Setting departments:', response.data)
           setDepartments(response.data)
@@ -144,7 +127,54 @@ export default function CreateTeam() {
       }
     }
 
+    const fetchCities = async () => {
+      try {
+        setCitiesLoading(true)
+        console.log('Fetching cities for teams...')
+        const response = await apiService.getCities()
+        console.log('Cities API response:', response)
+
+        if (response.success && response.data) {
+          console.log('Setting cities:', response.data)
+          setCities(response.data)
+        } else {
+          console.error('Failed to fetch cities:', response.message || response.error)
+          // Don't set error for cities, just log it
+          console.warn(`Failed to load cities: ${response.message || response.error || 'Unknown error'}`)
+        }
+      } catch (error: any) {
+        console.error('Error fetching cities:', error)
+        console.warn(`Failed to load cities: ${error.message || 'Network error'}`)
+      } finally {
+        setCitiesLoading(false)
+      }
+    }
+
+    const fetchEmployees = async () => {
+      try {
+        setEmployeesLoading(true)
+        console.log('Fetching employees for team leads...')
+        const response = await apiService.getEmployees({ limit: 100, isActive: true }) // Get all active employees
+        console.log('Employees API response:', response)
+
+        if (response.success && response.data?.employees) {
+          console.log('Setting employees:', response.data.employees)
+          setEmployees(response.data.employees)
+        } else {
+          console.error('Failed to fetch employees:', response.message || response.error)
+          console.warn(`Failed to load employees: ${response.message || response.error || 'Unknown error'}`)
+        }
+      } catch (error: any) {
+        console.error('Error fetching employees:', error)
+        console.warn(`Failed to load employees: ${error.message || 'Network error'}`)
+      } finally {
+        setEmployeesLoading(false)
+      }
+    }
+
     fetchDepartments()
+    fetchCities()
+    fetchEmployees()
   }, [])
 
   const {
@@ -160,8 +190,8 @@ export default function CreateTeam() {
       description: '',
       departmentId: '',
       city: '',
-      country: '',
-      teamLeadId: '',
+      state: '',
+      managerId: '',
       maxMembers: 10,
       skills: [],
       isActive: true,
@@ -169,12 +199,12 @@ export default function CreateTeam() {
   })
 
   const selectedDepartment = watch('departmentId')
-  const selectedCountry = watch('country')
 
   // Filter team leads by selected department
-  const availableTeamLeads = potentialTeamLeads.filter(lead => {
-    const dept = departments.find(d => d.id === selectedDepartment)
-    return dept ? lead.department === dept.name : true
+  const availableTeamLeads = employees.filter(employee => {
+    // Only show employees from the selected department who can be team leads
+    if (!selectedDepartment) return false
+    return employee.departmentId === selectedDepartment && employee.isActive
   })
 
   const onSubmit = async (data: CreateTeamFormData) => {
@@ -189,21 +219,21 @@ export default function CreateTeam() {
         description: data.description,
         isActive: data.isActive,
         departmentId: data.departmentId,
-        teamLeadId: data.teamLeadId,
+        managerId: data.managerId,
         city: data.city,
-        country: data.country,
+        state: data.state,
         memberCount: 0, // Start with 0 members
         maxMembers: data.maxMembers,
         skills: data.skills,
         status: data.isActive ? 'Active' as const : 'Inactive' as const,
         createdAt: new Date().toISOString(),
       }
-      
+
       const response = await apiService.createTeam(teamPayload)
-      
+
       if (response.success) {
         setSuccess('Team created successfully!')
-        
+
         // Redirect after success
         setTimeout(() => {
           navigate('/teams')
@@ -211,7 +241,7 @@ export default function CreateTeam() {
       } else {
         throw new Error(response.message || response.error || 'Failed to create team')
       }
-      
+
     } catch (error: any) {
       console.error('Error creating team:', error)
       setError(error.message || 'Failed to create team')
@@ -349,25 +379,30 @@ export default function CreateTeam() {
 
               <Grid item xs={12} md={6}>
                 <Controller
-                  name="country"
+                  name="city"
                   control={control}
                   render={({ field }) => (
                     <Autocomplete
                       {...field}
-                      options={countries}
+                      options={cities.map(city => city.name)}
                       onChange={(_, value) => {
                         field.onChange(value || '')
-                        // Reset city when country changes
-                        setValue('city', '')
+                        // Auto-update state based on selected city from database
+                        if (value) {
+                          const selectedCityData = cities.find(city => city.name === value)
+                          if (selectedCityData) {
+                            setValue('state', selectedCityData.state)
+                          }
+                        }
                       }}
                       renderInput={(params) => (
                         <TextField
                           {...params}
-                          label="Country"
-                          placeholder="Select country"
+                          label="City"
+                          placeholder="Select city"
                           required
-                          error={!!errors.country}
-                          helperText={errors.country?.message}
+                          error={!!errors.city}
+                          helperText={errors.city?.message}
                         />
                       )}
                     />
@@ -377,24 +412,20 @@ export default function CreateTeam() {
 
               <Grid item xs={12} md={6}>
                 <Controller
-                  name="city"
+                  name="state"
                   control={control}
                   render={({ field }) => (
-                    <Autocomplete
+                    <TextField
                       {...field}
-                      options={cities}
-                      disabled={!selectedCountry}
-                      onChange={(_, value) => field.onChange(value || '')}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="City"
-                          placeholder="Select city"
-                          required
-                          error={!!errors.city}
-                          helperText={errors.city?.message || (!selectedCountry ? 'Select country first' : '')}
-                        />
-                      )}
+                      label="State"
+                      placeholder="State will be auto-filled when city is selected"
+                      fullWidth
+                      required
+                      error={!!errors.state}
+                      helperText={errors.state?.message || "State is automatically populated based on city selection"}
+                      InputProps={{
+                        readOnly: false, // Allow manual editing if needed
+                      }}
                     />
                   )}
                 />
@@ -409,7 +440,7 @@ export default function CreateTeam() {
 
               <Grid item xs={12} md={6}>
                 <Controller
-                  name="teamLeadId"
+                  name="managerId"
                   control={control}
                   render={({ field }) => (
                     <FormControl fullWidth>
@@ -417,24 +448,31 @@ export default function CreateTeam() {
                       <Select
                         {...field}
                         label="Team Lead (Optional)"
-                        disabled={!selectedDepartment}
+                        disabled={!selectedDepartment || employeesLoading}
                       >
                         <MenuItem value="">
                           <em>No team lead assigned</em>
                         </MenuItem>
-                        {availableTeamLeads.map((lead) => (
-                          <MenuItem key={lead.id} value={lead.id}>
+                        {availableTeamLeads.map((employee) => (
+                          <MenuItem key={employee.id} value={employee.id}>
                             <Box>
-                              <Typography variant="body1">{lead.name}</Typography>
+                              <Typography variant="body1">
+                                {employee.user ? `${employee.user.firstName} ${employee.user.lastName}` : employee.firstName || employee.lastName}
+                              </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {lead.email}
+                                {employee.user?.email || employee.email || employee.employeeId}
                               </Typography>
                             </Box>
                           </MenuItem>
                         ))}
                       </Select>
                       <FormHelperText>
-                        {!selectedDepartment ? 'Select department first' : 'Choose a team lead from the selected department'}
+                        {employeesLoading
+                          ? 'Loading employees...'
+                          : !selectedDepartment
+                            ? 'Select department first'
+                            : 'Choose a team lead from the selected department'
+                        }
                       </FormHelperText>
                     </FormControl>
                   )}

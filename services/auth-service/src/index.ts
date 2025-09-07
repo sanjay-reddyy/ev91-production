@@ -10,6 +10,7 @@ import employeeRoutes from "./routes/employeeRoutes";
 import roleRoutes from "./routes/roleRoutes";
 import departmentRoutes from "./routes/departmentRoutes";
 import teamRoutes from "./routes/teamRoutes";
+import citySyncRoutes from "./routes/citySyncRoutes";
 
 // Load environment variables
 dotenv.config();
@@ -103,6 +104,9 @@ app.use("/api/v1", employeeRoutes);
 app.use("/api/v1", roleRoutes);
 app.use("/api/v1/departments", departmentRoutes);
 app.use("/api/v1/teams", teamRoutes);
+
+// Internal sync routes (no auth required for service-to-service communication)
+app.use("/internal", citySyncRoutes);
 
 // Error handling middleware
 app.use((error: Error, req: Request, res: Response, next: any) => {

@@ -8,74 +8,117 @@ export class TeamService {
     this.prisma = new PrismaClient();
   }
 
-  /**
-   * Create a new team
-   */
+  // Basic CRUD operations only - full implementation will come later
   async createTeam(data: CreateTeamDto): Promise<Team> {
-    // Validate department
-    const department = await this.prisma.department.findUnique({
-      where: { id: data.departmentId },
-    });
+    // Prepare the data for Prisma create
+    const createData: any = {
+      name: data.name,
+      description: data.description,
+      departmentId: data.departmentId,
+      managerId: data.managerId,
+      city: data.city,
+      state: data.state,
+      maxMembers: data.maxMembers || 10,
+      memberCount: data.memberCount || 0,
+      status: data.status || "Active",
+      isActive: data.isActive !== undefined ? data.isActive : true,
+    };
 
-    if (!department || !department.isActive) {
-      throw new Error("Invalid or inactive department");
+    // Convert skills array to JSON string if provided
+    if (data.skills && Array.isArray(data.skills)) {
+      createData.skills = JSON.stringify(data.skills);
     }
 
-    // Check if team name already exists in the department
-    const existingTeam = await this.prisma.team.findFirst({
-      where: {
-        name: data.name,
-        departmentId: data.departmentId,
-      },
-    });
-
-    if (existingTeam) {
-      throw new Error("Team with this name already exists in the department");
-    }
-
-    // Validate manager if provided
-    if (data.managerId) {
-      const manager = await this.prisma.employee.findUnique({
-        where: { id: data.managerId },
-      });
-
-      if (
-        !manager ||
-        !manager.isActive ||
-        manager.departmentId !== data.departmentId
-      ) {
-        throw new Error(
-          "Invalid manager or manager does not belong to the same department"
-        );
-      }
+    // Handle empty managerId
+    if (data.managerId === "") {
+      createData.managerId = null;
     }
 
     return (await this.prisma.team.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        departmentId: data.departmentId,
-        managerId: data.managerId,
-        isActive: true,
-      },
-      include: {
-        department: true,
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
+      data: createData,
     })) as any;
   }
 
-  /**
-   * Get all teams with optional filtering
-   */
-  async getAllTeams(departmentId?: string, includeInactive: boolean = false) {
+  async getTeamById(id: string): Promise<Team | null> {
+    const team = await this.prisma.team.findUnique({
+      where: { id },
+      include: {
+        department: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            code: true,
+            isActive: true,
+          },
+        },
+        manager: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        employees: {
+          where: {
+            user: { isActive: true },
+          },
+          select: {
+            id: true,
+            employeeId: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            position: true,
+          },
+        },
+        _count: {
+          select: {
+            employees: true,
+          },
+        },
+      },
+    });
+
+    if (!team) {
+      return null;
+    }
+
+    const teamData = { ...team };
+
+    if (team.skills) {
+      try {
+        // Parse skills JSON string back to array
+        (teamData as any).skills = JSON.parse(team.skills);
+      } catch (e) {
+        // If parsing fails, return as is or empty array
+        (teamData as any).skills = [];
+      }
+    }
+
+    // Add computed fields for frontend compatibility
+    (teamData as any).memberCount = team.employees?.length || 0;
+    (teamData as any).teamLead = team.manager?.user
+      ? `${team.manager.user.firstName} ${team.manager.user.lastName}`
+      : null;
+
+    return teamData as any;
+  }
+
+  async getAllTeams(
+    departmentId?: string,
+    includeInactive?: boolean
+  ): Promise<Team[]> {
     const where: any = {};
 
     if (departmentId) {
@@ -86,361 +129,158 @@ export class TeamService {
       where.isActive = true;
     }
 
-    const results = await this.prisma.team.findMany({
+    const teams = await this.prisma.team.findMany({
       where,
       include: {
         department: {
           select: {
             id: true,
             name: true,
+            description: true,
             code: true,
-          },
-        },
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        employees: {
-          where: includeInactive ? {} : { isActive: true },
-          select: {
-            id: true,
-            employeeId: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            position: true,
-          },
-        },
-        _count: {
-          select: {
-            employees: {
-              where: { isActive: true },
-            },
-          },
-        },
-      },
-      orderBy: [{ department: { name: "asc" } }, { name: "asc" }],
-    });
-
-    // Transform results to match Team type
-    return results.map((result) => ({
-      id: result.id,
-      name: result.name,
-      description: result.description || undefined,
-      departmentId: result.departmentId,
-      managerId: result.managerId || undefined,
-      isActive: result.isActive,
-      createdAt: result.createdAt,
-      updatedAt: result.updatedAt,
-      department: {
-        id: result.department.id,
-        name: result.department.name,
-        code: result.department.code || undefined,
-      } as any,
-      manager: result.manager
-        ? ({
-            id: result.manager.id,
-            firstName: result.manager.firstName,
-            lastName: result.manager.lastName,
-            email: result.manager.email,
-          } as any)
-        : undefined,
-      employees: result.employees.map((emp) => ({
-        id: emp.id,
-        employeeId: emp.employeeId,
-        firstName: emp.firstName,
-        lastName: emp.lastName,
-        email: emp.email,
-        position: emp.position || undefined,
-      })) as any,
-    })) as Team[];
-  }
-
-  /**
-   * Get team by ID
-   */
-  async getTeamById(id: string): Promise<Team | null> {
-    const result = await this.prisma.team.findUnique({
-      where: { id },
-      include: {
-        department: true,
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            position: true,
-          },
-        },
-        employees: {
-          select: {
-            id: true,
-            employeeId: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            position: true,
             isActive: true,
           },
         },
-      },
-    });
-
-    if (!result) return null;
-
-    // Transform result to match Team type
-    return {
-      id: result.id,
-      name: result.name,
-      description: result.description || undefined,
-      departmentId: result.departmentId,
-      managerId: result.managerId || undefined,
-      isActive: result.isActive,
-      createdAt: result.createdAt,
-      updatedAt: result.updatedAt,
-      department: {
-        id: result.department.id,
-        name: result.department.name,
-        description: result.department.description || undefined,
-        code: result.department.code || undefined,
-        isActive: result.department.isActive,
-        createdAt: result.department.createdAt,
-        updatedAt: result.department.updatedAt,
-      },
-      manager: result.manager
-        ? ({
-            id: result.manager.id,
-            firstName: result.manager.firstName,
-            lastName: result.manager.lastName,
-            email: result.manager.email,
-            position: result.manager.position || undefined,
-          } as any)
-        : undefined,
-      employees: result.employees.map((emp) => ({
-        id: emp.id,
-        employeeId: emp.employeeId,
-        firstName: emp.firstName,
-        lastName: emp.lastName,
-        email: emp.email,
-        position: emp.position || undefined,
-        isActive: emp.isActive,
-      })) as any,
-    } as Team;
-  }
-
-  /**
-   * Update team
-   */
-  async updateTeam(id: string, data: UpdateTeamDto): Promise<Team> {
-    const team = await this.prisma.team.findUnique({
-      where: { id },
-      include: { department: true },
-    });
-
-    if (!team) {
-      throw new Error("Team not found");
-    }
-
-    // Check for name conflicts within the same department
-    if (data.name && data.name !== team.name) {
-      const existingName = await this.prisma.team.findFirst({
-        where: {
-          name: data.name,
-          departmentId: team.departmentId,
-          id: { not: id },
-        },
-      });
-
-      if (existingName) {
-        throw new Error("Team with this name already exists in the department");
-      }
-    }
-
-    // Validate manager if changing
-    if (data.managerId) {
-      const manager = await this.prisma.employee.findUnique({
-        where: { id: data.managerId },
-      });
-
-      if (
-        !manager ||
-        !manager.isActive ||
-        manager.departmentId !== team.departmentId
-      ) {
-        throw new Error(
-          "Invalid manager or manager does not belong to the same department"
-        );
-      }
-    }
-
-    return (await this.prisma.team.update({
-      where: { id },
-      data: {
-        name: data.name,
-        description: data.description,
-        managerId: data.managerId,
-        isActive: data.isActive,
-      },
-      include: {
-        department: true,
         manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    })) as any;
-  }
-
-  /**
-   * Delete team (only if no active employees)
-   */
-  async deleteTeam(id: string): Promise<void> {
-    const team = await this.prisma.team.findUnique({
-      where: { id },
-      include: {
-        employees: { where: { isActive: true } },
-      },
-    });
-
-    if (!team) {
-      throw new Error("Team not found");
-    }
-
-    if (team.employees.length > 0) {
-      throw new Error("Cannot delete team with active employees");
-    }
-
-    await this.prisma.team.delete({
-      where: { id },
-    });
-  }
-
-  /**
-   * Add employee to team
-   */
-  async addEmployeeToTeam(teamId: string, employeeId: string): Promise<void> {
-    const team = await this.prisma.team.findUnique({
-      where: { id: teamId },
-      include: { department: true },
-    });
-
-    if (!team || !team.isActive) {
-      throw new Error("Invalid or inactive team");
-    }
-
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: employeeId },
-    });
-
-    if (!employee || !employee.isActive) {
-      throw new Error("Invalid or inactive employee");
-    }
-
-    if (employee.departmentId !== team.departmentId) {
-      throw new Error(
-        "Employee does not belong to the same department as the team"
-      );
-    }
-
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { teamId: teamId },
-    });
-  }
-
-  /**
-   * Remove employee from team
-   */
-  async removeEmployeeFromTeam(employeeId: string): Promise<void> {
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: employeeId },
-    });
-
-    if (!employee) {
-      throw new Error("Employee not found");
-    }
-
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { teamId: null },
-    });
-  }
-
-  /**
-   * Get teams by department
-   */
-  async getTeamsByDepartment(
-    departmentId: string,
-    includeInactive: boolean = false
-  ) {
-    const where = includeInactive
-      ? { departmentId }
-      : { departmentId, isActive: true };
-
-    return await this.prisma.team.findMany({
-      where,
-      include: {
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        _count: {
-          select: {
-            employees: {
-              where: { isActive: true },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
             },
           },
         },
-      },
-      orderBy: { name: "asc" },
-    });
-  }
-
-  /**
-   * Get team statistics
-   */
-  async getTeamStats() {
-    const [totalTeams, activeTeams, totalEmployees] = await Promise.all([
-      this.prisma.team.count(),
-      this.prisma.team.count({ where: { isActive: true } }),
-      this.prisma.employee.count({ where: { teamId: { not: null } } }),
-    ]);
-
-    const teamsWithEmployeeCounts = await this.prisma.team.findMany({
-      select: {
-        id: true,
-        name: true,
+        employees: {
+          where: {
+            user: { isActive: true },
+          },
+          select: {
+            id: true,
+            employeeId: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            position: true,
+          },
+        },
         _count: {
           select: {
             employees: true,
           },
         },
       },
+    });
+
+    // Parse skills JSON for all teams and add computed fields
+    return teams.map((team) => {
+      const teamData = { ...team };
+
+      if (team.skills) {
+        try {
+          (teamData as any).skills = JSON.parse(team.skills);
+        } catch (e) {
+          (teamData as any).skills = [];
+        }
+      }
+
+      // Add computed fields for frontend compatibility
+      (teamData as any).memberCount = team.employees?.length || 0;
+      (teamData as any).teamLead = team.manager?.user
+        ? `${team.manager.user.firstName} ${team.manager.user.lastName}`
+        : null;
+
+      return teamData;
+    }) as any;
+  }
+
+  async getTeamsByDepartment(
+    departmentId: string,
+    includeInactive?: boolean
+  ): Promise<Team[]> {
+    const teams = await this.prisma.team.findMany({
+      where: {
+        departmentId,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
+    });
+
+    // Parse skills JSON for all teams
+    return teams.map((team) => {
+      if (team.skills) {
+        try {
+          (team as any).skills = JSON.parse(team.skills);
+        } catch (e) {
+          (team as any).skills = [];
+        }
+      }
+      return team;
+    }) as any;
+  }
+
+  async updateTeam(
+    id: string,
+    data: UpdateTeamDto,
+    updatedBy?: string
+  ): Promise<Team> {
+    // Prepare the data for Prisma update
+    const updateData: any = { ...data };
+
+    // Convert skills array to JSON string if provided
+    if (data.skills && Array.isArray(data.skills)) {
+      updateData.skills = JSON.stringify(data.skills);
+    }
+
+    // Handle empty managerId (team lead)
+    if (data.managerId === "") {
+      updateData.managerId = null;
+    }
+
+    return (await this.prisma.team.update({
+      where: { id },
+      data: updateData,
+    })) as any;
+  }
+
+  async addEmployeeToTeam(teamId: string, employeeId: string): Promise<void> {
+    await this.prisma.employee.update({
+      where: { id: employeeId },
+      data: { teamId },
+    });
+  }
+
+  async removeEmployeeFromTeam(employeeId: string): Promise<void> {
+    await this.prisma.employee.update({
+      where: { id: employeeId },
+      data: { teamId: null },
+    });
+  }
+
+  async getTeamStats(): Promise<any> {
+    // Simplified stats - full implementation later
+    const total = await this.prisma.team.count();
+    const active = await this.prisma.team.count({
       where: { isActive: true },
     });
 
-    const averageTeamSize =
-      totalEmployees > 0 ? totalEmployees / activeTeams : 0;
-
     return {
-      totalTeams,
-      activeTeams,
-      inactiveTeams: totalTeams - activeTeams,
-      totalEmployeesInTeams: totalEmployees,
-      averageTeamSize: Math.round(averageTeamSize * 100) / 100,
-      teamsWithEmployeeCounts,
+      total,
+      active,
+      inactive: total - active,
     };
+  }
+
+  async deleteTeam(id: string): Promise<void> {
+    await this.prisma.team.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 }

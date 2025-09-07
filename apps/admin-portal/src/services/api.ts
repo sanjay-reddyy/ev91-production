@@ -19,7 +19,7 @@ class ApiService {
   constructor() {
     // Main API for general endpoints
     this.api = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000/api",
+      baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
       timeout: 10000,
       headers: {
         "Content-Type": "application/json",
@@ -190,26 +190,52 @@ class ApiService {
     search?: string;
     departmentId?: string;
     teamId?: string;
+    isActive?: boolean; // Add isActive parameter support
   }): Promise<ApiResponse<{ employees: User[]; pagination: any }>> {
     try {
-      const response = await this.api.get("/employees/search", { params });
+      console.log("🔍 API: Fetching employees with params:", params);
+      const response = await this.api.get("/v1/employees/search", { params });
 
-      // Transform the response to match expected format
-      if (response.data.success && response.data.data) {
+      console.log("📡 API: Raw response from server:", {
+        status: response.status,
+        success: response.data?.success,
+        dataType: typeof response.data?.data,
+        dataLength: Array.isArray(response.data?.data)
+          ? response.data.data.length
+          : "not array",
+        paginationType: typeof response.data?.pagination,
+        rawResponse: response.data,
+      });
+
+      // Backend returns: { success: true, data: employees[], pagination: {...} }
+      // Transform to match expected frontend format
+      if (response.data.success) {
+        const employees = response.data.data || [];
         return {
           success: true,
           data: {
-            employees: response.data.data,
+            employees: employees,
             pagination: response.data.pagination || {},
           },
         };
+      } else {
+        console.error("❌ API: Server returned success=false:", response.data);
+        return response.data;
       }
-
-      return response.data;
     } catch (error: any) {
+      console.error("❌ API: Error fetching employees:", {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+      });
       return {
         success: false,
-        error: error.response?.data?.error || "Failed to fetch employees",
+        error:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to fetch employees",
       };
     }
   }
@@ -262,7 +288,7 @@ class ApiService {
       console.log("Creating employee with data:", formattedData);
 
       const response = await this.api.post<ApiResponse<{ employee: User }>>(
-        "/employees",
+        "/v1/employees",
         formattedData
       );
 
@@ -298,7 +324,7 @@ class ApiService {
   async getUserById(id: string): Promise<ApiResponse<{ user: User }>> {
     try {
       const response = await this.api.get<ApiResponse<{ employee: User }>>(
-        `/employees/${id}`
+        `/v1/employees/${id}`
       );
 
       // Transform the response to match expected format
@@ -322,21 +348,17 @@ class ApiService {
     data: Partial<User>
   ): Promise<ApiResponse<{ employee: User }>> {
     try {
-      console.log("UpdateEmployee: Starting update", { id, data });
+      console.log("🔧 UpdateEmployee: Starting update", { id, data });
 
       const response = await this.api.put<ApiResponse<{ employee: User }>>(
-        `/employees/${id}`,
+        `/v1/employees/${id}`,
         data
       );
 
-      console.log(
-        "UpdateEmployee: Response received",
-        response.status,
-        response.data
-      );
+      console.log("✅ UpdateEmployee: Success response", response.data);
       return response.data;
     } catch (error: any) {
-      console.error("UpdateEmployee: Error occurred", {
+      console.error("❌ UpdateEmployee: Error occurred", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -353,7 +375,7 @@ class ApiService {
   async deleteEmployee(id: string): Promise<ApiResponse> {
     try {
       const response = await this.api.delete<ApiResponse>(
-        `/employees/${id}/deactivate`
+        `/v1/employees/${id}/deactivate`
       );
       return response.data;
     } catch (error: any) {
@@ -373,12 +395,19 @@ class ApiService {
   }
 
   // Department endpoints
-  async getDepartments(): Promise<ApiResponse<Department[]>> {
+  async getDepartments(
+    includeInactive?: boolean
+  ): Promise<ApiResponse<Department[]>> {
     try {
+      let url = "/v1/departments";
+      if (includeInactive) {
+        url += "?includeInactive=true";
+      }
+
       const response = await this.api.get<{
         success: boolean;
         data: Department[];
-      }>("/departments");
+      }>(url);
       return {
         success: response.data.success,
         data: response.data.data,
@@ -396,40 +425,119 @@ class ApiService {
     }
   }
 
+  // City endpoints
+  async getCities(): Promise<
+    ApiResponse<
+      Array<{ id: string; name: string; state: string; isActive: boolean }>
+    >
+  > {
+    try {
+      const response = await this.authApi.get<{
+        success: boolean;
+        data: Array<{
+          id: string;
+          name: string;
+          state: string;
+          isActive: boolean;
+        }>;
+      }>("/internal/city-sync/cities");
+
+      // Filter for active cities and return full city objects with state info
+      const activeCities =
+        response.data.data?.filter((city) => city.isActive) || [];
+
+      return {
+        success: response.data.success,
+        data: activeCities,
+        message: response.data.success ? undefined : "Failed to fetch cities",
+      };
+    } catch (error: any) {
+      console.error("API Error in getCities:", error);
+      return {
+        success: false,
+        data: [],
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
+  }
+
   async createDepartment(
     data: CreateDepartmentData
   ): Promise<ApiResponse<{ department: Department }>> {
-    const response = await this.api.post<
-      ApiResponse<{ department: Department }>
-    >("/departments", data);
-    return response.data;
+    try {
+      const response = await this.api.post<
+        ApiResponse<{ department: Department }>
+      >("/v1/departments", data);
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in createDepartment:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async updateDepartment(
     id: string,
     data: Partial<Department>
   ): Promise<ApiResponse<{ department: Department }>> {
-    const response = await this.api.put<
-      ApiResponse<{ department: Department }>
-    >(`/departments/${id}`, data);
-    return response.data;
+    try {
+      const response = await this.api.put<
+        ApiResponse<{ department: Department }>
+      >(`/v1/departments/${id}`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in updateDepartment:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async deleteDepartment(id: string): Promise<ApiResponse> {
-    const response = await this.api.delete<ApiResponse>(`/departments/${id}`);
-    return response.data;
+    try {
+      const response = await this.api.delete<ApiResponse>(
+        `/v1/departments/${id}`
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in deleteDepartment:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   // Team endpoints
   async getTeams(
-    departmentId?: string
+    departmentId?: string,
+    includeInactive?: boolean
   ): Promise<ApiResponse<{ teams: Team[] }>> {
-    const params = departmentId ? { departmentId } : {};
-    const response = await this.api.get<ApiResponse<{ teams: Team[] }>>(
-      "/teams",
-      { params }
-    );
-    return response.data;
+    try {
+      const params: any = {};
+      if (departmentId) {
+        params.departmentId = departmentId;
+      }
+      if (includeInactive) {
+        params.includeInactive = "true";
+      }
+
+      const response = await this.api.get<ApiResponse<{ teams: Team[] }>>(
+        "/v1/teams",
+        { params }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in getTeams:", error);
+      return {
+        success: false,
+        data: { teams: [] },
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async getTeam(id: string): Promise<ApiResponse<Team>> {
@@ -437,7 +545,7 @@ class ApiService {
       const response = await this.api.get<{
         success: boolean;
         data: { team: Team };
-      }>(`/teams/${id}`);
+      }>(`/v1/teams/${id}`);
       return {
         success: response.data.success,
         data: response.data.data.team,
@@ -460,61 +568,118 @@ class ApiService {
   async createTeam(
     data: Omit<Team, "id">
   ): Promise<ApiResponse<{ team: Team }>> {
-    const response = await this.api.post<ApiResponse<{ team: Team }>>(
-      "/teams",
-      data
-    );
-    return response.data;
+    try {
+      const response = await this.api.post<ApiResponse<{ team: Team }>>(
+        "/v1/teams",
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in createTeam:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async updateTeam(
     id: string,
     data: Partial<Team>
   ): Promise<ApiResponse<{ team: Team }>> {
-    const response = await this.api.put<ApiResponse<{ team: Team }>>(
-      `/teams/${id}`,
-      data
-    );
-    return response.data;
+    try {
+      const response = await this.api.put<ApiResponse<{ team: Team }>>(
+        `/v1/teams/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in updateTeam:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async deleteTeam(id: string): Promise<ApiResponse> {
-    const response = await this.api.delete<ApiResponse>(`/teams/${id}`);
-    return response.data;
+    try {
+      const response = await this.api.delete<ApiResponse>(`/v1/teams/${id}`);
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in deleteTeam:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   // Role endpoints
   async getRoles(): Promise<ApiResponse<{ roles: Role[] }>> {
-    const response = await this.api.get<ApiResponse<{ roles: Role[] }>>(
-      "/roles"
-    );
-    return response.data;
+    try {
+      const response = await this.api.get<ApiResponse<{ roles: Role[] }>>(
+        "/v1/roles"
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in getRoles:", error);
+      return {
+        success: false,
+        data: { roles: [] },
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async createRole(
     data: Omit<Role, "id">
   ): Promise<ApiResponse<{ role: Role }>> {
-    const response = await this.api.post<ApiResponse<{ role: Role }>>(
-      "/roles",
-      data
-    );
-    return response.data;
+    try {
+      const response = await this.api.post<ApiResponse<{ role: Role }>>(
+        "/v1/roles",
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in createRole:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async updateRole(
     id: string,
     data: Partial<Role>
   ): Promise<ApiResponse<{ role: Role }>> {
-    const response = await this.api.put<ApiResponse<{ role: Role }>>(
-      `/roles/${id}`,
-      data
-    );
-    return response.data;
+    try {
+      const response = await this.api.put<ApiResponse<{ role: Role }>>(
+        `/v1/roles/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in updateRole:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   async deleteRole(id: string): Promise<ApiResponse> {
-    const response = await this.api.delete<ApiResponse>(`/roles/${id}`);
-    return response.data;
+    try {
+      const response = await this.api.delete<ApiResponse>(`/v1/roles/${id}`);
+      return response.data;
+    } catch (error: any) {
+      console.error("API Error in deleteRole:", error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || "Network error",
+      };
+    }
   }
 
   // Permission endpoints

@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { EmployeeController } from "../controllers/employeeController";
 import { DepartmentController } from "../controllers/departmentController";
-import { TeamController } from "../controllers/teamController";
 import {
   authenticateEmployee,
   requirePermission,
@@ -14,7 +13,6 @@ const router = Router();
 // Initialize controllers
 const employeeController = new EmployeeController();
 const departmentController = new DepartmentController();
-const teamController = new TeamController();
 
 // =================== EMPLOYEE ROUTES ===================
 
@@ -186,114 +184,6 @@ router.delete(
   authenticateEmployee,
   requirePermission("auth", "departments", "delete"),
   departmentController.deleteDepartment.bind(departmentController)
-);
-
-// =================== TEAM ROUTES ===================
-
-/**
- * @route POST /teams
- * @desc Create new team
- * @access Private - Requires auth + admin permission
- */
-router.post(
-  "/teams",
-  authenticateEmployee,
-  requirePermission("auth", "teams", "create"),
-  TeamController.createTeamValidation,
-  teamController.createTeam.bind(teamController)
-);
-
-/**
- * @route GET /teams
- * @desc Get all teams with optional department filtering
- * @access Private - Requires auth
- */
-router.get(
-  "/teams",
-  authenticateEmployee,
-  teamController.getAllTeams.bind(teamController)
-);
-
-/**
- * @route GET /teams/:id
- * @desc Get team by ID
- * @access Private - Requires auth
- */
-router.get(
-  "/teams/:id",
-  authenticateEmployee,
-  teamController.getTeamById.bind(teamController)
-);
-
-/**
- * @route PUT /teams/:id
- * @desc Update team
- * @access Private - Requires auth + update permission
- */
-router.put(
-  "/teams/:id",
-  authenticateEmployee,
-  requirePermission("auth", "teams", "update"),
-  TeamController.updateTeamValidation,
-  teamController.updateTeam.bind(teamController)
-);
-
-/**
- * @route DELETE /teams/:id
- * @desc Delete team
- * @access Private - Requires auth + delete permission
- */
-router.delete(
-  "/teams/:id",
-  authenticateEmployee,
-  requirePermission("auth", "teams", "delete"),
-  teamController.deleteTeam.bind(teamController)
-);
-
-/**
- * @route POST /teams/:teamId/employees/:employeeId
- * @desc Add employee to team
- * @access Private - Requires auth + update permission
- */
-router.post(
-  "/teams/:teamId/employees/:employeeId",
-  authenticateEmployee,
-  requirePermission("auth", "teams", "update"),
-  teamController.addEmployeeToTeam.bind(teamController)
-);
-
-/**
- * @route DELETE /teams/employees/:employeeId
- * @desc Remove employee from team
- * @access Private - Requires auth + update permission
- */
-router.delete(
-  "/teams/employees/:employeeId",
-  authenticateEmployee,
-  requirePermission("auth", "teams", "update"),
-  teamController.removeEmployeeFromTeam.bind(teamController)
-);
-
-/**
- * @route GET /departments/:departmentId/teams
- * @desc Get teams by department
- * @access Private - Requires auth
- */
-router.get(
-  "/departments/:departmentId/teams",
-  authenticateEmployee,
-  teamController.getTeamsByDepartment.bind(teamController)
-);
-
-/**
- * @route GET /teams/stats
- * @desc Get team statistics
- * @access Private - Requires auth
- */
-router.get(
-  "/teams/stats",
-  authenticateEmployee,
-  teamController.getTeamStats.bind(teamController)
 );
 
 /**
