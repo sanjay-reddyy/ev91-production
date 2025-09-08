@@ -52,11 +52,13 @@ export class CitySyncController {
           break;
 
         default:
-          console.warn(`🔶 Unknown city event type: ${event.type}`);
+          // Handle unexpected event types gracefully
+          const unexpectedEvent = event as any; // Type assertion for unknown events
+          console.warn(`🔶 Unknown city event type: ${unexpectedEvent.type}`);
           res.status(200).json({
             success: true,
             message: "Event type not handled but acknowledged",
-            eventId: event.eventId,
+            eventId: unexpectedEvent.eventId,
           });
           return;
       }

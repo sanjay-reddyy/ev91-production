@@ -7,7 +7,6 @@ import { PrismaClient } from "@prisma/client";
 // Import routes
 import clientRoutes from "./routes/clientRoutes";
 import storeRoutes from "./routes/storeRoutes";
-import riderEarningsRoutes from "./routes/riderEarningsRoutes";
 import citySyncRoutes from "./routes/citySyncRoutes";
 
 // Import middleware
@@ -80,15 +79,13 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Apply authentication middleware to API routes (except health and some test routes)
-// Temporarily disabled for testing
-// app.use('/api/clients/:id', authMiddleware);
-// app.use('/api', authMiddleware);
+// Apply authentication middleware to API routes
+console.log("🔐 Enabling authentication middleware for all API routes");
+app.use("/api", authMiddleware);
 
 // API Routes
 app.use("/api/clients", clientRoutes);
 app.use("/api/stores", storeRoutes);
-app.use("/api/rider-earnings", riderEarningsRoutes);
 
 // Internal sync routes (no auth required for service-to-service communication)
 app.use("/internal", citySyncRoutes);
@@ -124,9 +121,6 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🏢 Clients API: http://localhost:${PORT}/api/clients`);
   console.log(`🏪 Stores API: http://localhost:${PORT}/api/stores`);
-  console.log(
-    `💰 Rider Earnings API: http://localhost:${PORT}/api/rider-earnings`
-  );
 });
 
 export default app;

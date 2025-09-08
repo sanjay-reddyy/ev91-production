@@ -24,7 +24,6 @@ import {
   AccountCircle as AccountCircleIcon,
   Settings as SettingsIcon,
   Store as StoreIcon,
-  Person as ClientIcon,
   AttachMoney as EarningsIcon,
   DirectionsBike as VehicleIcon,
   Warning as DamageIcon,
@@ -79,53 +78,49 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  // 1. Dashboard
   {
     text: 'Dashboard',
     icon: <DashboardIcon />,
     path: '/',
     // Dashboard is generally accessible to all authenticated users
   },
+  // 2. Rider Management (with separate Rider List and Rider Earnings)
   {
-    text: 'Employees',
+    text: 'Rider Management',
     icon: <PeopleIcon />,
-    path: '/employees',
     anyOfPermissions: [
-      { service: 'auth', resource: 'employees', action: 'read' },
-      { service: 'auth', resource: 'users', action: 'read' },
-      { service: 'auth', resource: 'employees', action: 'manage' }
+      { service: 'rider', resource: 'riders', action: 'read' },
+      { service: 'rider', resource: 'riders', action: 'manage' },
+      { service: 'rider', resource: 'kyc', action: 'read' },
+      { service: 'rider', resource: 'kyc', action: 'verify' },
+      { service: 'rider', resource: 'earnings', action: 'read' }
+    ],
+    children: [
+      {
+        text: 'Rider List',
+        icon: <PeopleIcon />,
+        path: '/rider-management',
+        anyOfPermissions: [
+          { service: 'rider', resource: 'riders', action: 'read' },
+          { service: 'rider', resource: 'riders', action: 'manage' },
+          { service: 'rider', resource: 'kyc', action: 'read' },
+          { service: 'rider', resource: 'kyc', action: 'verify' }
+        ]
+      },
+      {
+        text: 'Rider Earnings',
+        icon: <EarningsIcon />,
+        path: '/rider-earnings',
+        anyOfPermissions: [
+          { service: 'rider', resource: 'earnings', action: 'read' },
+          { service: 'rider', resource: 'riders', action: 'read' },
+          { service: 'rider', resource: 'riders', action: 'manage' }
+        ]
+      }
     ]
   },
-  {
-    text: 'Teams & Departments',
-    icon: <GroupsIcon />,
-    path: '/teams',
-    anyOfPermissions: [
-      { service: 'auth', resource: 'teams', action: 'read' },
-      { service: 'auth', resource: 'teams', action: 'manage' },
-      { service: 'auth', resource: 'departments', action: 'read' },
-      { service: 'auth', resource: 'departments', action: 'manage' }
-    ]
-  },
-  {
-    text: 'Clients',
-    icon: <ClientIcon />,
-    path: '/clients',
-    requiredPermission: {
-      service: 'client',
-      resource: 'clients',
-      action: 'read'
-    }
-  },
-  {
-    text: 'Stores',
-    icon: <StoreIcon />,
-    path: '/stores',
-    requiredPermission: {
-      service: 'client',
-      resource: 'stores',
-      action: 'read'
-    }
-  },
+  // 3. Vehicle Management
   {
     text: 'Vehicle Management',
     icon: <VehicleIcon />,
@@ -198,6 +193,16 @@ const menuItems: MenuItem[] = [
         text: 'City Management',
         icon: <HubIcon />,
         path: '/cities',
+        requiredPermission: {
+          service: 'vehicle',
+          resource: 'cities',
+          action: 'read'
+        }
+      },
+      {
+        text: 'City Dashboard',
+        icon: <DashboardIcon />,
+        path: '/city-dashboard',
         requiredPermission: {
           service: 'vehicle',
           resource: 'cities',
@@ -286,6 +291,7 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
+  // 4. Spare Parts Management
   {
     text: 'Spare Parts Management',
     icon: <SparePartsIcon />,
@@ -445,27 +451,40 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
+  // 5. Clients & Stores
   {
-    text: 'Rider Earnings',
-    icon: <EarningsIcon />,
-    path: '/rider-earnings',
+    text: 'Clients & Stores',
+    icon: <StoreIcon />,
+    path: '/clients',
     anyOfPermissions: [
-      { service: 'rider', resource: 'earnings', action: 'read' },
-      { service: 'rider', resource: 'riders', action: 'read' },
-      { service: 'rider', resource: 'riders', action: 'manage' }
+      { service: 'client', resource: 'clients', action: 'read' },
+      { service: 'client', resource: 'stores', action: 'read' }
     ]
   },
+  // 6. Employee Management
   {
-    text: 'Rider Management',
+    text: 'Employee Management',
     icon: <PeopleIcon />,
-    path: '/rider-management',
+    path: '/employees',
     anyOfPermissions: [
-      { service: 'rider', resource: 'riders', action: 'read' },
-      { service: 'rider', resource: 'riders', action: 'manage' },
-      { service: 'rider', resource: 'kyc', action: 'read' },
-      { service: 'rider', resource: 'kyc', action: 'verify' }
+      { service: 'auth', resource: 'employees', action: 'read' },
+      { service: 'auth', resource: 'users', action: 'read' },
+      { service: 'auth', resource: 'employees', action: 'manage' }
     ]
   },
+  // 7. Team and Department
+  {
+    text: 'Teams & Departments',
+    icon: <GroupsIcon />,
+    path: '/teams',
+    anyOfPermissions: [
+      { service: 'auth', resource: 'teams', action: 'read' },
+      { service: 'auth', resource: 'teams', action: 'manage' },
+      { service: 'auth', resource: 'departments', action: 'read' },
+      { service: 'auth', resource: 'departments', action: 'manage' }
+    ]
+  },
+  // 8. Roles and Permissions
   {
     text: 'Roles & Permissions',
     icon: <SecurityIcon />,
@@ -475,12 +494,14 @@ const menuItems: MenuItem[] = [
       { service: 'auth', resource: 'permissions', action: 'read' }
     ]
   },
+  // 9. Profile
   {
     text: 'Profile',
     icon: <AccountCircleIcon />,
     path: '/profile',
     // Profile is always accessible to authenticated users
   },
+  // 10. Settings
   {
     text: 'Settings',
     icon: <SettingsIcon />,

@@ -9,18 +9,13 @@ import {
   Grid,
   Typography,
   Box,
-  Chip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Autocomplete,
   Alert,
-  Divider,
   Card,
   CardContent,
   IconButton,
   Tooltip,
+  CircularProgress,
 } from '@mui/material'
 import {
   Save as SaveIcon,
@@ -28,7 +23,6 @@ import {
   Person as PersonIcon,
   LocationCity as LocationIcon,
   Business as BusinessIcon,
-  Assignment as AssignmentIcon,
   DirectionsCar as VehicleIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material'
@@ -98,6 +92,12 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
   const [assignmentNotes, setAssignmentNotes] = useState('')
+
+  // Loading states for better UX
+  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingClients, setLoadingClients] = useState(false)
+  const [loadingStores, setLoadingStores] = useState(false)
+  const [storeAssignmentError, setStoreAssignmentError] = useState('')
 
   // Vehicle assignment (existing)
   const [availableVehicles, setAvailableVehicles] = useState<any[]>([])
@@ -170,17 +170,32 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
       setSelectedVehicle(null)
       setSelectedHub(null)
       setAssignmentNotes('')
+      setStoreAssignmentError('')
+      // Clear arrays to reset dropdowns
+      setClients([])
+      setStores([])
     }
   }, [rider])
 
   const loadCities = async () => {
+    console.log('🔍 Loading cities...')
+    setLoadingCities(true)
+    setStoreAssignmentError('')
     try {
       const response = await clientStoreService.getCities()
+      console.log('🏙️ Cities response:', response)
       if (response.success) {
         setCities(response.data)
+        console.log('✅ Cities loaded successfully:', response.data.length, 'cities')
+      } else {
+        console.error('❌ Failed to load cities:', response)
+        setStoreAssignmentError('Failed to load cities. Please try again.')
       }
     } catch (error) {
-      console.error('Error loading cities:', error)
+      console.error('💥 Error loading cities:', error)
+      setStoreAssignmentError('Error loading cities. Please check your connection.')
+    } finally {
+      setLoadingCities(false)
     }
   }
 
@@ -207,37 +222,67 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
   }
 
   const handleCityChange = async (city: ClientCity | null) => {
+    console.log('🏙️ City changed to:', city)
     setSelectedCity(city)
     setSelectedClient(null)
     setSelectedStore(null)
     setClients([])
     setStores([])
+    setStoreAssignmentError('')
 
     if (city) {
+      console.log('🔍 Loading clients for city:', city.name)
+      setLoadingClients(true)
       try {
         const response = await clientStoreService.getClientsByCity(city.name)
+        console.log('🏢 Clients response for city:', response)
         if (response.success) {
           setClients(response.data)
+          console.log('✅ Clients loaded successfully:', response.data.length, 'clients')
+          if (response.data.length === 0) {
+            setStoreAssignmentError(`No clients found in ${city.name}. Please select a different city.`)
+          }
+        } else {
+          console.error('❌ Failed to load clients for city:', response)
+          setStoreAssignmentError('Failed to load clients for selected city.')
         }
       } catch (error) {
-        console.error('Error loading clients for city:', error)
+        console.error('💥 Error loading clients for city:', error)
+        setStoreAssignmentError('Error loading clients. Please try again.')
+      } finally {
+        setLoadingClients(false)
       }
     }
   }
 
   const handleClientChange = async (client: Client | null) => {
+    console.log('🏢 Client changed to:', client)
     setSelectedClient(client)
     setSelectedStore(null)
     setStores([])
+    setStoreAssignmentError('')
 
     if (client) {
+      console.log('🔍 Loading stores for client:', client.id, client.name)
+      setLoadingStores(true)
       try {
         const response = await clientStoreService.getStoresByClient(client.id)
+        console.log('🏪 Stores response for client:', response)
         if (response.success) {
           setStores(response.data)
+          console.log('✅ Stores loaded successfully:', response.data.length, 'stores')
+          if (response.data.length === 0) {
+            setStoreAssignmentError(`No stores found for ${client.name}. Please select a different client.`)
+          }
+        } else {
+          console.error('❌ Failed to load stores for client:', response)
+          setStoreAssignmentError('Failed to load stores for selected client.')
         }
       } catch (error) {
-        console.error('Error loading stores for client:', error)
+        console.error('💥 Error loading stores for client:', error)
+        setStoreAssignmentError('Error loading stores. Please try again.')
+      } finally {
+        setLoadingStores(false)
       }
     }
   }
@@ -278,6 +323,7 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
 
     try {
       setLoading(true)
+      setStoreAssignmentError('')
 
       // Save rider basic information
       await onSave(formData)
@@ -285,13 +331,22 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
       // Handle store assignment if selected
       if (rider && selectedStore && selectedClient) {
         try {
+          console.log('🏪 Assigning store to rider:', {
+            riderId: rider.id,
+            storeId: selectedStore.id,
+            clientId: selectedClient.id,
+            storeName: selectedStore.storeName,
+            clientName: selectedClient.name
+          })
           await riderService.assignStoreToRider(rider.id, {
             storeId: selectedStore.id,
             clientId: selectedClient.id,
             notes: assignmentNotes,
           })
+          console.log('✅ Store assignment successful')
         } catch (error) {
-          console.error('Error assigning store:', error)
+          console.error('❌ Error assigning store:', error)
+          setStoreAssignmentError('Failed to assign store. The rider was saved but store assignment failed.')
         }
       }
 
@@ -590,10 +645,17 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
                     )}
                   </Box>
 
+                  {storeAssignmentError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {storeAssignmentError}
+                    </Alert>
+                  )}
+
                   {selectedStore ? (
                     <Alert severity="success" sx={{ mb: 2 }}>
                       Rider is assigned to: <strong>{selectedStore.storeName}</strong>
-                      ({selectedClient?.name})
+                      {selectedClient && ` (${selectedClient.name})`}
+                      {selectedCity && ` in ${selectedCity.name}, ${selectedCity.state}`}
                     </Alert>
                   ) : (
                     <Grid container spacing={2}>
@@ -603,8 +665,22 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
                           getOptionLabel={(city) => `${city.name}, ${city.state}`}
                           value={selectedCity}
                           onChange={(_, value) => handleCityChange(value)}
+                          loading={loadingCities}
                           renderInput={(params) => (
-                            <TextField {...params} label="Select City" fullWidth />
+                            <TextField
+                              {...params}
+                              label="Select City"
+                              fullWidth
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <React.Fragment>
+                                    {loadingCities ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                  </React.Fragment>
+                                ),
+                              }}
+                            />
                           )}
                         />
                       </Grid>
@@ -614,9 +690,23 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
                           getOptionLabel={(client) => `${client.name} (${client.clientCode})`}
                           value={selectedClient}
                           onChange={(_, value) => handleClientChange(value)}
-                          disabled={!selectedCity}
+                          disabled={!selectedCity || loadingClients}
+                          loading={loadingClients}
                           renderInput={(params) => (
-                            <TextField {...params} label="Select Client" fullWidth />
+                            <TextField
+                              {...params}
+                              label="Select Client"
+                              fullWidth
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <React.Fragment>
+                                    {loadingClients ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                  </React.Fragment>
+                                ),
+                              }}
+                            />
                           )}
                         />
                       </Grid>
@@ -626,9 +716,23 @@ const EnhancedRiderForm: React.FC<EnhancedRiderFormProps> = ({
                           getOptionLabel={(store) => `${store.storeName} (${store.storeCode})`}
                           value={selectedStore}
                           onChange={(_, value) => setSelectedStore(value)}
-                          disabled={!selectedClient}
+                          disabled={!selectedClient || loadingStores}
+                          loading={loadingStores}
                           renderInput={(params) => (
-                            <TextField {...params} label="Select Store" fullWidth />
+                            <TextField
+                              {...params}
+                              label="Select Store"
+                              fullWidth
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <React.Fragment>
+                                    {loadingStores ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                  </React.Fragment>
+                                ),
+                              }}
+                            />
                           )}
                         />
                       </Grid>

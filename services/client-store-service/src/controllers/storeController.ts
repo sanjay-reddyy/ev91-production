@@ -1,120 +1,144 @@
-import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { asyncHandler, createError } from '../middleware/errorHandler';
-import { AuthenticatedRequest } from '../middleware/auth';
+import { Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
+import { asyncHandler, createError } from "../middleware/errorHandler";
+import { AuthenticatedRequest } from "../middleware/auth";
 
 const prisma = new PrismaClient();
 
 // Create a new store
-export const createStore = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const {
-    clientId,
-    name,
-    address,
-    cityId,
-    latitude,
-    longitude,
-    phone,
-    email,
-    managerName,
-    managerPhone,
-    managerEmail,
-    storeType,
-    businessHours,
-    deliveryRadius,
-    minimumOrderAmount,
-    deliveryFee,
-    isEVChargingAvailable,
-    chargingStationType,
-    chargingPower,
-    averagePreparationTime,
-    peakHours,
-    specialInstructions,
-    acceptsCash,
-    acceptsCard,
-    acceptsDigitalPayment,
-    commission,
-    isActive,
-    metadata
-  } = req.body;
+export const createStore = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    console.log(
+      `🏪 Creating store with data:`,
+      JSON.stringify(req.body, null, 2)
+    );
 
-  // Validate required fields
-  if (!clientId || !name || !address || !cityId) {
-    throw createError('ClientId, name, address, and cityId are required', 400, 'MISSING_REQUIRED_FIELDS');
-  }
+    // Map frontend field names to backend field names
+    const requestBody = { ...req.body };
 
-  // Verify client exists
-  const client = await prisma.client.findUnique({
-    where: { id: clientId }
-  });
-
-  if (!client) {
-    throw createError('Client not found', 404, 'CLIENT_NOT_FOUND');
-  }
-
-  const store = await prisma.store.create({
-    data: {
-      clientId,
-      name,
-      address,
-      cityId,
-      latitude: latitude ? parseFloat(latitude) : null,
-      longitude: longitude ? parseFloat(longitude) : null,
-      phone,
-      email,
-      managerName,
-      managerPhone,
-      managerEmail,
-      storeType,
-      businessHours: businessHours || {},
-      deliveryRadius: deliveryRadius ? parseFloat(deliveryRadius) : null,
-      minimumOrderAmount: minimumOrderAmount ? parseFloat(minimumOrderAmount) : null,
-      deliveryFee: deliveryFee ? parseFloat(deliveryFee) : null,
-      isEVChargingAvailable: isEVChargingAvailable || false,
-      chargingStationType,
-      chargingPower: chargingPower ? parseFloat(chargingPower) : null,
-      averagePreparationTime: averagePreparationTime ? parseInt(averagePreparationTime) : null,
-      peakHours: peakHours || {},
-      specialInstructions,
-      acceptsCash: acceptsCash !== undefined ? acceptsCash : true,
-      acceptsCard: acceptsCard !== undefined ? acceptsCard : true,
-      acceptsDigitalPayment: acceptsDigitalPayment !== undefined ? acceptsDigitalPayment : true,
-      commission: commission ? parseFloat(commission) : null,
-      isActive: isActive !== undefined ? isActive : true,
-      metadata: metadata || {},
-      createdBy: req.user?.id
-    },
-    include: {
-      client: {
-        select: {
-          id: true,
-          name: true,
-          email: true
-        }
-      }
+    // Handle contactPersonName -> storeManagerName mapping
+    if ("contactPersonName" in requestBody) {
+      requestBody.storeManagerName = requestBody.contactPersonName;
+      delete requestBody.contactPersonName;
     }
-  });
 
-  res.status(201).json({
-    success: true,
-    message: 'Store created successfully',
-    data: store
-  });
-});
+    // Handle latitude/longitude -> gpsLatitude/gpsLongitude mapping
+    if ("latitude" in requestBody) {
+      requestBody.gpsLatitude = requestBody.latitude;
+      delete requestBody.latitude;
+    }
+
+    if ("longitude" in requestBody) {
+      requestBody.gpsLongitude = requestBody.longitude;
+      delete requestBody.longitude;
+    }
+
+    // Extract only valid schema fields
+    const {
+      clientId,
+      storeName,
+      storeCode,
+      storeType = "Showroom",
+      completeAddress,
+      city,
+      state = "",
+      pinCode = "",
+      storeStatus = "Active",
+      contactNumber,
+      emailAddress,
+    } = requestBody;
+
+    // Validate required fields
+    if (!clientId || !storeName || !completeAddress || !city) {
+      throw createError(
+        "ClientId, storeName, completeAddress, and city are required",
+        400,
+        "MISSING_REQUIRED_FIELDS"
+      );
+    }
+
+    // Verify client exists
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+    });
+
+    if (!client) {
+      throw createError("Client not found", 404, "CLIENT_NOT_FOUND");
+    }
+
+    const store = await prisma.store.create({
+      data: {
+        // Required fields
+        clientId,
+        storeName,
+        completeAddress,
+        city,
+        state,
+        pinCode,
+        storeType,
+        storeStatus,
+
+        // Optional fields from frontend
+        storeCode: storeCode || `STORE_${Date.now()}`,
+
+        // GPS coordinates - use mapped values
+        gpsLatitude: requestBody.gpsLatitude
+          ? parseFloat(requestBody.gpsLatitude)
+          : null,
+        gpsLongitude: requestBody.gpsLongitude
+          ? parseFloat(requestBody.gpsLongitude)
+          : null,
+
+        // Contact fields - use mapped values
+        storeManagerName: requestBody.storeManagerName || null,
+        contactNumber: contactNumber || null,
+        emailAddress: emailAddress || null,
+
+        // Default values for new schema fields
+        country: "India",
+        currentOfferRate: 0.0,
+        offerType: "none",
+        isOfferActive: false,
+        busyLevel: "medium",
+        averageOrdersPerDay: 0,
+        orderDifficultyLevel: "medium",
+        averageDeliveryDistance: 0.0,
+        monthlyOrderVolume: 0,
+        riderRating: 0.0,
+        averagePickupTime: 0,
+        storePriority: "standard",
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            clientCode: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Store created successfully",
+      data: store,
+    });
+  }
+);
 
 // Get all stores with filtering
 export const getStores = asyncHandler(async (req: Request, res: Response) => {
   const {
-    page = '1',
-    limit = '10',
+    page = "1",
+    limit = "10",
     search,
     clientId,
-    cityId,
+    city,
     storeType,
-    isActive,
-    isEVChargingAvailable,
-    sortBy = 'createdAt',
-    sortOrder = 'desc'
+    storeStatus,
+    sortBy = "createdAt",
+    sortOrder = "desc",
   } = req.query;
 
   const pageNum = parseInt(page as string);
@@ -126,31 +150,17 @@ export const getStores = asyncHandler(async (req: Request, res: Response) => {
 
   if (search) {
     where.OR = [
-      { name: { contains: search as string, mode: 'insensitive' } },
-      { address: { contains: search as string, mode: 'insensitive' } },
-      { managerName: { contains: search as string, mode: 'insensitive' } }
+      { storeName: { contains: search as string, mode: "insensitive" } },
+      { storeCode: { contains: search as string, mode: "insensitive" } },
+      { completeAddress: { contains: search as string, mode: "insensitive" } },
+      { storeManagerName: { contains: search as string, mode: "insensitive" } },
     ];
   }
 
-  if (clientId) {
-    where.clientId = clientId as string;
-  }
-
-  if (cityId) {
-    where.cityId = cityId as string;
-  }
-
-  if (storeType) {
-    where.storeType = storeType as string;
-  }
-
-  if (isActive !== undefined) {
-    where.isActive = isActive === 'true';
-  }
-
-  if (isEVChargingAvailable !== undefined) {
-    where.isEVChargingAvailable = isEVChargingAvailable === 'true';
-  }
+  if (clientId) where.clientId = clientId as string;
+  if (city) where.city = city as string;
+  if (storeType) where.storeType = storeType as string;
+  if (storeStatus) where.storeStatus = storeStatus as string;
 
   // Get stores with pagination
   const [stores, total] = await Promise.all([
@@ -159,24 +169,19 @@ export const getStores = asyncHandler(async (req: Request, res: Response) => {
       skip,
       take: limitNum,
       orderBy: {
-        [sortBy as string]: sortOrder as 'asc' | 'desc'
+        [sortBy as string]: sortOrder as "asc" | "desc",
       },
       include: {
         client: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
+            clientCode: true,
+          },
         },
-        _count: {
-          select: {
-            riderEarnings: true
-          }
-        }
-      }
+      },
     }),
-    prisma.store.count({ where })
+    prisma.store.count({ where }),
   ]);
 
   res.json({
@@ -186,234 +191,422 @@ export const getStores = asyncHandler(async (req: Request, res: Response) => {
       currentPage: pageNum,
       totalPages: Math.ceil(total / limitNum),
       totalItems: total,
-      itemsPerPage: limitNum
-    }
+      itemsPerPage: limitNum,
+    },
   });
 });
 
 // Get store by ID
-export const getStoreById = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+export const getStoreById = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-  const store = await prisma.store.findUnique({
-    where: { id },
-    include: {
-      client: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          businessType: true
-        }
+    const store = await prisma.store.findUnique({
+      where: {
+        id: id as string,
       },
-      riderEarnings: {
-        take: 10,
-        orderBy: {
-          createdAt: 'desc'
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            clientCode: true,
+          },
         },
-        select: {
-          id: true,
-          riderId: true,
-          baseEarning: true,
-          bonusEarning: true,
-          totalEarning: true,
-          createdAt: true
-        }
       },
-      _count: {
-        select: {
-          riderEarnings: true
-        }
-      }
+    });
+
+    if (!store) {
+      throw createError("Store not found", 404, "STORE_NOT_FOUND");
     }
-  });
 
-  if (!store) {
-    throw createError('Store not found', 404, 'STORE_NOT_FOUND');
+    res.json({
+      success: true,
+      data: store,
+    });
   }
-
-  res.json({
-    success: true,
-    data: store
-  });
-});
+);
 
 // Update store
-export const updateStore = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params;
-  const updateData = { ...req.body };
+export const updateStore = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.params;
 
-  // Remove fields that shouldn't be updated directly
-  delete updateData.id;
-  delete updateData.createdAt;
-  delete updateData.createdBy;
-
-  // Handle numeric fields
-  if (updateData.latitude) updateData.latitude = parseFloat(updateData.latitude);
-  if (updateData.longitude) updateData.longitude = parseFloat(updateData.longitude);
-  if (updateData.deliveryRadius) updateData.deliveryRadius = parseFloat(updateData.deliveryRadius);
-  if (updateData.minimumOrderAmount) updateData.minimumOrderAmount = parseFloat(updateData.minimumOrderAmount);
-  if (updateData.deliveryFee) updateData.deliveryFee = parseFloat(updateData.deliveryFee);
-  if (updateData.chargingPower) updateData.chargingPower = parseFloat(updateData.chargingPower);
-  if (updateData.averagePreparationTime) updateData.averagePreparationTime = parseInt(updateData.averagePreparationTime);
-  if (updateData.commission) updateData.commission = parseFloat(updateData.commission);
-
-  // Add update tracking
-  updateData.updatedAt = new Date();
-  updateData.updatedBy = req.user?.id;
-
-  const store = await prisma.store.update({
-    where: { id },
-    data: updateData,
-    include: {
-      client: {
-        select: {
-          id: true,
-          name: true,
-          email: true
-        }
-      }
-    }
-  });
-
-  res.json({
-    success: true,
-    message: 'Store updated successfully',
-    data: store
-  });
-});
-
-// Delete store (soft delete)
-export const deleteStore = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params;
-
-  // Check if store has recent earnings
-  const recentEarnings = await prisma.riderEarning.count({
-    where: {
-      storeId: id,
-      createdAt: {
-        gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
-      }
-    }
-  });
-
-  if (recentEarnings > 0) {
-    throw createError(
-      'Cannot delete store with recent rider earnings. Please contact administrator.',
-      400,
-      'STORE_HAS_RECENT_ACTIVITY'
+    console.log(
+      `🔄 Updating store ${id} with data:`,
+      JSON.stringify(req.body, null, 2)
     );
-  }
 
-  // Soft delete by setting isActive to false
-  const store = await prisma.store.update({
-    where: { id },
-    data: {
-      isActive: false,
-      updatedAt: new Date(),
-      updatedBy: req.user?.id
+    // First, handle field mapping before destructuring
+    let requestBody = { ...req.body };
+
+    // Handle contactPersonName -> storeManagerName mapping
+    if ("contactPersonName" in requestBody) {
+      requestBody.storeManagerName = requestBody.contactPersonName;
+      delete requestBody.contactPersonName;
     }
-  });
 
-  res.json({
-    success: true,
-    message: 'Store deleted successfully',
-    data: store
-  });
-});
+    // Handle latitude/longitude -> gpsLatitude/gpsLongitude mapping
+    if ("latitude" in requestBody) {
+      requestBody.gpsLatitude = requestBody.latitude;
+      delete requestBody.latitude;
+    }
+
+    if ("longitude" in requestBody) {
+      requestBody.gpsLongitude = requestBody.longitude;
+      delete requestBody.longitude;
+    }
+
+    // Strip relation fields and computed fields from update data
+    const {
+      client,
+      clientId,
+      totalOrders,
+      averageRating,
+      createdAt,
+      updatedAt,
+      createdBy,
+      updatedBy,
+      // Remove invalid fields that don't exist in the schema
+      deliveryRadius,
+      minimumOrderAmount,
+      deliveryFee,
+      chargingPower,
+      averagePreparationTime,
+      commission,
+      businessHours,
+      peakHours,
+      specialInstructions,
+      acceptsCash,
+      acceptsCard,
+      acceptsDigitalPayment,
+      metadata,
+      primaryContact,
+      secondaryContact,
+      email,
+      storeManagerContact,
+      storeManagerEmail,
+      chargingStationType,
+      ...validUpdateData
+    } = requestBody;
+
+    // Only include fields that exist in the Store schema
+    const updateData: any = {};
+
+    // Basic info fields
+    if (validUpdateData.storeName)
+      updateData.storeName = validUpdateData.storeName;
+    if (validUpdateData.storeCode)
+      updateData.storeCode = validUpdateData.storeCode;
+    if (validUpdateData.storeType)
+      updateData.storeType = validUpdateData.storeType;
+    if (validUpdateData.brandFranchise)
+      updateData.brandFranchise = validUpdateData.brandFranchise;
+
+    // Address fields
+    if (validUpdateData.completeAddress)
+      updateData.completeAddress = validUpdateData.completeAddress;
+    if (validUpdateData.city) updateData.city = validUpdateData.city;
+    if (validUpdateData.state) updateData.state = validUpdateData.state;
+    if (validUpdateData.country) updateData.country = validUpdateData.country;
+    if (validUpdateData.pinCode) updateData.pinCode = validUpdateData.pinCode;
+    if (validUpdateData.landmark)
+      updateData.landmark = validUpdateData.landmark;
+    if (validUpdateData.zoneRegion)
+      updateData.zoneRegion = validUpdateData.zoneRegion;
+
+    // GPS coordinates
+    if (validUpdateData.gpsLatitude)
+      updateData.gpsLatitude = parseFloat(validUpdateData.gpsLatitude);
+    if (validUpdateData.gpsLongitude)
+      updateData.gpsLongitude = parseFloat(validUpdateData.gpsLongitude);
+
+    // Contact fields
+    if (validUpdateData.storeManagerName)
+      updateData.storeManagerName = validUpdateData.storeManagerName;
+    if (validUpdateData.contactNumber)
+      updateData.contactNumber = validUpdateData.contactNumber;
+    if (validUpdateData.emailAddress)
+      updateData.emailAddress = validUpdateData.emailAddress;
+    if (validUpdateData.whatsappNumber)
+      updateData.whatsappNumber = validUpdateData.whatsappNumber;
+
+    // Status
+    if (validUpdateData.storeStatus)
+      updateData.storeStatus = validUpdateData.storeStatus;
+
+    // Add updated timestamp
+    updateData.updatedAt = new Date();
+
+    console.log(
+      `🔄 Processed update data:`,
+      JSON.stringify(updateData, null, 2)
+    );
+
+    try {
+      const store = await prisma.store.update({
+        where: {
+          id: id as string,
+        },
+        data: updateData,
+        include: {
+          client: {
+            select: {
+              id: true,
+              name: true,
+              clientCode: true,
+            },
+          },
+        },
+      });
+
+      console.log(`✅ Store updated successfully: ${id}`);
+
+      res.json({
+        success: true,
+        message: "Store updated successfully",
+        data: store,
+      });
+    } catch (error) {
+      console.error(`❌ Error updating store ${id}:`, error);
+      throw error;
+    }
+  }
+);
+
+// Delete store
+export const deleteStore = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.params;
+
+    // Check if store exists
+    const existingStore = await prisma.store.findUnique({
+      where: { id },
+    });
+
+    if (!existingStore) {
+      throw createError("Store not found", 404, "STORE_NOT_FOUND");
+    }
+
+    // Delete store record
+    await prisma.store.delete({
+      where: { id },
+    });
+
+    res.json({
+      success: true,
+      message: "Store deleted successfully",
+      data: { id },
+    });
+  }
+);
 
 // Get stores by client
-export const getStoresByClient = asyncHandler(async (req: Request, res: Response) => {
-  const { clientId } = req.params;
+export const getStoresByClient = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { clientId } = req.params;
 
-  const stores = await prisma.store.findMany({
-    where: {
-      clientId,
-      isActive: true
-    },
-    include: {
-      _count: {
-        select: {
-          riderEarnings: true
-        }
-      }
-    },
-    orderBy: {
-      name: 'asc'
-    }
-  });
+    const stores = await prisma.store.findMany({
+      where: {
+        clientId,
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            clientCode: true,
+          },
+        },
+      },
+      orderBy: {
+        storeName: "asc",
+      },
+    });
 
-  res.json({
-    success: true,
-    data: stores
-  });
-});
+    res.json({
+      success: true,
+      data: stores,
+    });
+  }
+);
 
 // Get stores by city
-export const getStoresByCity = asyncHandler(async (req: Request, res: Response) => {
-  const { cityId } = req.params;
+export const getStoresByCity = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { city } = req.params;
 
-  const stores = await prisma.store.findMany({
-    where: {
-      cityId,
-      isActive: true
-    },
-    include: {
-      client: {
-        select: {
-          id: true,
-          name: true
-        }
-      }
-    },
-    orderBy: {
-      name: 'asc'
-    }
-  });
+    const stores = await prisma.store.findMany({
+      where: {
+        city,
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            clientCode: true,
+          },
+        },
+      },
+      orderBy: {
+        storeName: "asc",
+      },
+    });
 
-  res.json({
-    success: true,
-    data: stores
-  });
-});
+    res.json({
+      success: true,
+      data: stores,
+    });
+  }
+);
 
 // Get store statistics
-export const getStoreStats = asyncHandler(async (req: Request, res: Response) => {
-  const { cityId, clientId } = req.query;
+export const getStoreStats = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { clientId, city, storeType, storeStatus } = req.query;
 
-  const where: any = {};
-  if (cityId) where.cityId = cityId as string;
-  if (clientId) where.clientId = clientId as string;
+    // Build where clause for filtering
+    const where: any = {};
+    if (clientId) where.clientId = clientId as string;
+    if (city) where.city = city as string;
+    if (storeType) where.storeType = storeType as string;
+    if (storeStatus) where.storeStatus = storeStatus as string;
 
-  const [
-    totalStores,
-    activeStores,
-    evChargingStores,
-    storeTypeStats
-  ] = await Promise.all([
-    prisma.store.count({ where }),
-    prisma.store.count({ where: { ...where, isActive: true } }),
-    prisma.store.count({ where: { ...where, isEVChargingAvailable: true } }),
-    prisma.store.groupBy({
-      by: ['storeType'],
-      where,
-      _count: {
-        storeType: true
-      }
-    })
-  ]);
-
-  res.json({
-    success: true,
-    data: {
+    // Get basic counts
+    const [
       totalStores,
       activeStores,
-      inactiveStores: totalStores - activeStores,
-      evChargingStores,
-      storeTypeDistribution: storeTypeStats.reduce((acc, stat) => {
-        acc[stat.storeType || 'Unknown'] = stat._count.storeType;
-        return acc;
-      }, {} as Record<string, number>)
-    }
-  });
-});
+      inactiveStores,
+      pendingStores,
+      storesByType,
+      storesByCity,
+      storesByClient,
+    ] = await Promise.all([
+      // Total stores count
+      prisma.store.count({ where }),
+
+      // Active stores count
+      prisma.store.count({
+        where: { ...where, storeStatus: "ACTIVE" },
+      }),
+
+      // Inactive stores count
+      prisma.store.count({
+        where: { ...where, storeStatus: "INACTIVE" },
+      }),
+
+      // Pending stores count
+      prisma.store.count({
+        where: { ...where, storeStatus: "PENDING" },
+      }),
+
+      // Stores by type
+      prisma.store.groupBy({
+        by: ["storeType"],
+        where,
+        _count: {
+          id: true,
+        },
+      }),
+
+      // Stores by city
+      prisma.store.groupBy({
+        by: ["city"],
+        where,
+        _count: {
+          id: true,
+        },
+        orderBy: {
+          _count: {
+            id: "desc",
+          },
+        },
+        take: 10,
+      }),
+
+      // Stores by client
+      prisma.store.groupBy({
+        by: ["clientId"],
+        where,
+        _count: {
+          id: true,
+        },
+        orderBy: {
+          _count: {
+            id: "desc",
+          },
+        },
+        take: 10,
+      }),
+    ]);
+
+    // Get client details for top clients
+    const topClients = await Promise.all(
+      storesByClient.map(async (item) => {
+        const client = await prisma.client.findUnique({
+          where: { id: item.clientId },
+          select: {
+            id: true,
+            name: true,
+            clientCode: true,
+          },
+        });
+        return {
+          client,
+          storeCount: item._count.id,
+        };
+      })
+    );
+
+    const stats = {
+      overview: {
+        totalStores,
+        activeStores,
+        inactiveStores,
+        pendingStores,
+      },
+      distribution: {
+        byType: storesByType.map((item) => ({
+          storeType: item.storeType,
+          count: item._count.id,
+        })),
+        byCity: storesByCity.map((item) => ({
+          city: item.city,
+          count: item._count.id,
+        })),
+        byClient: topClients,
+      },
+    };
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  }
+);
+
+// Get all unique cities from stores
+export const getStoreCities = asyncHandler(
+  async (req: Request, res: Response) => {
+    const cities = await prisma.store.findMany({
+      select: {
+        city: true,
+      },
+      distinct: ["city"],
+      where: {
+        city: {
+          not: "",
+        },
+      },
+      orderBy: {
+        city: "asc",
+      },
+    });
+
+    res.json({
+      success: true,
+      data: cities.map((item) => item.city).filter(Boolean),
+    });
+  }
+);

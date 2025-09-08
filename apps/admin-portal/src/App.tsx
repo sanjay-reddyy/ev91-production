@@ -18,8 +18,7 @@ import Dashboard from './pages/Dashboard'
 import Teams from './pages/Teams'
 import CreateTeam from './pages/CreateTeam'
 import EditTeam from './pages/EditTeam'
-import Clients from './pages/Clients'
-import Stores from './pages/Stores'
+import ClientStoreManagement from './pages/ClientStoreManagement'
 import RiderEarnings from './pages/RiderEarnings'
 import RiderManagement from './pages/RiderManagement'
 import RiderProfile from './pages/RiderProfile'
@@ -42,6 +41,11 @@ import VehicleModelForm from './pages/VehicleModelForm'
 import HubManagement from './pages/HubManagement'
 import HubForm from './pages/HubForm'
 import HubDetails from './pages/HubDetails'
+
+// City Management Pages
+import CityManagement from './pages/CityManagement'
+import CityForm from './pages/CityForm'
+import CityDashboard from './pages/CityDashboard'
 
 // Service Management Pages
 import ServiceManagement from './pages/ServiceManagement'
@@ -168,8 +172,8 @@ const App: React.FC = () => {
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/teams/create" element={<CreateTeam />} />
                 <Route path="/teams/edit/:id" element={<EditTeam />} />
-                <Route path="/clients" element={<Clients />} />
-                <Route path="/stores" element={<Stores />} />
+                <Route path="/clients" element={<ClientStoreManagement />} />
+                <Route path="/stores" element={<ClientStoreManagement />} />
                 <Route path="/rider-earnings" element={<RiderEarnings />} />
                 <Route path="/rider-management" element={<RiderManagement />} />
                 <Route path="/rider-management/:riderId" element={<RiderProfile />} />
@@ -191,6 +195,12 @@ const App: React.FC = () => {
                 <Route path="/hubs/new" element={<HubForm />} />
                 <Route path="/hubs/:id" element={<HubDetails />} />
                 <Route path="/hubs/:id/edit" element={<HubForm />} />
+
+                {/* City Management Routes */}
+                <Route path="/cities" element={<CityManagement />} />
+                <Route path="/cities/add" element={<CityForm />} />
+                <Route path="/cities/:id/edit" element={<CityForm />} />
+                <Route path="/city-dashboard" element={<CityDashboard />} />
 
                 {/* OEM Management Routes */}
                 <Route path="/oems" element={<OEMManagement />} />

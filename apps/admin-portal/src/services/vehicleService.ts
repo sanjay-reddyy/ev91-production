@@ -1016,6 +1016,62 @@ export const vehicleService = {
     }
   },
 
+  async createCity(cityData: any) {
+    try {
+      const response = await vehicleApi.post("/cities", cityData);
+      return response.data;
+    } catch (error: any) {
+      console.error("Error creating city:", error);
+      throw error;
+    }
+  },
+
+  async updateCity(id: string, cityData: any) {
+    try {
+      const response = await vehicleApi.put(`/cities/${id}`, cityData);
+      return response.data;
+    } catch (error: any) {
+      console.error("Error updating city:", error);
+      throw error;
+    }
+  },
+
+  async deleteCity(id: string) {
+    try {
+      const response = await vehicleApi.delete(`/cities/${id}`);
+      return response.data;
+    } catch (error: any) {
+      console.error("Error deleting city:", error);
+      throw error;
+    }
+  },
+
+  async getOperationalCities() {
+    try {
+      const response = await vehicleApi.get("/cities/operational");
+      return response.data;
+    } catch (error: any) {
+      console.error("Error fetching operational cities:", error);
+      return {
+        data: [],
+        message: error.message || "Error fetching operational cities",
+      };
+    }
+  },
+
+  async getCitiesWithCounts() {
+    try {
+      const response = await vehicleApi.get("/cities/with-counts");
+      return response.data;
+    } catch (error: any) {
+      console.error("Error fetching cities with counts:", error);
+      return {
+        data: [],
+        message: error.message || "Error fetching cities with counts",
+      };
+    }
+  },
+
   // Service History operations
   async getVehicleServiceHistory(vehicleId: string) {
     try {
