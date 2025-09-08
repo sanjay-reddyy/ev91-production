@@ -45,6 +45,7 @@ import {
   Build as InstallationIcon,
   AttachMoney as CostTrackingIcon,
   MergeType as UnifiedServiceIcon,
+  LocationOn as CityIcon,
 } from '@mui/icons-material'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useAuth } from '../../contexts/AuthContext'
@@ -186,26 +187,6 @@ const menuItems: MenuItem[] = [
         requiredPermission: {
           service: 'vehicle',
           resource: 'hubs',
-          action: 'read'
-        }
-      },
-      {
-        text: 'City Management',
-        icon: <HubIcon />,
-        path: '/cities',
-        requiredPermission: {
-          service: 'vehicle',
-          resource: 'cities',
-          action: 'read'
-        }
-      },
-      {
-        text: 'City Dashboard',
-        icon: <DashboardIcon />,
-        path: '/city-dashboard',
-        requiredPermission: {
-          service: 'vehicle',
-          resource: 'cities',
           action: 'read'
         }
       },
@@ -484,7 +465,41 @@ const menuItems: MenuItem[] = [
       { service: 'auth', resource: 'departments', action: 'manage' }
     ]
   },
-  // 8. Roles and Permissions
+  // 8. City Management
+  {
+    text: 'City Management',
+    icon: <CityIcon />,
+    anyOfPermissions: [
+      { service: 'vehicle', resource: 'cities', action: 'read' },
+      { service: 'vehicle', resource: 'cities', action: 'manage' },
+      { service: 'vehicle', resource: 'cities', action: 'create' },
+      { service: 'vehicle', resource: 'cities', action: 'update' },
+      { service: 'vehicle', resource: 'cities', action: 'delete' }
+    ],
+    children: [
+      {
+        text: 'City Dashboard',
+        icon: <DashboardIcon />,
+        path: '/city-dashboard',
+        requiredPermission: {
+          service: 'vehicle',
+          resource: 'cities',
+          action: 'read'
+        }
+      },
+      {
+        text: 'City Management',
+        icon: <CityIcon />,
+        path: '/cities',
+        requiredPermission: {
+          service: 'vehicle',
+          resource: 'cities',
+          action: 'read'
+        }
+      },
+    ],
+  },
+  // 9. Roles and Permissions
   {
     text: 'Roles & Permissions',
     icon: <SecurityIcon />,
@@ -494,14 +509,14 @@ const menuItems: MenuItem[] = [
       { service: 'auth', resource: 'permissions', action: 'read' }
     ]
   },
-  // 9. Profile
+  // 10. Profile
   {
     text: 'Profile',
     icon: <AccountCircleIcon />,
     path: '/profile',
     // Profile is always accessible to authenticated users
   },
-  // 10. Settings
+  // 11. Settings
   {
     text: 'Settings',
     icon: <SettingsIcon />,
