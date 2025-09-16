@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../index";
+import { City as PrismaCity } from "@prisma/client";
 import {
   City,
   CreateCityRequest,
@@ -48,23 +49,15 @@ export class CityService {
           timezone: data.timezone || "Asia/Kolkata",
           isActive: data.isActive ?? true,
           isOperational: data.isOperational ?? true,
+          marketPotential: data.marketPotential ?? null,
         },
       });
-
-      // Add event sourcing fields for return type compatibility
-      const cityWithEventFields = {
-        ...city,
-        version: 1,
-        lastModifiedBy: "system",
-        eventSequence: 0,
-        lastSyncAt: new Date(),
-      };
 
       Logger.info("City created successfully", {
         cityId: city.id,
         cityName: city.name,
       });
-      return cityWithEventFields;
+      return city as City;
     } catch (error) {
       Logger.error("Error creating city", error);
       if ((error as any)?.error) throw error;
@@ -81,7 +74,7 @@ export class CityService {
         where: { id },
       });
 
-      return city;
+      return city as City | null;
     } catch (error) {
       Logger.error("Error fetching city by ID", { cityId: id, error });
       throw ErrorHandler.handlePrismaError(error);
@@ -97,7 +90,7 @@ export class CityService {
         where: { code },
       });
 
-      return city;
+      return city as City | null;
     } catch (error) {
       Logger.error("Error fetching city by code", { cityCode: code, error });
       throw ErrorHandler.handlePrismaError(error);
@@ -250,11 +243,17 @@ export class CityService {
 
       const updatedCity = await prisma.city.update({
         where: { id },
-        data,
+        data: {
+          ...data,
+          marketPotential:
+            data.marketPotential !== undefined
+              ? data.marketPotential
+              : undefined,
+        },
       });
 
       Logger.info("City updated successfully", { cityId: id });
-      return updatedCity;
+      return updatedCity as City;
     } catch (error) {
       Logger.error("Error updating city", { cityId: id, error });
       if ((error as any)?.error) throw error;

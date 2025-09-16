@@ -8,6 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import clientRoutes from "./routes/clientRoutes";
 import storeRoutes from "./routes/storeRoutes";
 import citySyncRoutes from "./routes/citySyncRoutes";
+import cityRoutes from "./routes/cityRoutes";
 
 // Import middleware
 import { authMiddleware } from "./middleware/auth";
@@ -79,13 +80,19 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Public API Routes (no authentication required for dropdown data)
+app.use("/cities", cityRoutes);
+
 // Apply authentication middleware to API routes
 console.log("🔐 Enabling authentication middleware for all API routes");
 app.use("/api", authMiddleware);
 
-// API Routes
+// API Routes (protected)
 app.use("/api/clients", clientRoutes);
 app.use("/api/stores", storeRoutes);
+
+// Public API Routes (no authentication required for dropdown data)
+app.use("/api/v1/cities", cityRoutes);
 
 // Internal sync routes (no auth required for service-to-service communication)
 app.use("/internal", citySyncRoutes);

@@ -40,7 +40,7 @@ export interface CityEventData {
   isOperational: boolean;
   launchDate?: Date;
   estimatedPopulation?: number;
-  marketPotential?: string;
+  marketPotential?: number;
   version: number;
   lastModifiedBy?: string;
   eventSequence: number;

@@ -19,7 +19,7 @@ services:
       retries: 5
     networks:
       - ev91-network
-  
+
   redis:
     image: redis:7-alpine
     restart: always
@@ -34,7 +34,7 @@ services:
       retries: 5
     networks:
       - ev91-network
-  
+
   # Backend Services
   api-gateway:
     build:
@@ -262,7 +262,7 @@ services:
       - /app/node_modules
     networks:
       - ev91-network
-  
+
   # Frontend Services - Port Range 3000-3099
   admin-portal:
     build:
@@ -289,7 +289,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "19006:19006"  # Expo Metro bundler port
-      - "19001:19001"  # Expo DevTools port  
+      - "19001:19001"  # Expo DevTools port
     volumes:
       - ../apps/mobile-app:/app
       - /app/node_modules

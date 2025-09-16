@@ -147,7 +147,7 @@ model City {
 
   // Business Information
   estimatedPopulation Int?
-  marketPotential     String? // High, Medium, Low
+  marketPotential     Float? // Estimated market size in INR
 
   // Event Sourcing Fields (for cross-service synchronization)
   version           Int     @default(1) // For optimistic locking
@@ -161,6 +161,7 @@ model City {
 
   // Relationships
   hubs Hub[]
+  eventLogs CityEventLog[]
 
   @@map("cities")
   @@schema("vehicle")
@@ -991,6 +992,32 @@ enum WorkflowStepStatus {
   Skipped     @map("Skipped")
   Failed      @map("Failed")
 
+  @@schema("vehicle")
+}
+
+// City Event Log for sync recovery and event sourcing
+model CityEventLog {
+  id          String   @id @default(cuid())
+  eventId     String   @unique @map("event_id")
+  eventType   String   @map("event_type")
+  cityId      String   @map("city_id")
+  eventData   Json     @map("event_data")
+  timestamp   DateTime @default(now())
+  processed   Boolean  @default(false)
+  processedAt DateTime? @map("processed_at")
+  retryCount  Int      @default(0) @map("retry_count")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relation to City
+  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([cityId])
+  @@index([processed, retryCount, updatedAt])
+  @@index([timestamp])
+  @@map("city_event_logs")
   @@schema("vehicle")
 }
 

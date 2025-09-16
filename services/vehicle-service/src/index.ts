@@ -19,6 +19,7 @@ import vehicleModelRoutes from "./routes/vehicle-models";
 import cityRoutes from "./routes/cities";
 import hubRoutes from "./routes/hubs";
 import documentRoutes from "./routes/documents";
+import syncRecoveryRoutes from "./routes/syncRecovery";
 
 // Import middleware
 import { errorHandler } from "./middleware/errorHandler";
@@ -114,6 +115,7 @@ app.use("/api/v1/vehicle-models", authMiddleware, vehicleModelRoutes);
 app.use("/api/v1/cities", cityRoutes); // Temporarily remove auth for testing
 app.use("/api/v1/hubs", optionalAuth, hubRoutes);
 app.use("/api/v1/documents", authMiddleware, documentRoutes);
+app.use("/admin/sync", syncRecoveryRoutes); // Admin sync recovery endpoints (temporarily without auth for testing)
 
 // Legacy compatibility
 app.use("/vehicles", handoverRoutes); // Keep existing handover route

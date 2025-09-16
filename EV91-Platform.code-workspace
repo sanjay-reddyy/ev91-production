@@ -4,6 +4,10 @@
       "name": "🏗️ Root",
       "path": "."
     },
+     {
+      "name": "🚚 Vehicle Service",
+      "path": "./services/vehicle-service"
+    },
     {
       "name": "🔐 Auth Service",
       "path": "./services/auth-service"
@@ -13,12 +17,16 @@
       "path": "./services/client-store-service"
     },
     {
-      "name": "👥 Team Service",
-      "path": "./services/team-service"
-    },
-    {
       "name": "🚚 Rider Service",
       "path": "./services/rider-service"
+    },
+    {
+      "name": "⚙️ Spare Parts Service",
+      "path": "./services/spare-parts-service"
+    },
+    {
+      "name": "⚙️ API Gateway",
+      "path": "./apps/api-gateway"
     },
     {
       "name": "⚙️ Admin Portal",

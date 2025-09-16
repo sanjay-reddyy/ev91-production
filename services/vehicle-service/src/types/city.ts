@@ -20,7 +20,7 @@ export interface City {
   isOperational: boolean;
   launchDate: Date | null;
   estimatedPopulation: number | null;
-  marketPotential: string | null;
+  marketPotential: number | null;
   // Event Sourcing Fields
   version: number;
   lastModifiedBy: string | null;
@@ -46,7 +46,7 @@ export interface CreateCityRequest {
   isOperational?: boolean;
   launchDate?: Date;
   estimatedPopulation?: number;
-  marketPotential?: string;
+  marketPotential?: number;
 }
 
 // City update interface
@@ -65,7 +65,7 @@ export interface UpdateCityRequest {
   isOperational?: boolean;
   launchDate?: Date;
   estimatedPopulation?: number;
-  marketPotential?: string;
+  marketPotential?: number;
 }
 
 // City with Hub count
@@ -97,17 +97,11 @@ export interface CityFilters {
   isOperational?: boolean;
   state?: string;
   regionCode?: string;
-  marketPotential?: string;
+  marketPotential?: number;
   search?: string; // Search by name, displayName, or code
 }
 
 // City enums
-export enum CityMarketPotential {
-  HIGH = "High",
-  MEDIUM = "Medium",
-  LOW = "Low",
-}
-
 export enum CityRegion {
   NORTH = "North",
   SOUTH = "South",

@@ -102,7 +102,7 @@ Includes:
    ```bash
    # Windows
    .\infra\docker-manage.ps1 dev up
-   
+
    # Linux/Mac
    ./infra/docker-manage.sh dev up
    ```
@@ -222,7 +222,7 @@ Each service uses its own schema for isolation:
    ```bash
    # Check what's using a port
    netstat -ano | findstr :3000
-   
+
    # Kill process using port
    taskkill /PID <PID> /F
    ```
@@ -243,7 +243,7 @@ Each service uses its own schema for isolation:
    ```bash
    # Check service logs
    .\infra\docker-manage.ps1 dev logs
-   
+
    # Check service status
    .\infra\docker-manage.ps1 dev status
    ```

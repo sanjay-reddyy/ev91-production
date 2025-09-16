@@ -13,6 +13,7 @@ import {
 } from "../types/city";
 import { ErrorHandler, Logger } from "../utils";
 import { cityEventPublisher } from "../events/cityEventPublisher";
+import { EventStore } from "../services/eventStore";
 
 export class CityController {
   /**
@@ -54,6 +55,11 @@ export class CityController {
           cityEventData,
           "system"
         );
+
+        // Store event persistently for recovery
+        await EventStore.storeEvent(cityEvent);
+
+        // Attempt to publish to services
         await cityEventPublisher.publishCityEvent(cityEvent);
         Logger.info(`City created event published for city: ${city.id}`);
       } catch (eventError) {
@@ -100,7 +106,9 @@ export class CityController {
           : undefined,
         state: req.query.state as string,
         regionCode: req.query.regionCode as string,
-        marketPotential: req.query.marketPotential as string,
+        marketPotential: req.query.marketPotential
+          ? parseFloat(req.query.marketPotential as string)
+          : undefined,
         search: req.query.search as string,
       };
 
@@ -331,6 +339,11 @@ export class CityController {
           changes,
           "system"
         );
+
+        // Store event persistently for recovery
+        await EventStore.storeEvent(cityEvent);
+
+        // Attempt to publish to services
         await cityEventPublisher.publishCityEvent(cityEvent);
         Logger.info(`City updated event published for city: ${city.id}`);
       } catch (eventError) {

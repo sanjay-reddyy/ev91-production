@@ -21,7 +21,7 @@ services:
       retries: 5
     networks:
       - ev91-network
-  
+
   redis:
     image: redis:7-alpine
     restart: always
@@ -36,7 +36,7 @@ services:
       retries: 5
     networks:
       - ev91-network
-  
+
   # Load Balancer
   nginx:
     image: nginx:alpine
@@ -235,7 +235,7 @@ services:
         condition: service_healthy
     networks:
       - ev91-network
-  
+
   # Frontend Services
   admin-portal:
     build:

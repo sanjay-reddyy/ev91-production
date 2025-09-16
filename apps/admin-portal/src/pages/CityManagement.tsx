@@ -215,7 +215,7 @@ const CityManagement: React.FC = () => {
   };
 
   const handleEditCity = (city: ExtendedCity) => {
-    navigate(`/cities/edit/${city.id}`);
+    navigate(`/cities/${city.id}/edit`);
   };
 
   const handleDeleteCity = (city: ExtendedCity) => {
