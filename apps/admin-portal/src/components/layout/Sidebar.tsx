@@ -46,6 +46,7 @@ import {
   AttachMoney as CostTrackingIcon,
   MergeType as UnifiedServiceIcon,
   LocationOn as CityIcon,
+  ShoppingCart as OrderIcon,
 } from '@mui/icons-material'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useAuth } from '../../contexts/AuthContext'
@@ -432,7 +433,39 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
-  // 5. Clients & Stores
+  // 5. Order Management
+  {
+    text: 'Order Management',
+    icon: <OrderIcon />,
+    anyOfPermissions: [
+      { service: 'order', resource: 'orders', action: 'read' },
+      { service: 'order', resource: 'orders', action: 'manage' },
+      { service: 'order', resource: 'orders', action: 'create' }
+    ],
+    children: [
+      {
+        text: 'All Orders',
+        icon: <OrderIcon />,
+        path: '/orders',
+        requiredPermission: {
+          service: 'order',
+          resource: 'orders',
+          action: 'read'
+        }
+      },
+      {
+        text: 'Create New Order',
+        icon: <OrderIcon />,
+        path: '/orders/new',
+        requiredPermission: {
+          service: 'order',
+          resource: 'orders',
+          action: 'create'
+        }
+      }
+    ]
+  },
+  // 6. Clients & Stores
   {
     text: 'Clients & Stores',
     icon: <StoreIcon />,
@@ -442,7 +475,7 @@ const menuItems: MenuItem[] = [
       { service: 'client', resource: 'stores', action: 'read' }
     ]
   },
-  // 6. Employee Management
+  // 7. Employee Management
   {
     text: 'Employee Management',
     icon: <PeopleIcon />,
@@ -453,7 +486,7 @@ const menuItems: MenuItem[] = [
       { service: 'auth', resource: 'employees', action: 'manage' }
     ]
   },
-  // 7. Team and Department
+  // 8. Team and Department
   {
     text: 'Teams & Departments',
     icon: <GroupsIcon />,
@@ -465,7 +498,7 @@ const menuItems: MenuItem[] = [
       { service: 'auth', resource: 'departments', action: 'manage' }
     ]
   },
-  // 8. City Management
+  // 9. City Management
   {
     text: 'City Management',
     icon: <CityIcon />,
@@ -499,7 +532,7 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
-  // 9. Roles and Permissions
+  // 10. Roles and Permissions
   {
     text: 'Roles & Permissions',
     icon: <SecurityIcon />,
@@ -509,14 +542,14 @@ const menuItems: MenuItem[] = [
       { service: 'auth', resource: 'permissions', action: 'read' }
     ]
   },
-  // 10. Profile
+  // 11. Profile
   {
     text: 'Profile',
     icon: <AccountCircleIcon />,
     path: '/profile',
     // Profile is always accessible to authenticated users
   },
-  // 11. Settings
+  // 12. Settings
   {
     text: 'Settings',
     icon: <SettingsIcon />,

@@ -31,6 +31,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { vehicleService, Vehicle, MediaFile } from '../services/vehicleService';
 import { riderService } from '../services';
+import RiderHistoryTimeline from '../components/vehicles/RiderHistoryTimeline';
 
 interface ServiceRecord {
   id: string;
@@ -358,6 +359,7 @@ const VehicleProfile: React.FC = () => {
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="vehicle profile tabs">
             <Tab label="Basic Information" />
             <Tab label="Service History" />
+            <Tab label="Rider History" />
             <Tab label={`All Documents (${mediaFiles.length})`} />
             <Tab label={`Photos (${getMediaByType('photo').length})`} />
           </Tabs>
@@ -853,6 +855,11 @@ const VehicleProfile: React.FC = () => {
           </CardContent>
         </TabPanel>
 
+        {/* Rider History Tab */}
+        <TabPanel value={tabValue} index={2}>
+          <RiderHistoryTimeline vehicleId={vehicle.id} />
+        </TabPanel>
+
         {mediaLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
@@ -860,12 +867,12 @@ const VehicleProfile: React.FC = () => {
         ) : (
           <>
             {/* All Documents Tab */}
-            <TabPanel value={tabValue} index={2}>
+            <TabPanel value={tabValue} index={3}>
               {renderMediaGrid(mediaFiles, 'All Documents')}
             </TabPanel>
 
             {/* Photos Tab */}
-            <TabPanel value={tabValue} index={3}>
+            <TabPanel value={tabValue} index={4}>
               {renderMediaGrid(getMediaByType('photo'), 'Photos')}
             </TabPanel>
           </>

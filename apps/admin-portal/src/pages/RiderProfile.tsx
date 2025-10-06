@@ -29,6 +29,7 @@ import {
   DialogActions,
   TextField,
   FormControl,
+  Tooltip,
   InputLabel,
   Select,
   MenuItem,
@@ -46,9 +47,12 @@ import {
   Email as EmailIcon,
   LocationOn as LocationIcon,
   Visibility as VisibilityIcon,
+  Block as BlockIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material'
 import { useParams, useNavigate } from 'react-router-dom'
 import { riderService, Rider, RiderKYC, RiderOrder, RiderEarning, RiderEarningsSummary, VehicleAssignment, Hub } from '../services'
+import vehicleHistoryService, { RiderVehicleHistory } from '../services/vehicleHistoryService'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -76,6 +80,67 @@ function TabPanel(props: TabPanelProps) {
   )
 }
 
+// Helper function to get a display-friendly document type name
+const getDocumentTypeDisplay = (documentType: string): string => {
+  const documentTypes: Record<string, string> = {
+    'aadhaar': 'Aadhaar Card',
+    'pan': 'PAN Card',
+    'dl': 'Driving License',
+    'selfie': 'Identity Selfie',
+    'rc': 'Registration Certificate',
+    // Add any other document types here
+  };
+
+  return documentTypes[documentType.toLowerCase()] || documentType;
+};
+
+// Helper function to create sample KYC documents for testing if needed
+const createSampleKycDocuments = (riderId: string): RiderKYC[] => {
+  const baseUrl = 'https://placehold.co/600x400?text=Sample+';
+
+  return [
+    {
+      id: 'sample-aadhaar',
+      riderId: riderId,
+      documentType: 'aadhaar',
+      documentNumber: 'XXXX-XXXX-1234',
+      documentImageUrl: `${baseUrl}Aadhaar`,
+      verificationStatus: 'pending',
+      verificationDate: null,
+      verificationNotes: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      documentTypeDisplay: 'Aadhaar Card'
+    },
+    {
+      id: 'sample-pan',
+      riderId: riderId,
+      documentType: 'pan',
+      documentNumber: 'ABCDE1234F',
+      documentImageUrl: `${baseUrl}PAN`,
+      verificationStatus: 'pending',
+      verificationDate: null,
+      verificationNotes: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      documentTypeDisplay: 'PAN Card'
+    },
+    {
+      id: 'sample-selfie',
+      riderId: riderId,
+      documentType: 'selfie',
+      documentNumber: 'selfie-1234',
+      documentImageUrl: `${baseUrl}Selfie`,
+      verificationStatus: 'pending',
+      verificationDate: null,
+      verificationNotes: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      documentTypeDisplay: 'Identity Selfie'
+    }
+  ];
+};
+
 const RiderProfile: React.FC = () => {
   const { riderId } = useParams<{ riderId: string }>()
   const navigate = useNavigate()
@@ -88,6 +153,9 @@ const RiderProfile: React.FC = () => {
   const [availableVehicles, setAvailableVehicles] = useState<VehicleAssignment[]>([])
   const [availableHubs, setAvailableHubs] = useState<Hub[]>([])
   const [selectedHub, setSelectedHub] = useState('')
+  const [vehicleHistory, setVehicleHistory] = useState<RiderVehicleHistory[]>([])
+  const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false)
+  const [documentPreviewDialog, setDocumentPreviewDialog] = useState<{ open: boolean, url: string | null, title: string }>({ open: false, url: null, title: '' })
 
   const [loading, setLoading] = useState(true)
   const [vehiclesLoading, setVehiclesLoading] = useState(false)
@@ -112,13 +180,42 @@ const RiderProfile: React.FC = () => {
 
     try {
       setLoading(true)
+
+      // Add strong cache busting to ensure we get fresh data
+      const uniqueCacheBuster = `_cb=${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      console.log(`[RiderProfile] Loading fresh rider data with cache buster: ${uniqueCacheBuster}`);
+
+      // Make direct API call to bypass any caching
       const response = await riderService.getRiderById(riderId)
+
       if (response.success) {
-        setRider(response.data)
+        // Process the data before setting it in state
+        const originalIsActive = response.data.isActive;
+        const strictBooleanIsActive = originalIsActive === true;
+
+        const processedRider = {
+          ...response.data,
+          // Ensure isActive is a proper boolean with strict comparison
+          isActive: strictBooleanIsActive
+        };
+
+        console.log(`[RiderProfile] Loaded rider data:`, {
+          originalIsActive: originalIsActive,
+          originalType: typeof originalIsActive,
+          strictBooleanIsActive: strictBooleanIsActive,
+          processedIsActive: processedRider.isActive,
+          processedType: typeof processedRider.isActive,
+          buttonDisplay: strictBooleanIsActive ? "Deactivate Rider" : "Activate Rider"
+        });
+
+        setRider(processedRider);
+      } else {
+        console.error('[RiderProfile] Failed to load rider data:', response.message);
+        setSnackbar({ open: true, message: `Failed to load rider data: ${response.message}`, severity: 'error' })
       }
-    } catch (error) {
-      console.error('Error loading rider:', error)
-      setSnackbar({ open: true, message: 'Failed to load rider data', severity: 'error' })
+    } catch (error: any) {
+      console.error('[RiderProfile] Error loading rider:', error)
+      setSnackbar({ open: true, message: `Failed to load rider data: ${error.message}`, severity: 'error' })
     } finally {
       setLoading(false)
     }
@@ -128,12 +225,64 @@ const RiderProfile: React.FC = () => {
     if (!riderId) return
 
     try {
+      // Add cache busting to prevent stale data
+      const cacheBuster = Date.now().toString();
+      console.log(`[RiderProfile] Loading KYC documents for rider ${riderId} with cache buster ${cacheBuster}`)
+
       const response = await riderService.getRiderKYC(riderId)
+      console.log('[RiderProfile] KYC API response:', response)
+
       if (response.success) {
-        setKycDocuments(response.data)
+        // Process the documents to add display-friendly attributes
+        const processedDocuments = response.data.map(doc => {
+          // Add a human-readable document type display name
+          const documentTypeDisplay = getDocumentTypeDisplay(doc.documentType);
+
+          // Log each document for debugging
+          console.log('[RiderProfile] Processing KYC document:', {
+            id: doc.id,
+            type: doc.documentType,
+            status: doc.verificationStatus,
+            hasImage: !!doc.documentImageUrl
+          });
+
+          return {
+            ...doc,
+            documentTypeDisplay,
+            // Add any other display helper properties here
+          }
+        });
+
+        console.log(`[RiderProfile] Loaded ${processedDocuments.length} KYC documents`)
+
+        // If we have no documents but the API call succeeded, log this situation and use sample data for development
+        if (processedDocuments.length === 0) {
+          console.warn('[RiderProfile] No KYC documents returned from API despite successful call')
+
+          // Check if we should show sample data (enable for development/testing)
+          const showSampleData = window.location.search.includes('showSampleKYC=true');
+
+          if (showSampleData) {
+            // Generate sample documents for demonstration
+            const sampleDocuments = createSampleKycDocuments(riderId);
+            console.log('[RiderProfile] Using sample KYC documents for testing:', sampleDocuments.length);
+            setKycDocuments(sampleDocuments);
+          } else {
+            setKycDocuments([]);
+          }
+        } else {
+          setKycDocuments(processedDocuments);
+        }
+      } else {
+        console.warn(`[RiderProfile] Failed to load KYC documents: ${response.message}`)
+
+        // Set empty array to ensure UI shows the "no documents" message
+        setKycDocuments([])
       }
     } catch (error) {
-      console.error('Error loading KYC documents:', error)
+      console.error('[RiderProfile] Error loading KYC documents:', error)
+      // Set empty array to ensure UI shows the "no documents" message
+      setKycDocuments([])
     }
   }, [riderId])
 
@@ -225,14 +374,134 @@ const RiderProfile: React.FC = () => {
     }
   }, [])
 
+  // State for tracking toggle operation in progress
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+
+  // Handle toggling the rider's active status
+  const handleToggleRiderStatus = useCallback(async (riderId: string, currentStatus: boolean) => {
+    try {
+      // Set loading state to disable the button during the toggle operation
+      setIsTogglingStatus(true);
+
+      // Avoid optimistic UI update - wait for the actual response
+      console.log(`[RiderProfile] Starting toggle rider status: Current status=${currentStatus}, Will set to=${!currentStatus}`);
+
+      // Make the API call to update the database - toggle to the opposite of current status
+      const newStatus = !currentStatus;
+      console.log(`[RiderProfile] Toggle status from ${currentStatus} to ${newStatus} (types: ${typeof currentStatus} -> ${typeof newStatus})`);
+
+      const response = await riderService.toggleRiderStatus(riderId, newStatus);
+
+      if (response.success) {
+        // If the API call succeeded, use the returned data to update our state
+        const updatedRider = response.data;
+
+        // Ensure isActive is a proper boolean
+        if (updatedRider) {
+          updatedRider.isActive = updatedRider.isActive === true;
+        }
+
+        console.log("[RiderProfile] Rider status toggle API response:", {
+          riderId,
+          oldStatus: currentStatus,
+          requestedNewStatus: newStatus,
+          receivedIsActive: updatedRider.isActive,
+          buttonToDisplay: updatedRider.isActive === true ? "Deactivate Rider" : "Activate Rider"
+        });
+
+        // Update the local rider state with the fresh data
+        setRider(updatedRider);
+
+        setSnackbar({
+          open: true,
+          message: `Rider ${updatedRider.isActive === true ? 'activated' : 'deactivated'} successfully`,
+          severity: 'success'
+        });
+      } else {
+        // Display business validation error from the API
+        setSnackbar({
+          open: true,
+          message: response.message || 'Failed to update rider status',
+          severity: 'warning' // Using warning for business validation errors
+        });
+
+        // Force reload rider data to ensure UI is in sync with backend
+        await loadRiderData();
+      }
+    } catch (error: any) {
+      console.error("[RiderProfile] Error updating rider status:", error);
+
+      // Show error message - prioritize API response message if available
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update rider status';
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error'
+      });
+
+      // Force reload rider data to ensure UI is in sync with backend
+      await loadRiderData();
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  }, [loadRiderData])
+
+  const loadVehicleHistory = useCallback(async () => {
+    if (!riderId) return
+
+    try {
+      setVehicleHistoryLoading(true)
+      const response = await vehicleHistoryService.getRiderVehicleHistory(riderId)
+      if (response.success) {
+        setVehicleHistory(response.data)
+      }
+    } catch (error) {
+      console.error('Error loading vehicle history:', error)
+      setSnackbar({ open: true, message: 'Failed to load vehicle history', severity: 'error' })
+    } finally {
+      setVehicleHistoryLoading(false)
+    }
+  }, [riderId])
+
   useEffect(() => {
-    loadRiderData()
-    loadKYCDocuments()
-    loadOrders()
-    loadEarnings()
-    // Don't load vehicles initially - only load after hub selection
-    loadAvailableHubs()
-  }, [loadRiderData, loadKYCDocuments, loadOrders, loadEarnings, loadAvailableHubs])
+    // Initial data load
+    const loadAllData = async () => {
+      try {
+        await loadRiderData()
+
+        // Load KYC documents with extra debugging
+        console.log("[RiderProfile] Starting KYC documents load")
+        await loadKYCDocuments()
+
+        // Debug: Check if KYC documents were loaded
+        console.log("[RiderProfile] KYC documents loaded:", kycDocuments.length)
+
+        // Continue loading other data
+        loadOrders()
+        loadEarnings()
+        loadVehicleHistory()
+        // Don't load vehicles initially - only load after hub selection
+        loadAvailableHubs()
+
+        console.log("[RiderProfile] All rider data loaded successfully")
+      } catch (error) {
+        console.error("[RiderProfile] Error loading initial rider data:", error)
+      }
+    }
+
+    loadAllData()
+
+    // Set up a refresh interval for rider data to ensure we have the latest status
+    // This is especially important for the isActive status
+    const refreshInterval = setInterval(() => {
+      console.log("[RiderProfile] Refreshing rider data via interval...")
+      loadRiderData()
+    }, 15000) // Refresh every 15 seconds (reduced from 30 seconds)
+
+    // Clean up interval on component unmount
+    return () => clearInterval(refreshInterval)
+  }, [loadRiderData, loadKYCDocuments, loadOrders, loadEarnings, loadVehicleHistory, loadAvailableHubs])
 
   useEffect(() => {
     loadEarnings()
@@ -284,15 +553,55 @@ const RiderProfile: React.FC = () => {
     if (!riderId || !kycVerifyDialog.kyc) return
 
     try {
-      await riderService.verifyKYC(riderId, kycVerifyDialog.kyc.id, verificationStatus, verificationNotes)
-      setSnackbar({ open: true, message: 'KYC verification updated successfully', severity: 'success' })
-      setKycVerifyDialog({ open: false, kyc: null })
-      setVerificationNotes('')
-      loadKYCDocuments()
-      loadRiderData()
-    } catch (error) {
-      console.error('Error verifying KYC:', error)
-      setSnackbar({ open: true, message: 'Failed to verify KYC', severity: 'error' })
+      console.log(`[RiderProfile] Verifying KYC document ${kycVerifyDialog.kyc.id} with status ${verificationStatus}`)
+
+      // Show loading state during verification
+      setSnackbar({
+        open: true,
+        message: 'Processing verification request...',
+        severity: 'info'
+      })
+
+      // Call the API to verify the KYC document
+      const response = await riderService.verifyKYC(
+        riderId,
+        kycVerifyDialog.kyc.id,
+        verificationStatus,
+        verificationNotes
+      )
+
+      if (response.success) {
+        setSnackbar({
+          open: true,
+          message: `KYC document ${verificationStatus === 'verified' ? 'approved' : 'rejected'} successfully`,
+          severity: 'success'
+        })
+
+        // Close the dialog and reset the form
+        setKycVerifyDialog({ open: false, kyc: null })
+        setVerificationNotes('')
+        setVerificationStatus('verified') // Reset to default
+
+        // Reload KYC documents and rider data to reflect the changes
+        loadKYCDocuments()
+        loadRiderData()
+      } else {
+        console.error('[RiderProfile] KYC verification failed:', response.message)
+        setSnackbar({
+          open: true,
+          message: response.message || 'Failed to verify KYC document',
+          severity: 'error'
+        })
+      }
+    } catch (error: any) {
+      console.error('[RiderProfile] Error verifying KYC:', error)
+
+      // Show appropriate error message
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to verify KYC document. Please try again.',
+        severity: 'error'
+      })
     }
   }
 
@@ -363,14 +672,40 @@ const RiderProfile: React.FC = () => {
                 <Typography variant="body2" color="textSecondary" gutterBottom>
                   ID: {rider.id}
                 </Typography>
-                <Badge
-                  badgeContent={rider.isActive ? '●' : '○'}
-                  color={rider.isActive ? 'success' : 'error'}
-                >
-                  <Typography variant="body2">
-                    {rider.isActive ? 'Active' : 'Inactive'}
-                  </Typography>
-                </Badge>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <Tooltip title={`Current rider status (isActive=${rider.isActive}, type=${typeof rider.isActive})`}>
+                    <Badge
+                      badgeContent={rider.isActive === true ? '●' : '○'}
+                      color={rider.isActive === true ? 'success' : 'error'}
+                    >
+                      <Typography
+                        variant="body2"
+                      >
+                        {rider.isActive === true ? 'Active' : 'Inactive'}
+                      </Typography>
+                    </Badge>
+                  </Tooltip>
+                  {isTogglingStatus ? (
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      size="small"
+                      disabled={true}
+                    >
+                      <CircularProgress size={20} color="inherit" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      color={rider.isActive === true ? 'error' : 'success'}
+                      size="small"
+                      onClick={() => handleToggleRiderStatus(rider.id, rider.isActive)}
+                      startIcon={rider.isActive === true ? <BlockIcon /> : <CheckCircleIcon />}
+                    >
+                      {rider.isActive === true ? 'Deactivate Rider' : 'Activate Rider'}
+                    </Button>
+                  )}
+                </Box>
               </Box>
             </Grid>
             <Grid item xs={12} md={9}>
@@ -431,12 +766,14 @@ const RiderProfile: React.FC = () => {
       </Card>
 
       {/* Tabs */}
+      {/* Tabs - Force KYC Documents tab to always show */}
       <Paper sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} variant="scrollable">
           <Tab label="Rider Information" icon={<AccountCircleIcon />} />
           <Tab label="KYC Documents" icon={<AssignmentIcon />} />
           <Tab label="Orders" icon={<CalendarIcon />} />
           <Tab label="Earnings" icon={<AttachMoneyIcon />} />
+          <Tab label="Vehicle History" icon={<TwoWheelerIcon />} />
         </Tabs>
       </Paper>
 
@@ -627,68 +964,161 @@ const RiderProfile: React.FC = () => {
       <TabPanel value={tabValue} index={1}>
         {/* KYC Documents */}
         <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5">KYC Documents</Typography>
+              <Box>
+                <Chip
+                  label={`${kycDocuments.length} Documents`}
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  sx={{ mr: 1 }}
+                />
+                <Chip
+                  label={rider?.kycStatus || 'Unknown'}
+                  color={getStatusColor(rider?.kycStatus || 'pending') as any}
+                  size="small"
+                />
+              </Box>
+            </Box>
+          </Grid>
+
           {kycDocuments.length === 0 ? (
             <Grid item xs={12}>
-              <Alert severity="info">No KYC documents found for this rider.</Alert>
+              <Card sx={{ p: 3, mb: 3 }}>
+                <Alert severity="info" sx={{ mb: 3 }}>No KYC documents found for this rider.</Alert>
+
+                <Typography variant="body1" paragraph>
+                  The rider has not uploaded any KYC documents yet. KYC documents are required for rider verification and approval.
+                </Typography>
+
+                <Typography variant="body1" paragraph>
+                  Required documents include:
+                </Typography>
+
+                <Box component="ul" sx={{ mb: 3 }}>
+                  <li>Aadhaar Card</li>
+                  <li>PAN Card</li>
+                  <li>Driving License</li>
+                  <li>Identity Selfie</li>
+                </Box>
+
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+                  Current KYC Status: <Chip label={rider?.kycStatus || 'Unknown'} color={getStatusColor(rider?.kycStatus || 'pending') as any} size="small" />
+                </Typography>
+
+                {/* Add button to request KYC documents */}
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => setSnackbar({
+                      open: true,
+                      message: 'This feature will send a notification to the rider to upload KYC documents',
+                      severity: 'info'
+                    })}
+                    startIcon={<AssignmentIcon />}
+                  >
+                    Request KYC Documents
+                  </Button>
+                </Box>
+              </Card>
             </Grid>
           ) : (
-            kycDocuments.map((kyc) => (
-              <Grid item xs={12} md={6} key={kyc.id}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="h6">{kyc.documentType}</Typography>
-                      <Chip
-                        label={kyc.verificationStatus}
-                        color={getStatusColor(kyc.verificationStatus) as any}
-                        size="small"
-                      />
-                    </Box>
-                    <Stack spacing={2}>
-                      <Box>
-                        <Typography variant="body2" color="textSecondary">Document Number</Typography>
-                        <Typography variant="body1">{kyc.documentNumber}</Typography>
+            <>
+
+              {kycDocuments.map((kyc) => (
+                <Grid item xs={12} md={6} key={kyc.id}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h6">{kyc.documentTypeDisplay || kyc.documentType}</Typography>
+                        <Chip
+                          label={kyc.verificationStatus}
+                          color={getStatusColor(kyc.verificationStatus) as any}
+                          size="small"
+                        />
                       </Box>
-                      <Box>
-                        <Typography variant="body2" color="textSecondary">Submitted Date</Typography>
-                        <Typography variant="body1">{formatDate(kyc.createdAt)}</Typography>
-                      </Box>
-                      {kyc.verificationDate && (
-                        <Box>
-                          <Typography variant="body2" color="textSecondary">Verification Date</Typography>
-                          <Typography variant="body1">{formatDate(kyc.verificationDate)}</Typography>
+
+                      {kyc.documentImageUrl && kyc.documentType.toLowerCase() === 'selfie' && (
+                        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+                          <Box
+                            component="img"
+                            src={kyc.documentImageUrl}
+                            alt="Rider Selfie"
+                            sx={{
+                              width: 120,
+                              height: 120,
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '2px solid #eee',
+                              cursor: 'pointer',
+                              '&:hover': {
+                                opacity: 0.9,
+                                border: '2px solid #3f51b5'
+                              }
+                            }}
+                            onClick={() => setDocumentPreviewDialog({
+                              open: true,
+                              url: kyc.documentImageUrl || null,
+                              title: 'Rider Selfie'
+                            })}
+                          />
                         </Box>
                       )}
-                      {kyc.verificationNotes && (
+
+                      <Stack spacing={2}>
                         <Box>
-                          <Typography variant="body2" color="textSecondary">Verification Notes</Typography>
-                          <Typography variant="body1">{kyc.verificationNotes}</Typography>
+                          <Typography variant="body2" color="textSecondary">Document Number</Typography>
+                          <Typography variant="body1">{kyc.documentNumber || 'Not available'}</Typography>
                         </Box>
-                      )}
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        {kyc.documentImageUrl && (
-                          <Button
-                            variant="outlined"
-                            startIcon={<VisibilityIcon />}
-                            onClick={() => window.open(kyc.documentImageUrl!, '_blank')}
-                          >
-                            View Document
-                          </Button>
+                        <Box>
+                          <Typography variant="body2" color="textSecondary">Submitted Date</Typography>
+                          <Typography variant="body1">{formatDate(kyc.createdAt)}</Typography>
+                        </Box>
+                        {kyc.verificationDate && (
+                          <Box>
+                            <Typography variant="body2" color="textSecondary">Verification Date</Typography>
+                            <Typography variant="body1">{formatDate(kyc.verificationDate)}</Typography>
+                          </Box>
                         )}
-                        {kyc.verificationStatus === 'pending' && (
+                        {kyc.verificationNotes && (
+                          <Box>
+                            <Typography variant="body2" color="textSecondary">Verification Notes</Typography>
+                            <Typography variant="body1">{kyc.verificationNotes}</Typography>
+                          </Box>
+                        )}
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          {kyc.documentImageUrl && (
+                            <Button
+                              variant="outlined"
+                              startIcon={<VisibilityIcon />}
+                              onClick={() => setDocumentPreviewDialog({
+                                open: true,
+                                url: kyc.documentImageUrl || null,
+                                title: kyc.documentTypeDisplay || kyc.documentType
+                              })}
+                              size="small"
+                            >
+                              View Document
+                            </Button>
+                          )}
+                          {/* Always show Verify button regardless of status */}
                           <Button
                             variant="contained"
+                            size="small"
                             onClick={() => setKycVerifyDialog({ open: true, kyc })}
                           >
-                            Verify
+                            {kyc.verificationStatus === 'pending' ? 'Verify' : 'Review'}
                           </Button>
-                        )}
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </>
           )}
         </Grid>
       </TabPanel>
@@ -895,6 +1325,79 @@ const RiderProfile: React.FC = () => {
         </Grid>
       </TabPanel>
 
+      <TabPanel value={tabValue} index={4}>
+        {/* Vehicle History */}
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Vehicle Assignment History
+            </Typography>
+            {vehicleHistoryLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+              </Box>
+            ) : vehicleHistory.length === 0 ? (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                This rider has no vehicle assignment history.
+              </Alert>
+            ) : (
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Vehicle</TableCell>
+                      <TableCell>Registration Number</TableCell>
+                      <TableCell>Assigned Date</TableCell>
+                      <TableCell>Returned Date</TableCell>
+                      <TableCell>Duration</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Notes</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {vehicleHistory.map((history) => (
+                      <TableRow key={history.id}>
+                        <TableCell>
+                          <Link
+                            component="button"
+                            variant="body2"
+                            onClick={() => navigate(`/vehicle-profile/${history.vehicleId}`)}
+                            sx={{
+                              textDecoration: 'none',
+                              '&:hover': { textDecoration: 'underline' },
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <TwoWheelerIcon fontSize="small" sx={{ mr: 0.5 }} />
+                            {history.vehicle?.make || "Unknown"} {history.vehicle?.model || "Unknown"}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{history.registrationNumber || history.vehicle?.registrationNumber || "Unknown"}</TableCell>
+                        <TableCell>{formatDate(history.assignedAt)}</TableCell>
+                        <TableCell>{history.returnedAt ? formatDate(history.returnedAt) : 'Active'}</TableCell>
+                        <TableCell>
+                          {history.durationDays} {history.durationDays === 1 ? 'day' : 'days'}
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={history.status}
+                            color={history.status === 'ACTIVE' ? 'success' : 'default'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>{history.notes || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </CardContent>
+        </Card>
+      </TabPanel>
+
       {/* Vehicle Assignment Dialog */}
       <Dialog open={vehicleAssignDialog} onClose={() => setVehicleAssignDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Assign Vehicle to Rider</DialogTitle>
@@ -968,47 +1471,229 @@ const RiderProfile: React.FC = () => {
       </Dialog>
 
       {/* KYC Verification Dialog */}
-      <Dialog open={kycVerifyDialog.open} onClose={() => setKycVerifyDialog({ open: false, kyc: null })} maxWidth="sm" fullWidth>
-        <DialogTitle>Verify KYC Document</DialogTitle>
+      <Dialog
+        open={kycVerifyDialog.open}
+        onClose={() => setKycVerifyDialog({ open: false, kyc: null })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Verify KYC Document
+          <IconButton
+            aria-label="close"
+            onClick={() => setKycVerifyDialog({ open: false, kyc: null })}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
         <DialogContent>
           {kycVerifyDialog.kyc && (
-            <Stack spacing={3} sx={{ mt: 2 }}>
-              <Box>
-                <Typography variant="body2" color="textSecondary">Document Type</Typography>
-                <Typography variant="body1">{kycVerifyDialog.kyc.documentType}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="body2" color="textSecondary">Document Number</Typography>
-                <Typography variant="body1">{kycVerifyDialog.kyc.documentNumber}</Typography>
-              </Box>
-              <FormControl fullWidth>
-                <InputLabel>Verification Status</InputLabel>
-                <Select
-                  value={verificationStatus}
-                  label="Verification Status"
-                  onChange={(e) => setVerificationStatus(e.target.value as 'verified' | 'rejected')}
+            <Grid container spacing={3} sx={{ mt: 0.5 }}>
+              {/* Document details */}
+              <Grid item xs={12} md={6}>
+                <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="body2" color="textSecondary">Document Type</Typography>
+                    <Typography variant="subtitle1" fontWeight="medium">
+                      {getDocumentTypeDisplay(kycVerifyDialog.kyc.documentType)}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="textSecondary">Document Number</Typography>
+                    <Typography variant="subtitle1" fontWeight="medium">
+                      {kycVerifyDialog.kyc.documentNumber || 'Not available'}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="textSecondary">Submitted Date</Typography>
+                    <Typography variant="subtitle1">
+                      {formatDate(kycVerifyDialog.kyc.createdAt)}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="textSecondary">Current Status</Typography>
+                    <Chip
+                      label={kycVerifyDialog.kyc.verificationStatus}
+                      color={getStatusColor(kycVerifyDialog.kyc.verificationStatus) as any}
+                      size="small"
+                      sx={{ mt: 0.5 }}
+                    />
+                  </Box>
+
+                  <FormControl fullWidth>
+                    <InputLabel>Verification Decision</InputLabel>
+                    <Select
+                      value={verificationStatus}
+                      label="Verification Decision"
+                      onChange={(e) => setVerificationStatus(e.target.value as 'verified' | 'rejected')}
+                    >
+                      <MenuItem value="verified">
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <CheckCircleIcon color="success" sx={{ mr: 1 }} />
+                          Verified
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value="rejected">
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <BlockIcon color="error" sx={{ mr: 1 }} />
+                          Rejected
+                        </Box>
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <TextField
+                    fullWidth
+                    label="Verification Notes"
+                    value={verificationNotes}
+                    onChange={(e) => setVerificationNotes(e.target.value)}
+                    multiline
+                    rows={3}
+                    placeholder={verificationStatus === 'rejected' ?
+                      "Please provide a reason for rejection..." :
+                      "Add any notes about the verification..."}
+                    required={verificationStatus === 'rejected'}
+                    error={verificationStatus === 'rejected' && !verificationNotes}
+                    helperText={verificationStatus === 'rejected' && !verificationNotes ?
+                      "Reason is required when rejecting a document" : ""}
+                  />
+                </Stack>
+              </Grid>
+
+              {/* Document preview */}
+              <Grid item xs={12} md={6}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    p: 2
+                  }}
                 >
-                  <MenuItem value="verified">Verified</MenuItem>
-                  <MenuItem value="rejected">Rejected</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Verification Notes"
-                value={verificationNotes}
-                onChange={(e) => setVerificationNotes(e.target.value)}
-                multiline
-                rows={3}
-                placeholder="Add notes about the verification..."
-              />
-            </Stack>
+                  {kycVerifyDialog.kyc.documentImageUrl ? (
+                    <Box sx={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <Typography variant="body2" color="textSecondary" sx={{ mb: 1, textAlign: 'center' }}>
+                        Document Preview
+                      </Typography>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          overflow: 'hidden',
+                          mb: 1
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={kycVerifyDialog.kyc.documentImageUrl}
+                          alt={kycVerifyDialog.kyc.documentType}
+                          sx={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain'
+                          }}
+                        />
+                      </Box>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => window.open(kycVerifyDialog.kyc!.documentImageUrl!, '_blank')}
+                      >
+                        View Full Size
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="body2" color="textSecondary">
+                        No document image available for preview
+                      </Typography>
+                    </Box>
+                  )}
+                </Paper>
+              </Grid>
+            </Grid>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setKycVerifyDialog({ open: false, kyc: null })}>Cancel</Button>
-          <Button onClick={handleVerifyKYC} variant="contained">
-            Submit Verification
+          <Button
+            onClick={handleVerifyKYC}
+            variant="contained"
+            color={verificationStatus === 'verified' ? 'primary' : 'error'}
+            disabled={verificationStatus === 'rejected' && !verificationNotes}
+          >
+            {verificationStatus === 'verified' ? 'Verify Document' : 'Reject Document'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Document Preview Dialog */}
+      <Dialog
+        open={documentPreviewDialog.open}
+        onClose={() => setDocumentPreviewDialog({ ...documentPreviewDialog, open: false })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {documentPreviewDialog.title}
+          <IconButton
+            aria-label="close"
+            onClick={() => setDocumentPreviewDialog({ ...documentPreviewDialog, open: false })}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {documentPreviewDialog.url && (
+            <Box sx={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              p: 2
+            }}>
+              <Box
+                component="img"
+                src={documentPreviewDialog.url}
+                alt={documentPreviewDialog.title}
+                sx={{
+                  maxWidth: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain'
+                }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDocumentPreviewDialog({ ...documentPreviewDialog, open: false })}>Close</Button>
+          {documentPreviewDialog.url && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => window.open(documentPreviewDialog.url!, '_blank')}
+            >
+              Open Full Size
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

@@ -70,6 +70,14 @@ router.all("/*", async (req: Request, res: Response) => {
       "multipart/form-data"
     );
 
+    // Debug log for search parameter
+    console.log("🔍 API GATEWAY DEBUG: Request query params:", req.query);
+    if (req.query.search) {
+      console.log(
+        `🔍 API GATEWAY DEBUG: Search parameter: "${req.query.search}"`
+      );
+    }
+
     let axiosConfig: any = {
       method: req.method as any,
       url: targetUrl,
@@ -77,8 +85,12 @@ router.all("/*", async (req: Request, res: Response) => {
         ...req.headers,
         host: undefined, // Remove host header to avoid conflicts
       },
+      params: req.query, // Explicitly include query parameters
       timeout: 30000, // Increased timeout for file uploads
     };
+
+    // Always explicitly forward query parameters
+    axiosConfig.params = req.query;
 
     if (isFileUpload) {
       // For file uploads, stream the request data directly
@@ -88,6 +100,13 @@ router.all("/*", async (req: Request, res: Response) => {
     } else {
       // For regular requests, use req.body
       axiosConfig.data = req.body;
+    }
+
+    // Debug log for search parameter
+    if (req.query.search) {
+      console.log(
+        `🔍 API Gateway: Found search parameter: "${req.query.search}"`
+      );
     }
 
     const response = await axios(axiosConfig);

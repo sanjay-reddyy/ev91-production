@@ -27,20 +27,8 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { sparePartsService, suppliersService } from '../services/sparePartsService';
+import { sparePartsService, suppliersService, categoriesService } from '../services/sparePartsService';
 import { vehicleModelService } from '../services/vehicleModelService';
-
-// Mock categories for now - can be replaced with actual API call
-const MOCK_CATEGORIES = [
-  { id: 'cat1', name: 'ENGINE', displayName: 'Engine Components', code: 'ENG' },
-  { id: 'cat2', name: 'BRAKE', displayName: 'Brake System', code: 'BRK' },
-  { id: 'cat3', name: 'ELECTRICAL', displayName: 'Electrical Components', code: 'ELC' },
-  { id: 'cat4', name: 'BODY', displayName: 'Body Parts', code: 'BDY' },
-  { id: 'cat5', name: 'SUSPENSION', displayName: 'Suspension System', code: 'SUS' },
-  { id: 'cat6', name: 'TRANSMISSION', displayName: 'Transmission System', code: 'TRN' },
-  { id: 'cat7', name: 'COOLING', displayName: 'Cooling System', code: 'COL' },
-  { id: 'cat8', name: 'FUEL', displayName: 'Fuel System', code: 'FUL' },
-];
 
 const QUALITY_GRADES = [
   { value: 'A', label: 'Grade A - Premium Quality' },
@@ -575,6 +563,18 @@ const SparePartFormPage: React.FC = () => {
     }
   );
 
+  // Fetch categories from API
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading
+  } = useQuery(
+    ['categories'],
+    () => categoriesService.getAll(),
+    {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    }
+  );
+
   // Fetch vehicle models
   const { data: vehicleModelsData } = useQuery(
     ['vehicleModels'],
@@ -640,6 +640,15 @@ const SparePartFormPage: React.FC = () => {
   );
 
   const suppliers = suppliersData?.data?.suppliers || [];
+
+  // Get categories from API response or use fallback
+  // The structure needs to match what BasicInfoStep expects: array of {id, displayName, code}
+  const categories = categoriesData?.data?.categories || [];
+
+  // Log categories for debugging
+  console.log('Available categories:', categories);
+  console.log('Categories loading state:', categoriesLoading);
+  console.log('Categories data raw:', categoriesData);
 
   // Stepper navigation removed
 
@@ -752,8 +761,9 @@ const SparePartFormPage: React.FC = () => {
               <BasicInfoStep
                 control={basicInfoForm.control}
                 errors={basicInfoForm.formState.errors}
-                categories={MOCK_CATEGORIES}
+                categories={categories}
                 suppliers={suppliers}
+                loading={categoriesLoading}
               />
             </CardContent>
           </Card>
@@ -792,7 +802,7 @@ const SparePartFormPage: React.FC = () => {
               <Typography variant="h6" gutterBottom>Review & Submit</Typography>
               <ReviewStep
                 values={combineFormData()}
-                categories={MOCK_CATEGORIES}
+                categories={categories}
                 suppliers={suppliers}
                 vehicleModels={vehicleModels}
               />
@@ -848,13 +858,7 @@ const SparePartFormPage: React.FC = () => {
       </Card>
 
       {/* Stage-wise Form */}
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        // Only allow submit on last step
-        if (activeStep === steps.length - 1) {
-          onSubmit();
-        }
-      }}>
+      <div>
         {renderStepContent(activeStep)}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
           <Button
@@ -868,11 +872,12 @@ const SparePartFormPage: React.FC = () => {
           </Button>
           {activeStep === steps.length - 1 ? (
             <Button
-              type="submit"
+              type="button"
               variant="contained"
               color="primary"
               disabled={loading || existingSparePartLoading}
               startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
+              onClick={onSubmit}
             >
               {loading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Part' : 'Create Part')}
             </Button>
@@ -886,7 +891,7 @@ const SparePartFormPage: React.FC = () => {
             </Button>
           )}
         </Box>
-      </form>
+      </div>
 
       {/* Snackbar */}
       <Snackbar

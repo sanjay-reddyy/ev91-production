@@ -1,19 +1,235 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["orders"]
 }
 
-model Job {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  vehicleId  Int
-  status     String
-  startedAt  DateTime
-  endedAt    DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model City {
+  id                   String    @id @default(cuid())
+  name                 String    @unique
+  display_name         String
+  code                 String    @unique
+  state                String
+  country              String    @default("India")
+  timezone             String    @default("Asia/Kolkata")
+  latitude             Float
+  longitude            Float
+  pin_code_range       String?
+  region_code          String?
+  is_active            Boolean   @default(true)
+  is_operational       Boolean   @default(true)
+  launch_date          DateTime? @db.Timestamp(6)
+  estimated_population Int?
+  market_potential     String?
+  version              Int       @default(1)
+  last_modified_by     String?
+  event_sequence       Int       @default(0)
+  last_sync_at         DateTime  @default(now()) @db.Timestamp(6)
+  created_at           DateTime  @default(now()) @db.Timestamp(6)
+  updated_at           DateTime  @db.Timestamp(6)
+  orders               Order[]
+
+  @@map("cities")
+  @@schema("orders")
+}
+
+model Order {
+  id                       String              @id @default(cuid())
+  order_number             String              @unique
+  client_id                String
+  client_name              String
+  client_code              String
+  store_id                 String
+  store_name               String
+  store_code               String
+  store_address            String?
+  city_id                  String
+  city_name                String
+  rider_id                 String?
+  rider_name               String?
+  rider_phone              String?
+  order_type               String
+  order_source             String
+  priority                 String              @default("NORMAL")
+  status                   String              @default("CREATED")
+  status_reason            String?
+  status_history           String?
+  created_at               DateTime            @default(now()) @db.Timestamp(6)
+  updated_at               DateTime            @db.Timestamp(6)
+  assigned_at              DateTime?           @db.Timestamp(6)
+  picked_at                DateTime?           @db.Timestamp(6)
+  delivered_at             DateTime?           @db.Timestamp(6)
+  estimated_pickup_time    DateTime?           @db.Timestamp(6)
+  estimated_delivery_time  DateTime?           @db.Timestamp(6)
+  scheduled_for            DateTime?           @db.Timestamp(6)
+  customer_name            String?
+  customer_phone           String?
+  customer_email           String?
+  pickup_address           String?
+  pickup_latitude          Float?
+  pickup_longitude         Float?
+  delivery_address         String?
+  delivery_latitude        Float?
+  delivery_longitude       Float?
+  distance                 Float?
+  payment_method           String
+  payment_status           String              @default("PENDING")
+  order_value              Float
+  delivery_fee             Float               @default(0)
+  total_amount             Float
+  currency                 String              @default("INR")
+  vehicle_id               String?
+  vehicle_type             String?
+  battery_level            Int?
+  battery_consumed         Int?
+  item_count               Int                 @default(1)
+  item_summary             String?
+  special_instructions     String?
+  rider_rating             Float?
+  customer_rating          Float?
+  rider_feedback           String?
+  customer_feedback        String?
+  tags                     String?
+  notes                    String?
+  cancelled_by             String?
+  failure_reason           String?
+  synced_with_rider        Boolean             @default(false)
+  synced_with_client_store Boolean             @default(false)
+  last_sync_attempt        DateTime?           @db.Timestamp(6)
+  order_items              OrderItem[]
+  order_payments           OrderPayment?
+  order_status_updates     OrderStatusUpdate[]
+  order_tracking           OrderTracking?
+  cities                   City                @relation(fields: [city_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([client_id, store_id, rider_id, status], map: "idx_orders_composite")
+  @@index([order_number], map: "idx_orders_order_number")
+  @@map("orders")
+  @@schema("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  order_id    String
+  name        String
+  description String?
+  sku         String?
+  quantity    Int      @default(1)
+  unit_price  Float
+  total_price Float
+  status      String   @default("ORDERED")
+  notes       String?
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @db.Timestamp(6)
+  orders      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("order_items")
+  @@schema("orders")
+}
+
+model OrderStatusUpdate {
+  id              String   @id @default(cuid())
+  order_id        String
+  from_status     String
+  to_status       String
+  reason          String?
+  notes           String?
+  updated_by      String?
+  updated_by_name String?
+  ip_address      String?
+  user_agent      String?
+  created_at      DateTime @default(now()) @db.Timestamp(6)
+  orders          Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("order_status_updates")
+  @@schema("orders")
+}
+
+model OrderTracking {
+  id                  String    @id @default(cuid())
+  order_id            String    @unique
+  current_location    String?
+  current_latitude    Float?
+  current_longitude   Float?
+  last_updated_at     DateTime  @default(now()) @db.Timestamp(6)
+  estimated_arrival   DateTime? @db.Timestamp(6)
+  delay_minutes       Int?      @default(0)
+  delay_reason        String?
+  location_history    String?
+  checkpoints         String?
+  public_tracking_id  String?   @unique
+  public_tracking_url String?
+  orders              Order     @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("order_tracking")
+  @@schema("orders")
+}
+
+model OrderPayment {
+  id                    String    @id @default(cuid())
+  order_id              String    @unique
+  payment_method        String
+  payment_status        String    @default("PENDING")
+  amount                Float
+  currency              String    @default("INR")
+  transaction_id        String?
+  payment_gateway       String?
+  payment_url           String?
+  gateway_response      String?
+  paid_at               DateTime? @db.Timestamp(6)
+  payment_due_by        DateTime? @db.Timestamp(6)
+  payer_name            String?
+  payer_phone           String?
+  payer_email           String?
+  is_refunded           Boolean   @default(false)
+  refund_amount         Float?
+  refund_reason         String?
+  refunded_at           DateTime? @db.Timestamp(6)
+  refund_transaction_id String?
+  created_at            DateTime  @default(now()) @db.Timestamp(6)
+  updated_at            DateTime  @db.Timestamp(6)
+  orders                Order     @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("order_payments")
+  @@schema("orders")
+}
+
+model OrderEvent {
+  id               String    @id @default(cuid())
+  order_id         String
+  order_number     String
+  event_type       String
+  event_data       String
+  target_service   String
+  process_status   String    @default("PENDING")
+  process_attempts Int       @default(0)
+  last_attempt_at  DateTime? @db.Timestamp(6)
+  processed_at     DateTime? @db.Timestamp(6)
+  error_details    String?
+  created_at       DateTime  @default(now()) @db.Timestamp(6)
+  updated_at       DateTime  @db.Timestamp(6)
+
+  @@index([order_id, process_status], map: "idx_order_events_order_status")
+  @@index([target_service, process_status], map: "idx_order_events_service_status")
+  @@map("order_events")
+  @@schema("orders")
+}
+
+model CityEventLog {
+  id           String    @id @default(cuid())
+  city_id      String
+  event_type   String
+  event_data   String
+  processed    Boolean   @default(false)
+  processed_at DateTime? @db.Timestamp(6)
+  created_at   DateTime  @default(now()) @db.Timestamp(6)
+
+  @@index([processed], map: "idx_city_event_log_processed")
+  @@map("city_event_log")
+  @@schema("orders")
 }

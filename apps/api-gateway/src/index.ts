@@ -13,6 +13,7 @@ import hubRoutes from "./routes/hubs";
 import clientStoreRoutes from "./routes/client-store";
 import riderRoutes from "./routes/riders";
 import sparePartsRoutes from "./routes/spare-parts";
+import orderRoutes from "./routes/orders";
 
 // Import middleware
 import { authMiddleware } from "./middleware/auth";
@@ -219,6 +220,7 @@ app.get("/", (req: Request, res: Response) => {
       "v1-employees": "/api/v1/employees/*",
       "v1-teams": "/api/v1/teams/*",
       "v1-departments": "/api/v1/departments/*",
+      orders: "/api/orders/*",
       internal: "/api/internal/*",
     },
   });
@@ -264,6 +266,7 @@ app.use("/api/stores", authMiddleware);
 app.use("/api/riders", authMiddleware);
 app.use("/api/rider-earnings", authMiddleware);
 app.use("/api/spare-parts", authMiddleware);
+app.use("/api/orders", authMiddleware);
 
 // Route configuration
 app.use("/api/auth", authRoutes);
@@ -292,6 +295,7 @@ app.use("/api/cities", hubRoutes); // Cities are handled by hub service
 app.use("/api", clientStoreRoutes); // Handles /clients, /stores, /rider-earnings
 app.use("/api/riders", riderRoutes);
 app.use("/api/spare-parts", sparePartsRoutes);
+app.use("/api/orders", orderRoutes);
 
 // 404 handler
 app.use("*", (req: Request, res: Response) => {

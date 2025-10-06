@@ -4,7 +4,7 @@ import axios from "axios";
 const router: Router = express.Router();
 
 const SPARE_PARTS_SERVICE_URL =
-  process.env.SPARE_PARTS_SERVICE_URL || "http://localhost:4006";
+  process.env.SPARE_PARTS_SERVICE_URL || "http://localhost:4010";
 
 // Proxy all spare parts requests to spare parts service
 router.all("/*", async (req: Request, res: Response) => {
@@ -39,6 +39,9 @@ router.all("/*", async (req: Request, res: Response) => {
         targetPath = `/api/v1${cleanPath}`;
       } else if (cleanPath.startsWith("/dashboard")) {
         // /api/spare-parts/dashboard -> /api/v1/dashboard
+        targetPath = `/api/v1${cleanPath}`;
+      } else if (cleanPath.startsWith("/categories")) {
+        // /api/spare-parts/categories -> /api/v1/categories
         targetPath = `/api/v1${cleanPath}`;
       } else {
         // Default: assume it's a spare-parts-specific endpoint

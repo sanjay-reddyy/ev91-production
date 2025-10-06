@@ -7,6 +7,11 @@ import { Box, CircularProgress } from '@mui/material'
 import Login from './pages/Login'
 import Layout from './components/layout/Layout'
 
+// Import Order Management pages
+import OrderList from './pages/OrderList'
+import OrderDetail from './pages/OrderDetail'
+import OrderForm from './pages/OrderForm'
+
 // Import auth components
 import SignUpForm from './components/auth/SignUpForm'
 import ForgotPasswordForm from './components/auth/ForgotPasswordForm'
@@ -22,6 +27,7 @@ import ClientStoreManagement from './pages/ClientStoreManagement'
 import RiderEarnings from './pages/RiderEarnings'
 import RiderManagement from './pages/RiderManagement'
 import RiderProfile from './pages/RiderProfile'
+import RiderDetail from './pages/RiderDetail'
 
 // Vehicle Management Pages
 import VehicleDashboard from './pages/VehicleDashboard'
@@ -176,7 +182,7 @@ const App: React.FC = () => {
                 <Route path="/stores" element={<ClientStoreManagement />} />
                 <Route path="/rider-earnings" element={<RiderEarnings />} />
                 <Route path="/rider-management" element={<RiderManagement />} />
-                <Route path="/rider-management/:riderId" element={<RiderProfile />} />
+                <Route path="/rider-management/:riderId" element={<RiderDetail />} />
 
                 {/* Vehicle Management Routes */}
                 <Route path="/vehicle-dashboard" element={<VehicleDashboard />} />
@@ -240,6 +246,12 @@ const App: React.FC = () => {
                 <Route path="/spare-parts/outward/approvals" element={<ApprovalManagement />} />
                 <Route path="/spare-parts/outward/installations" element={<InstallationManagement />} />
                 <Route path="/spare-parts/outward/cost-tracking" element={<CostTrackingManagement />} />
+
+                {/* Order Management Routes */}
+                <Route path="/orders" element={<OrderList />} />
+                <Route path="/orders/new" element={<OrderForm />} />
+                <Route path="/orders/:id/edit" element={<OrderForm />} />
+                <Route path="/orders/:id" element={<OrderDetail />} />
 
                 {/* Debug Routes */}
                 <Route path="/debug/vehicle-api" element={<DebugVehicleAPI />} />

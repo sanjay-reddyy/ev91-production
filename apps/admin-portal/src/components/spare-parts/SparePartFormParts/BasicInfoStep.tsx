@@ -7,9 +7,10 @@ interface BasicInfoStepProps {
   errors: any;
   categories: Array<{ id: string; displayName: string; code: string }>;
   suppliers: Array<{ id: string; name: string }>;
+  loading?: boolean;
 }
 
-const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ control, errors, categories, suppliers }) => (
+const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ control, errors, categories, suppliers, loading }) => (
   <>
     <Grid container spacing={2}>
       <Grid item xs={12}>
@@ -76,19 +77,44 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ control, errors, categori
       <Controller
         name="categoryId"
         control={control}
-        render={({ field }) => (
-          <FormControl fullWidth error={!!errors.categoryId} required>
-            <InputLabel>Category</InputLabel>
-            <Select {...field} label="Category">
-              {categories.map((category) => (
-                <MenuItem key={category.id} value={category.id}>
-                  {category.displayName}
-                </MenuItem>
-              ))}
-            </Select>
-            <FormHelperText>{errors.categoryId?.message}</FormHelperText>
-          </FormControl>
-        )}
+        render={({ field }) => {
+          // Reset value if we have no categories but field has a value
+          if (categories.length === 0 && field.value) {
+            field.onChange('');
+          }
+
+          return (
+            <FormControl fullWidth error={!!errors.categoryId} required>
+              <InputLabel>Category</InputLabel>
+              <Select
+                {...field}
+                label="Category"
+                disabled={loading}
+              >
+                {loading ? (
+                  <MenuItem value="">
+                    <em>Loading categories...</em>
+                  </MenuItem>
+                ) : categories.length > 0 ? (
+                  categories.map((category) => (
+                    <MenuItem key={category.id} value={category.id}>
+                      {category.displayName}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem value="">
+                    <em>No categories available</em>
+                  </MenuItem>
+                )}
+              </Select>
+              <FormHelperText>
+                {errors.categoryId?.message ||
+                (loading ? 'Loading categories...' :
+                (categories.length === 0 ? 'No categories available, please create some first' : ''))}
+              </FormHelperText>
+            </FormControl>
+          );
+        }}
       />
     </Grid>
   <Grid item xs={12} md={6}>

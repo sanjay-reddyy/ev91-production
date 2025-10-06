@@ -61,7 +61,8 @@ model Rider {
   id            String   @id @default(uuid())
   phone         String   @unique
   phoneVerified Boolean  @default(false)
-  registrationStatus String @default("PENDING") // PENDING, PHONE_VERIFIED, KYC_COMPLETED
+  registrationStatus String @default("PENDING") // PENDING, PHONE_VERIFIED, KYC_COMPLETED, COMPLETED
+  isActive      Boolean  @default(false) // Decoupled activation status from registration status
 
   // User data
   name          String?
@@ -101,8 +102,91 @@ model Rider {
 
   // Timestamps
   createdAt     DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt     DateTime @updatedAt
 
+  // Relationships
+  vehicleHistory RiderVehicleHistory[] // Relationship to vehicle assignment history
+  kycDocuments   KycDocument[]         // Relationship to KYC documents
+
+  @@schema("rider")
+}
+
+// Vehicle Assignment History - Tracks all vehicle assignments for riders
+model RiderVehicleHistory {
+  id            String   @id @default(uuid())
+  riderId       String
+  vehicleId     String   // ID from vehicle-service
+
+  // Assignment Details
+  assignedAt    DateTime @default(now())
+  returnedAt    DateTime?
+  assignedBy    String   // User ID who assigned the vehicle
+  returnedBy    String?  // User ID who processed the return
+
+  // Vehicle Information (denormalized from vehicle-service for faster retrieval)
+  registrationNumber String
+  vehicleMake        String? // Brand name (Honda, Ola, etc.)
+  vehicleModel       String? // Model name (Activa, S1 Pro, etc.)
+
+  // Status and Metadata
+  status            String @default("ACTIVE") // ACTIVE, RETURNED
+  notes             String? // Assignment/return notes
+  hubId             String? // Hub where vehicle was assigned from
+
+  // Performance and Usage Data
+  startMileage      Int?   // Mileage reading at assignment
+  endMileage        Int?   // Mileage reading at return
+  batteryPercentageStart Int?
+  batteryPercentageEnd   Int?
+
+  // Maintenance Information
+  conditionOnAssign String? // Excellent, Good, Fair, Poor
+  conditionOnReturn String?
+  damagesReported   String? // JSON array of reported damages
+
+  // Issues and Feedback
+  riderFeedback     String? // Rider's feedback on the vehicle
+  issuesReported    String? // JSON array of reported issues
+
+  // Audit and Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  rider     Rider   @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@index([riderId])
+  @@index([vehicleId])
+  @@index([status])
+  @@index([assignedAt])
+  @@map("rider_vehicle_history")
+  @@schema("rider")
+}
+
+// KYC Documents - Stores document uploads and verification status
+model KycDocument {
+  id                 String    @id @default(uuid())
+  riderId            String
+  documentType       String    // aadhaar, pan, dl, selfie
+  documentTypeDisplay String?  // Display name for the document type
+  documentNumber     String?   // Document identification number
+  documentImageUrl   String?   // URL to the document image in S3
+  verificationStatus String    @default("pending") // pending, verified, rejected
+  verificationDate   DateTime?
+  verificationNotes  String?
+  verifiedBy         String?   // Admin user who verified the document
+
+  // Audit and Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  rider     Rider   @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@index([riderId])
+  @@index([documentType])
+  @@index([verificationStatus])
+  @@map("kyc_documents")
   @@schema("rider")
 }
 

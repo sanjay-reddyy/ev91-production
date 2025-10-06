@@ -401,44 +401,101 @@ export class VehicleService {
     vehicles: VehicleResponse[];
     pagination: any;
   }> {
+    Logger.info("getVehicles called with params:", params);
+
+    // Sanitize and validate query parameters
     const { page, limit, skip } = PaginationHelper.sanitizeQueryParams(params);
+
+    // Validate sorting parameters
+    const validSortFields = [
+      "createdAt",
+      "updatedAt",
+      "registrationNumber",
+      "ageInMonths",
+      "mileage",
+      "operationalStatus",
+      "serviceStatus",
+    ];
+    const sortBy =
+      params.sortBy && validSortFields.includes(params.sortBy)
+        ? params.sortBy
+        : "createdAt";
+
+    const sortOrder = params.sortOrder === "asc" ? "asc" : "desc";
+
+    Logger.debug("Pagination and sorting parameters:", {
+      page,
+      limit,
+      skip,
+      sortBy,
+      sortOrder,
+    });
 
     // Build filter conditions
     const where = this.buildVehicleFilters(params);
+    Logger.debug("Built filter conditions:", where);
 
     try {
       // Get total count for pagination
       const total = await prisma.vehicle.count({ where });
+      Logger.debug(`Found ${total} vehicles matching filters`);
 
-      // Get vehicles
-      const vehicles = await prisma.vehicle.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [params.sortBy || "createdAt"]: params.sortOrder || "desc" },
-        include: {
-          model: {
-            include: { oem: true },
+      // Get vehicles with robust error handling
+      let vehicles = [];
+      try {
+        vehicles = await prisma.vehicle.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          include: {
+            model: {
+              include: { oem: true },
+            },
+            hub: {
+              include: { city: true },
+            },
+            rcDetails: true,
+            insuranceDetails: true,
+            statusHistory: {
+              orderBy: { changeDate: "desc" },
+              take: 1,
+            },
+            damageRecords: {
+              orderBy: { reportedDate: "desc" },
+            },
           },
-          hub: {
-            include: { city: true },
+        });
+        Logger.debug(`Retrieved ${vehicles.length} vehicles for current page`);
+      } catch (prismaError) {
+        Logger.error("Prisma query error in getVehicles:", prismaError);
+        // Attempt a more basic query if the complex one fails
+        Logger.info("Attempting fallback query with fewer relations...");
+        vehicles = await prisma.vehicle.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          include: {
+            model: {
+              include: { oem: true },
+            },
+            hub: true,
           },
-          rcDetails: true,
-          insuranceDetails: true,
-          statusHistory: {
-            orderBy: { changeDate: "desc" },
-            take: 1,
-          },
-          damageRecords: {
-            orderBy: { reportedDate: "desc" },
-          },
-        },
-      });
+        });
+        Logger.debug(`Fallback query retrieved ${vehicles.length} vehicles`);
+      }
 
+      // Calculate pagination info
       const pagination = PaginationHelper.calculatePagination(
         total,
         page,
         limit
+      );
+
+      Logger.debug("Pagination calculated:", pagination);
+      Logger.info(
+        `getVehicles returning ${vehicles.length} vehicles with pagination`
       );
 
       return { vehicles: vehicles as any[], pagination };
@@ -993,29 +1050,224 @@ export class VehicleService {
   }
 
   private static buildVehicleFilters(params: QueryParams) {
+    console.log("📋 Building filters with params:", params);
     const where: any = {};
 
-    if (params.oemId || params.modelId) {
+    // Filter by OEM or Model
+    if (params.oemId || params.modelId || params.oemType || params.oem) {
       where.model = {};
-      if (params.oemId) where.model.oemId = params.oemId;
+      // Support multiple OEM filter parameter names for better compatibility
+      const oemId = params.oemId || params.oemType || params.oem;
+      if (oemId) where.model.oemId = oemId;
+
+      // Only set modelId filter if directly specified
       if (params.modelId) where.modelId = params.modelId;
     }
 
-    if (params.operationalStatus)
-      where.operationalStatus = params.operationalStatus;
+    // Status filters
+    if (params.operationalStatus || params.status) {
+      // Use either operationalStatus or status (frontend param)
+      const statusValue = params.operationalStatus || params.status;
+
+      // If the status value is defined, normalize and map it
+      if (statusValue) {
+        const normalizedStatus = statusValue.toLowerCase().trim();
+
+        // Handle special cases with multiple statuses
+        if (normalizedStatus === "active") {
+          where.operationalStatus = { in: ["Available", "Assigned"] };
+        }
+        // Handle special status filter "inactive" which maps to both Retired and Damaged
+        else if (normalizedStatus === "inactive") {
+          where.operationalStatus = { in: ["Retired", "Damaged"] };
+        }
+        // For maintenance/under maintenance - unify different ways of specifying it
+        else if (
+          [
+            "maintenance",
+            "under maintenance",
+            "under_maintenance",
+            "undermaintenance",
+          ].includes(normalizedStatus)
+        ) {
+          where.operationalStatus = "Under Maintenance";
+        }
+        // Handle standard status values with proper capitalization
+        else if (
+          ["available", "assigned", "damaged", "retired"].includes(
+            normalizedStatus
+          )
+        ) {
+          // Capitalize first letter for standard statuses
+          where.operationalStatus =
+            normalizedStatus.charAt(0).toUpperCase() +
+            normalizedStatus.slice(1);
+        }
+        // For direct case-matching statuses (e.g. from dropdown selections)
+        else if (
+          [
+            "Available",
+            "Assigned",
+            "Under Maintenance",
+            "Damaged",
+            "Retired",
+          ].includes(statusValue)
+        ) {
+          where.operationalStatus = statusValue;
+        }
+        // For other cases, try capitalized first letter as a fallback
+        else {
+          where.operationalStatus =
+            normalizedStatus.charAt(0).toUpperCase() +
+            normalizedStatus.slice(1);
+        }
+
+        console.log(
+          `📊 Status filter: Original="${statusValue}", Normalized="${normalizedStatus}", Applied=${JSON.stringify(where.operationalStatus)}`
+        );
+      }
+    }
+
+    // Service status filters
     if (params.serviceStatus) where.serviceStatus = params.serviceStatus;
-    if (params.assignedRider) where.currentRiderId = params.assignedRider;
+
+    // Rider, fleet, and hub filters
+    if (params.assignedRider || params.currentRiderId) {
+      where.currentRiderId = params.assignedRider || params.currentRiderId;
+    }
     if (params.fleetOperatorId) where.fleetOperatorId = params.fleetOperatorId;
     if (params.hubId) where.hubId = params.hubId;
-    if (params.location)
-      where.location = { contains: params.location, mode: "insensitive" };
 
+    // Handle location with case-insensitive search
+    if (params.location) {
+      where.location = { contains: params.location, mode: "insensitive" };
+    }
+
+    // Handle age/mileage range filters
     if (params.minAge || params.maxAge) {
       where.ageInMonths = {};
       if (params.minAge) where.ageInMonths.gte = Number(params.minAge);
       if (params.maxAge) where.ageInMonths.lte = Number(params.maxAge);
     }
 
+    // Handle year filter if present
+    if (params.year !== undefined && params.year !== null) {
+      const yearValue = Number(params.year);
+      if (!isNaN(yearValue)) {
+        where.year = yearValue;
+      }
+    }
+
+    // Handle mileage range filters
+    if (params.minMileage || params.maxMileage) {
+      where.mileage = {};
+      if (params.minMileage) where.mileage.gte = Number(params.minMileage);
+      if (params.maxMileage) where.mileage.lte = Number(params.maxMileage);
+    }
+
+    // Handle purchase date range filters
+    if (params.purchaseDateFrom || params.purchaseDateTo) {
+      where.purchaseDate = {};
+      if (params.purchaseDateFrom) {
+        try {
+          where.purchaseDate.gte = new Date(params.purchaseDateFrom);
+        } catch (e) {
+          console.warn(
+            `Invalid date format for purchaseDateFrom: ${params.purchaseDateFrom}`
+          );
+        }
+      }
+      if (params.purchaseDateTo) {
+        try {
+          where.purchaseDate.lte = new Date(params.purchaseDateTo);
+        } catch (e) {
+          console.warn(
+            `Invalid date format for purchaseDateTo: ${params.purchaseDateTo}`
+          );
+        }
+      }
+    }
+
+    // Timeframe filters (startDate and endDate)
+    if (params.startDate || params.endDate) {
+      // Initialize the registrationDate condition if not already present
+      if (!where.registrationDate) {
+        where.registrationDate = {};
+      }
+
+      if (params.startDate) {
+        try {
+          // Handle various date formats (ISO, YYYY-MM-DD, MM/DD/YYYY, etc.)
+          const startDate = new Date(params.startDate);
+
+          // Verify it's a valid date
+          if (!isNaN(startDate.getTime())) {
+            // Set to start of day (00:00:00.000)
+            startDate.setHours(0, 0, 0, 0);
+            where.registrationDate.gte = startDate.toISOString();
+            console.log(
+              `📅 Start date filter: Original="${params.startDate}", Applied="${where.registrationDate.gte}"`
+            );
+          } else {
+            console.log(`⚠️ Invalid start date format: "${params.startDate}"`);
+          }
+        } catch (error: any) {
+          console.log(
+            `❌ Error parsing start date: "${params.startDate}", Error: ${error?.message || "Unknown error"}`
+          );
+        }
+      }
+
+      if (params.endDate) {
+        try {
+          // Handle various date formats
+          const endDate = new Date(params.endDate);
+
+          // Verify it's a valid date
+          if (!isNaN(endDate.getTime())) {
+            // Set to end of day (23:59:59.999) to include all records for this date
+            endDate.setHours(23, 59, 59, 999);
+            where.registrationDate.lte = endDate.toISOString();
+            console.log(
+              `📅 End date filter: Original="${params.endDate}", Applied="${where.registrationDate.lte}"`
+            );
+          } else {
+            console.log(`⚠️ Invalid end date format: "${params.endDate}"`);
+          }
+        } catch (error: any) {
+          console.log(
+            `❌ Error parsing end date: "${params.endDate}", Error: ${error?.message || "Unknown error"}`
+          );
+        }
+      }
+    }
+
+    // Handle global search (will search across multiple fields)
+    if (params.search) {
+      const searchTerm = params.search.trim();
+      console.log(`🔍 DEBUG: Applying search filter with term "${searchTerm}"`);
+
+      where.OR = [
+        { registrationNumber: { contains: searchTerm, mode: "insensitive" } },
+        { chassisNumber: { contains: searchTerm, mode: "insensitive" } },
+        { engineNumber: { contains: searchTerm, mode: "insensitive" } },
+        { location: { contains: searchTerm, mode: "insensitive" } },
+        {
+          model: {
+            OR: [
+              { name: { contains: searchTerm, mode: "insensitive" } },
+              { displayName: { contains: searchTerm, mode: "insensitive" } },
+            ],
+          },
+        },
+      ];
+
+      console.log("🔍 DEBUG: Search OR conditions:", JSON.stringify(where.OR));
+    } else {
+      console.log("⚠️ DEBUG: No search term provided in params");
+    }
+
+    console.log("🔍 Built filters:", where);
     return where;
   }
 
@@ -1246,15 +1498,122 @@ export class VehicleService {
     }
 
     const pagination = PaginationHelper.calculatePagination(
+      totalCount,
       page,
-      limit,
-      totalCount
+      limit
     );
 
     return {
       history,
       pagination,
     };
+  }
+
+  /**
+   * Get vehicle rider history (assignments, handovers, returns)
+   * This integrates handover records with media files
+   */
+  static async getVehicleRiderHistory(
+    id: string,
+    params: { page: number; limit: number; includeMedia?: boolean }
+  ) {
+    Logger.info("Getting vehicle rider history", { vehicleId: id, params });
+
+    const { page, limit, includeMedia = true } = params;
+    const skip = (page - 1) * limit;
+
+    try {
+      // First check if vehicle exists
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id },
+      });
+
+      if (!vehicle) {
+        throw ErrorHandler.handleNotFoundError("Vehicle");
+      }
+
+      // Get all handover records for this vehicle with rider details
+      const handoverRecords = await prisma.handoverRecord.findMany({
+        where: { vehicleId: id },
+        orderBy: { handoverDate: "desc" },
+        skip,
+        take: limit,
+      });
+
+      Logger.info(`Found ${handoverRecords.length} handover records`);
+
+      // Get the total count for pagination
+      const totalCount = await prisma.handoverRecord.count({
+        where: { vehicleId: id },
+      });
+
+      // Store handover records with associated media data
+      let handoverRecordsWithMedia: any[] = [];
+
+      if (includeMedia) {
+        // Get all handover records with their media files
+        for (const record of handoverRecords) {
+          // Get media files for this handover record
+          const media = await prisma.handoverMedia.findMany({
+            where: { handoverRecordId: record.id },
+          });
+
+          handoverRecordsWithMedia.push({
+            ...record,
+            media: media || [],
+          });
+        }
+      } else {
+        // Just convert the records to any type if media is not included
+        handoverRecordsWithMedia = handoverRecords.map((record) => ({
+          ...record,
+          media: [],
+        }));
+      }
+
+      // Build pagination object
+      const pagination = PaginationHelper.calculatePagination(
+        totalCount,
+        page,
+        limit
+      );
+
+      // Process records for better presentation
+      const processedRecords = handoverRecordsWithMedia.map((record) => {
+        // Extract key information for timeline view
+        const eventType = record.handoverType; // "Pickup" or "Drop"
+        const eventDate = record.handoverDate;
+
+        return {
+          id: record.id,
+          riderId: record.riderId,
+          vehicleId: record.vehicleId,
+          eventType,
+          eventDate,
+          mileageReading: record.mileageReading,
+          batteryPercentage: record.batteryPercentage,
+          overallCondition: record.overallCondition,
+          exteriorCondition: record.exteriorCondition,
+          interiorCondition: record.interiorCondition,
+          mechanicalCondition: record.mechanicalCondition,
+          issuesReported: record.issuesReported,
+          handoverLocation: record.handoverLocation,
+          verifiedBy: record.verifiedBy,
+          verificationDate: record.verificationDate,
+          media: record.media,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt,
+        };
+      });
+
+      return {
+        history: processedRecords,
+        pagination,
+      };
+    } catch (error) {
+      Logger.error("Failed to get vehicle rider history", error);
+      throw error;
+    }
   }
 
   /**

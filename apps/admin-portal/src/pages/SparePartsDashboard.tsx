@@ -39,7 +39,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   Warning as WarningIcon,
-  AttachMoney as MoneyIcon,
+  CurrencyRupee as MoneyIcon,
   ShoppingCart as OrderIcon,
   Speed as SpeedIcon,
   Assessment as AnalyticsIcon,
@@ -58,15 +58,15 @@ import { useQuery } from 'react-query'
 import { dashboardService, analyticsService } from '../services/sparePartsService'
 
 // Chart Component (using simple progress bars for now - can be replaced with proper charts)
-const SimpleBarChart: React.FC<{ 
+const SimpleBarChart: React.FC<{
   data: Array<{ label: string; value: number; color?: string }>
   title: string
 }> = ({ data, title }) => {
   const maxValue = Math.max(...data.map(item => item.value))
-  
+
   return (
     <Card>
-      <CardHeader 
+      <CardHeader
         title={title}
         titleTypographyProps={{ variant: 'h6', fontSize: '1rem' }}
         avatar={<PieChartIcon color="primary" />}
@@ -126,7 +126,7 @@ const SparePartsDashboard: React.FC = () => {
     isLoading: analyticsLoading,
   } = useQuery(
     ['analytics-usage', timeRange],
-    () => analyticsService.getUsageAnalysis({ 
+    () => analyticsService.getUsageAnalysis({
       startDate: new Date(Date.now() - (timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90) * 24 * 60 * 60 * 1000).toISOString(),
       endDate: new Date().toISOString()
     }),
@@ -238,8 +238,8 @@ const SparePartsDashboard: React.FC = () => {
                       ) : (
                         <TrendingDownIcon fontSize="small" color="error" />
                       )}
-                      <Typography 
-                        variant="caption" 
+                      <Typography
+                        variant="caption"
                         color={stats.usageTrend > 0 ? 'success.main' : 'error.main'}
                         ml={0.5}
                       >
@@ -274,8 +274,8 @@ const SparePartsDashboard: React.FC = () => {
                       ) : (
                         <TrendingDownIcon fontSize="small" color="error" />
                       )}
-                      <Typography 
-                        variant="caption" 
+                      <Typography
+                        variant="caption"
                         color={stats.costTrend > 0 ? 'success.main' : 'error.main'}
                         ml={0.5}
                       >
@@ -333,8 +333,8 @@ const SparePartsDashboard: React.FC = () => {
                       ) : (
                         <TrendingDownIcon fontSize="small" color="error" />
                       )}
-                      <Typography 
-                        variant="caption" 
+                      <Typography
+                        variant="caption"
                         color={stats.ordersTrend > 0 ? 'success.main' : 'error.main'}
                         ml={0.5}
                       >
@@ -356,8 +356,8 @@ const SparePartsDashboard: React.FC = () => {
       <Grid container spacing={3} mb={3}>
         <Grid item xs={12} md={8}>
           <Card>
-            <CardHeader 
-              title="Performance Metrics" 
+            <CardHeader
+              title="Performance Metrics"
               avatar={<SpeedIcon color="primary" />}
               action={
                 <IconButton>
@@ -414,8 +414,8 @@ const SparePartsDashboard: React.FC = () => {
 
         <Grid item xs={12} md={4}>
           <Card>
-            <CardHeader 
-              title="Quick Stats" 
+            <CardHeader
+              title="Quick Stats"
               avatar={<AnalyticsIcon color="primary" />}
             />
             <CardContent>
@@ -481,8 +481,8 @@ const SparePartsDashboard: React.FC = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Card>
-            <CardHeader 
-              title="Recent Stock Movements" 
+            <CardHeader
+              title="Recent Stock Movements"
               avatar={<TimelineIcon color="primary" />}
             />
             <CardContent sx={{ p: 0 }}>
@@ -491,8 +491,8 @@ const SparePartsDashboard: React.FC = () => {
                   <React.Fragment key={movement.id}>
                     <ListItem>
                       <ListItemAvatar>
-                        <Avatar sx={{ 
-                          bgcolor: movement.movementType === 'IN' ? 'success.light' : 
+                        <Avatar sx={{
+                          bgcolor: movement.movementType === 'IN' ? 'success.light' :
                                    movement.movementType === 'OUT' ? 'error.light' : 'info.light'
                         }}>
                           {movement.movementType === 'IN' ? (
@@ -510,11 +510,11 @@ const SparePartsDashboard: React.FC = () => {
                             <Typography variant="body2">
                               {movement.quantity} units
                             </Typography>
-                            <Chip 
-                              label={movement.movementType} 
-                              size="small" 
+                            <Chip
+                              label={movement.movementType}
+                              size="small"
                               color={
-                                movement.movementType === 'IN' ? 'success' : 
+                                movement.movementType === 'IN' ? 'success' :
                                 movement.movementType === 'OUT' ? 'error' : 'info'
                               }
                             />
@@ -538,7 +538,7 @@ const SparePartsDashboard: React.FC = () => {
 
         <Grid item xs={12} md={6}>
           <Card>
-            <CardHeader 
+            <CardHeader
               title={
                 <Box display="flex" alignItems="center" gap={1}>
                   Low Stock Alerts
@@ -574,10 +574,10 @@ const SparePartsDashboard: React.FC = () => {
                         }
                       />
                       <ListItemSecondaryAction>
-                        <Chip 
-                          label="Critical" 
-                          size="small" 
-                          color="error" 
+                        <Chip
+                          label="Critical"
+                          size="small"
+                          color="error"
                           variant="outlined"
                         />
                       </ListItemSecondaryAction>

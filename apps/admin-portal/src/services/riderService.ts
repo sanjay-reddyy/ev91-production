@@ -1,11 +1,13 @@
 import axios from "axios";
 
 const RIDER_SERVICE_URL =
-  import.meta.env.VITE_RIDER_API_URL || "http://localhost:8000/api/v1";
+  import.meta.env.VITE_RIDER_API_URL || "http://localhost:8000/api";
 
 // Configure axios instance for rider service
+// Note: The baseURL already includes /api, so all endpoint paths should NOT include /riders at the beginning
+// This is because the API Gateway is already configured to route /api/riders/* to the rider service
 const api = axios.create({
-  baseURL: RIDER_SERVICE_URL,
+  baseURL: `${RIDER_SERVICE_URL}/riders`,
   headers: {
     "Content-Type": "application/json",
   },
@@ -90,7 +92,13 @@ export interface VehicleAssignment {
   fuelType: string;
   assignedDate: string;
   status?: string;
-  operationalStatus?: string;
+  operationalStatus?:
+    | "Available"
+    | "Assigned"
+    | "Under Maintenance"
+    | "Retired"
+    | "Damaged"; // Matching vehicle's operationalStatus enum
+  serviceStatus?: "Active" | "Inactive" | "Scheduled for Service"; // Matching vehicle's serviceStatus enum
   hubId?: string;
   hubName?: string;
 }
@@ -126,6 +134,12 @@ export interface RiderKYC {
   verificationNotes: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // Additional fields for improved display
+  documentTypeDisplay?: string; // Human-readable document type
+  documentPreviewUrl?: string; // URL for thumbnail/preview
+  isValid?: boolean; // Whether document is valid (based on verification)
+  expiryDate?: string | null; // Document expiry date if applicable
 }
 
 export interface RiderOrder {
@@ -251,7 +265,7 @@ class RiderService {
   // ==========================================
 
   /**
-   * Get all riders with filtering and pagination
+   * Get all riders with filtering and pagination - enhanced with error handling and logging
    */
   async getRiders(params?: {
     page?: number;
@@ -264,30 +278,229 @@ class RiderService {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }): Promise<APIResponse<Rider[]>> {
-    const queryParams = new URLSearchParams();
+    console.log("🔄 riderService.getRiders - START", { params });
 
-    if (params?.page) queryParams.append("page", params.page.toString());
-    if (params?.limit) queryParams.append("limit", params.limit.toString());
-    if (params?.search) queryParams.append("search", params.search);
-    if (params?.registrationStatus)
-      queryParams.append("registrationStatus", params.registrationStatus);
-    if (params?.kycStatus) queryParams.append("kycStatus", params.kycStatus);
-    if (params?.isActive !== undefined)
-      queryParams.append("isActive", params.isActive.toString());
-    if (params?.city) queryParams.append("city", params.city);
-    if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
-    if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
+    try {
+      // Double-check token before making request
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        console.warn("No auth token available for getRiders");
+        return {
+          success: false,
+          data: [],
+          pagination: {
+            page: params?.page || 1,
+            limit: params?.limit || 10,
+            totalItems: 0,
+            totalPages: 0,
+          },
+          message: "Authentication required",
+        };
+      }
 
-    const response = await api.get(`/riders?${queryParams}`);
-    return response.data;
+      const queryParams = new URLSearchParams();
+
+      // Ensure page and limit are always included with default values
+      queryParams.append("page", params?.page?.toString() || "1");
+      queryParams.append("limit", params?.limit?.toString() || "10");
+
+      // Add other optional parameters with improved filter handling
+      if (params?.search) {
+        console.log(`Adding search filter: ${params.search}`);
+        queryParams.append("search", params.search);
+      }
+
+      if (params?.registrationStatus) {
+        console.log(
+          `Adding registrationStatus filter: ${params.registrationStatus}`
+        );
+        queryParams.append("registrationStatus", params.registrationStatus);
+      }
+
+      if (params?.kycStatus) {
+        console.log(`Adding kycStatus filter: ${params.kycStatus}`);
+        queryParams.append("kycStatus", params.kycStatus);
+      }
+
+      if (params?.isActive !== undefined) {
+        // Make sure we send a proper boolean string representation
+        const isActiveValue = params.isActive === true ? "true" : "false";
+        console.log(
+          `Adding isActive filter: ${params.isActive} (sending as ${isActiveValue})`
+        );
+        queryParams.append("isActive", isActiveValue);
+      }
+
+      if (params?.city) {
+        console.log(`Adding city filter: ${params.city}`);
+        queryParams.append("city", params.city);
+      }
+
+      if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
+      if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
+
+      // Add cache buster to prevent browser caching
+      queryParams.append("_", Date.now().toString());
+
+      console.log("🔍 API Request Debug:", {
+        url: "/riders",
+        params: Object.fromEntries(queryParams.entries()),
+        fullUrl: `/riders?${queryParams.toString()}`,
+      });
+
+      // Make the API call with our filters
+      const response = await api.get(`?${queryParams}`);
+
+      // Enhanced response debugging
+      console.log("📡 API Response Debug:", {
+        dataLength: response.data?.data?.length || 0,
+        totalFromPagination: response.data?.pagination?.totalItems,
+        responseStructure: Object.keys(response.data || {}),
+        success: response.data?.success,
+        firstFewRiders: response.data?.data?.slice(0, 2).map((r: Rider) => ({
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          isActive: r.isActive,
+          registrationStatus: r.registrationStatus,
+        })),
+      });
+
+      // Enhanced debugging for rider status
+      if (response.data?.data?.length > 0) {
+        console.log("👥 Riders status summary:", {
+          activeCount: response.data.data.filter(
+            (r: Rider) => r.isActive === true
+          ).length,
+          inactiveCount: response.data.data.filter(
+            (r: Rider) => r.isActive === false
+          ).length,
+          unknownCount: response.data.data.filter(
+            (r: Rider) => r.isActive === undefined
+          ).length,
+          // Add vehicle assignment debugging
+          withVehicleIdCount: response.data.data.filter(
+            (r: Rider) =>
+              r.assignedVehicleId !== null && r.assignedVehicleId !== undefined
+          ).length,
+          withVehicleObjectCount: response.data.data.filter(
+            (r: Rider) =>
+              r.assignedVehicle !== null && r.assignedVehicle !== undefined
+          ).length,
+          sampleRider: response.data.data[0]
+            ? {
+                id: response.data.data[0].id,
+                isActive: response.data.data[0].isActive,
+                registrationStatus: response.data.data[0].registrationStatus,
+                // Add vehicle details to sample
+                assignedVehicleId: response.data.data[0].assignedVehicleId,
+                hasAssignedVehicle: !!response.data.data[0].assignedVehicle,
+              }
+            : null,
+        });
+      }
+
+      console.log("✅ riderService.getRiders - SUCCESS");
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn(
+          "Authentication required for rider list - returning empty list"
+        );
+        // Return empty but structured data instead of throwing
+        return {
+          success: false,
+          data: [],
+          pagination: {
+            page: params?.page || 1,
+            limit: params?.limit || 10,
+            totalItems: 0,
+            totalPages: 0,
+          },
+          message: "Authentication required",
+        };
+      }
+      // For other errors, log and rethrow
+      console.error("Error in getRiders:", error);
+      throw error;
+    }
   }
 
   /**
-   * Get rider by ID with detailed information
+   * Get rider by ID with detailed information and cache busting
    */
   async getRiderById(riderId: string): Promise<APIResponse<Rider>> {
-    const response = await api.get(`/riders/${riderId}`);
-    return response.data;
+    // Add cache buster to prevent browser caching
+    const cacheBuster = `_t=${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 15)}`;
+
+    console.log(
+      `🔍 Fetching rider with ID ${riderId} with cache buster ${cacheBuster}`
+    );
+
+    try {
+      // Use cache buster in the URL instead of headers to avoid CORS issues
+      // Remove leading slash to avoid path issues with baseURL
+      const response = await api.get(`${riderId}?${cacheBuster}`);
+
+      // Save the raw response for debugging
+      const rawIsActive = response.data?.data?.isActive;
+      const rawIsActiveType = typeof rawIsActive;
+
+      // Process the response to ensure boolean values are correctly handled
+      if (response.data?.data) {
+        // Ensure isActive is a proper boolean by doing an explicit conversion
+        // Use === comparison to ensure true Boolean value
+        const originalValue = response.data.data.isActive;
+        const convertedValue = originalValue === true;
+
+        // Force the value to be a strict boolean
+        response.data.data.isActive = convertedValue;
+
+        // Log the conversion details
+        console.log(`Boolean conversion for isActive:`, {
+          original: originalValue,
+          originalType: typeof originalValue,
+          originalStringified: JSON.stringify(originalValue),
+          converted: convertedValue,
+          convertedType: typeof convertedValue,
+          convertedStringified: JSON.stringify(convertedValue),
+          convertedCheck: convertedValue ? "TRUE" : "FALSE",
+        });
+      }
+
+      // Enhanced debug logging for rider status and vehicle assignment
+      console.log(`✅ Successfully fetched rider ${riderId}:`, {
+        rawIsActive: rawIsActive,
+        rawIsActiveType: rawIsActiveType,
+        rawIsActiveStringified: JSON.stringify(rawIsActive),
+        processedIsActive: response.data?.data?.isActive,
+        processedIsActiveType: typeof response.data?.data?.isActive,
+        registrationStatus: response.data?.data?.registrationStatus,
+        assignedVehicleId: response.data?.data?.assignedVehicleId,
+        hasAssignedVehicle: !!response.data?.data?.assignedVehicle,
+        assignedVehicleDetails: response.data?.data?.assignedVehicle
+          ? {
+              registrationNumber:
+                response.data.data.assignedVehicle.registrationNumber,
+              operationalStatus:
+                response.data.data.assignedVehicle.operationalStatus,
+            }
+          : null,
+      });
+
+      // Log the entire response data structure to verify all fields
+      console.log(
+        "Full rider data structure:",
+        JSON.stringify(response.data.data, null, 2)
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error fetching rider ${riderId}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -296,7 +509,7 @@ class RiderService {
   async createRider(
     riderData: RiderRegistrationData
   ): Promise<APIResponse<Rider>> {
-    const response = await api.post(`/riders`, riderData);
+    const response = await api.post(``, riderData);
     return response.data;
   }
 
@@ -307,7 +520,7 @@ class RiderService {
     riderId: string,
     riderData: Partial<RiderRegistrationData>
   ): Promise<APIResponse<Rider>> {
-    const response = await api.put(`/riders/${riderId}`, riderData);
+    const response = await api.put(`${riderId}`, riderData);
     return response.data;
   }
 
@@ -315,26 +528,239 @@ class RiderService {
    * Delete rider (soft delete)
    */
   async deleteRider(riderId: string): Promise<APIResponse<void>> {
-    const response = await api.delete(`/riders/${riderId}`);
+    const response = await api.delete(`${riderId}`);
     return response.data;
   }
 
   /**
-   * Activate/Deactivate rider
+   * Activate/Deactivate rider with cache busting and enhanced error handling
+   * Fixed URL construction for proper API path
+   * @param riderId The ID of the rider to toggle status
+   * @param isActive The new active status (true for active, false for inactive)
    */
   async toggleRiderStatus(
     riderId: string,
     isActive: boolean
   ): Promise<APIResponse<Rider>> {
-    const response = await api.patch(`/riders/${riderId}/status`, { isActive });
-    return response.data;
+    try {
+      // Add timestamp to URL for cache busting
+      const cacheBuster = `_t=${Date.now()}`;
+
+      console.log(
+        `[riderService] Toggling rider status: riderId=${riderId}, isActive=${isActive} (${typeof isActive}), cacheBuster=${cacheBuster}`
+      );
+
+      // Call the API to update the rider's active status
+      // Fixed URL - ensure proper path with /riders/ prefix
+      // Convert isActive to strict boolean to ensure proper serialization
+      const isActiveBool = isActive === true;
+
+      console.log(
+        `[riderService] Sending status update with isActive=${isActiveBool} (${typeof isActiveBool})`
+      );
+
+      // Force true/false in the payload to ensure API receives a boolean
+      const payload = {
+        isActive: isActiveBool,
+      };
+
+      console.log(
+        "[riderService] Payload for status update:",
+        JSON.stringify(payload)
+      );
+
+      // Fixed path - we should not include the /riders/ prefix since it's already in the baseURL
+      const response = await api.patch(
+        `${riderId}/status?${cacheBuster}`,
+        payload
+      );
+
+      console.log("Rider status API response:", response.data);
+
+      // Always fetch the rider again to get updated data after status change
+      if (response.data.success) {
+        console.log(
+          "[riderService] Status update successful, fetching latest rider data"
+        );
+
+        // Add longer delay before fetching updated data to ensure consistency with database
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        // Add stronger cache busting for the getRiderById call
+        const uniqueCacheBuster = `_cb=${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 15)}`;
+
+        try {
+          // Make direct API call to bypass any caching
+          const freshResponse = await api.get(
+            `${riderId}?${uniqueCacheBuster}`
+          );
+
+          console.log("[riderService] Raw updated rider data:", {
+            success: freshResponse.data.success,
+            isActive: freshResponse.data.data?.isActive,
+            isActiveType: typeof freshResponse.data.data?.isActive,
+          });
+
+          // Double check the isActive status in the response
+          if (freshResponse.data.success) {
+            // Force isActive to be a boolean to ensure consistency
+            const actualValue = freshResponse.data.data.isActive;
+            const strictBooleanValue = actualValue === true;
+
+            // Update the value in the response to ensure it's a strict boolean
+            freshResponse.data.data.isActive = strictBooleanValue;
+
+            console.log("[riderService] Updated rider active status:", {
+              expected: isActive,
+              actual: actualValue,
+              actualType: typeof actualValue,
+              strictBoolean: strictBooleanValue,
+              match: strictBooleanValue === isActive,
+            });
+          }
+
+          return freshResponse.data;
+        } catch (fetchError) {
+          console.error(
+            "[riderService] Error fetching updated rider data:",
+            fetchError
+          );
+
+          // Fall back to returning the original response but ensure isActive is correct
+          // This ensures the component will at least show the correct button state
+          if (response.data?.data) {
+            response.data.data.isActive = isActiveBool;
+          }
+          return response.data;
+        }
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error("Error in toggleRiderStatus:", error);
+
+      // Handle business validation errors properly
+      if (error.response?.data?.message) {
+        return {
+          success: false,
+          message: error.response.data.message,
+          data: {} as Rider,
+        };
+      }
+
+      throw error;
+    }
   }
 
   /**
    * Approve rider registration
    */
   async approveRider(riderId: string): Promise<APIResponse<Rider>> {
-    const response = await api.patch(`/riders/${riderId}/approve`);
+    const response = await api.patch(`${riderId}/approve`);
+    return response.data;
+  }
+
+  /**
+   * Approve rider registration with option to activate
+   */
+  async approveRiderWithActivation(
+    riderId: string,
+    activateImmediately: boolean = true
+  ): Promise<APIResponse<Rider>> {
+    const response = await api.patch(`${riderId}/approve`, {
+      activateImmediately,
+    });
+    return response.data;
+  }
+
+  /**
+   * Complete rider registration and verify KYC in one step
+   * Use the admin API endpoint to complete registration and optionally activate the rider
+   */
+  async completeRiderRegistration(
+    riderId: string,
+    options: {
+      kycVerified?: boolean;
+      activateRider?: boolean;
+    } = {}
+  ): Promise<APIResponse<Rider>> {
+    try {
+      console.log(
+        `[riderService] Completing registration for rider ${riderId} with options:`,
+        options
+      );
+
+      const response = await api.patch(
+        `/admin/${riderId}/complete-registration`,
+        options
+      );
+
+      console.log(`[riderService] Complete registration response:`, {
+        success: response.data.success,
+        message: response.data.message,
+        riderId: response.data.data?.id,
+        isActive: response.data.data?.isActive,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error(
+        `[riderService] Error completing rider registration:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get rider registration status details
+   * This returns additional information about the registration progress
+   * @param riderId The ID of the rider
+   * @param cacheBuster Optional cache busting parameter to prevent browser caching
+   */
+  async getRiderRegistrationStatus(
+    riderId: string,
+    cacheBuster?: string
+  ): Promise<
+    APIResponse<{
+      registrationStatus: string;
+      isActive: boolean;
+      kycStatus: string;
+      missingFields: string[];
+      completionPercentage: number;
+    }>
+  > {
+    // Based on examining app.ts and completeRegistration.ts:
+    // 1. The route for registration status is defined in completeRegistration.ts as "/riders/:riderId/status"
+    // 2. In app.ts, completeRegistrationRoutes are mounted at "/api/v1/registration"
+    // 3. The API Gateway routes "/api/riders/*" to the rider service
+    // 4. The rider service expects "/api/v1/registration/riders/:riderId/status"
+
+    // Use the standard api client which already has the correct baseURL
+    // Our baseURL is "${RIDER_SERVICE_URL}/riders", so we need to go up one level
+    // and access the registration path at the same level
+
+    const url = cacheBuster
+      ? `../registration/riders/${riderId}/status?${cacheBuster}`
+      : `../registration/riders/${riderId}/status`;
+
+    console.log(
+      `[riderService] Fetching registration status for rider ${riderId}`,
+      { withCacheBuster: !!cacheBuster, url }
+    );
+
+    const response = await api.get(url);
+
+    // Debug the raw response to check isActive type
+    const rawIsActive = response.data?.data?.isActive;
+    console.log(`[riderService] Raw registration status response:`, {
+      isActive: rawIsActive,
+      isActiveType: typeof rawIsActive,
+      isActiveStrictBoolean: rawIsActive === true,
+    });
+
     return response.data;
   }
 
@@ -345,7 +771,7 @@ class RiderService {
     riderId: string,
     reason: string
   ): Promise<APIResponse<Rider>> {
-    const response = await api.patch(`/riders/${riderId}/reject`, { reason });
+    const response = await api.patch(`${riderId}/reject`, { reason });
     return response.data;
   }
 
@@ -354,11 +780,54 @@ class RiderService {
   // ==========================================
 
   /**
-   * Get rider KYC documents
+   * Get rider KYC documents with enhanced logging and cache busting
    */
   async getRiderKYC(riderId: string): Promise<APIResponse<RiderKYC[]>> {
-    const response = await api.get(`/riders/${riderId}/kyc`);
-    return response.data;
+    try {
+      // Add cache busting to prevent browser caching
+      const cacheBuster = `_t=${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 15)}`;
+      console.log(
+        `[riderService] Fetching KYC documents for rider ${riderId} with cache buster ${cacheBuster}`
+      );
+
+      // Note: Since baseURL is already ${RIDER_SERVICE_URL}/riders, we should not include an extra /riders/ in the path
+      // Remove the leading slash to avoid path issues
+      const response = await api.get(`${riderId}/kyc?${cacheBuster}`);
+
+      console.log(`[riderService] KYC documents API response:`, {
+        success: response.data?.success,
+        count: Array.isArray(response.data?.data)
+          ? response.data?.data?.length
+          : "unknown",
+        documentTypes: Array.isArray(response.data?.data)
+          ? response.data?.data?.map((doc: RiderKYC) => doc.documentType)
+          : [],
+      });
+
+      // Ensure we always have an array for data
+      if (response.data?.success && !Array.isArray(response.data.data)) {
+        console.warn(
+          "[riderService] KYC documents response data is not an array, converting to array"
+        );
+        response.data.data = response.data.data ? [response.data.data] : [];
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error(
+        `[riderService] Error fetching KYC documents for rider ${riderId}:`,
+        error
+      );
+
+      // Return structured error response instead of throwing
+      return {
+        success: false,
+        data: [],
+        message: error.message || "Failed to load KYC documents",
+      };
+    }
   }
 
   /**
@@ -368,19 +837,83 @@ class RiderService {
     riderId: string,
     kycData: RiderKYCSubmission
   ): Promise<APIResponse<RiderKYC>> {
-    const formData = new FormData();
-    formData.append("documentType", kycData.documentType);
-    formData.append("documentNumber", kycData.documentNumber);
-    if (kycData.documentImage) {
-      formData.append("documentImage", kycData.documentImage);
-    }
+    try {
+      console.log(
+        `[riderService] Submitting KYC document for rider ${riderId}:`,
+        {
+          documentType: kycData.documentType,
+          documentNumber: kycData.documentNumber,
+          hasImage: !!kycData.documentImage,
+          imageSize: kycData.documentImage?.size || 0,
+          imageType: kycData.documentImage?.type || "unknown",
+          imageName: kycData.documentImage?.name || "unknown",
+        }
+      );
 
-    const response = await api.post(`/riders/${riderId}/kyc`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    return response.data;
+      // Create a properly formatted FormData object
+      const formData = new FormData();
+      formData.append("documentType", kycData.documentType);
+      formData.append("documentNumber", kycData.documentNumber);
+
+      if (kycData.documentImage) {
+        // Make sure we're sending the file with the correct field name and file properties
+        formData.append("file", kycData.documentImage);
+      }
+
+      // Remove the leading slash to avoid path issues with baseURL
+      // The baseURL is already configured to include /api/riders
+      const response = await api.post(`${riderId}/kyc`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        // Increase timeout for file uploads
+        timeout: 30000,
+      });
+
+      console.log(`[riderService] KYC document submission successful:`, {
+        success: response.data?.success,
+        message: response.data?.message,
+        data: response.data?.data,
+      });
+
+      return response.data;
+    } catch (error: any) {
+      console.error(`[riderService] Error submitting KYC document:`, error);
+      if (error.response) {
+        console.error(
+          `Response status: ${error.response.status}`,
+          error.response.data
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Upload rider selfie
+   */
+  async uploadSelfie(
+    riderId: string,
+    selfieImage: File
+  ): Promise<APIResponse<RiderKYC>> {
+    try {
+      const formData = new FormData();
+      formData.append("documentType", "selfie");
+      formData.append("documentNumber", "selfie-" + Date.now()); // Generate a unique ID for the selfie
+      formData.append("documentImage", selfieImage);
+
+      // Remove the leading slash to avoid path issues with baseURL
+      const response = await api.post(`${riderId}/kyc`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Error uploading selfie:", error);
+      throw error;
+    }
   }
 
   /**
@@ -392,7 +925,7 @@ class RiderService {
     status: "verified" | "rejected",
     notes?: string
   ): Promise<APIResponse<RiderKYC>> {
-    const response = await api.patch(`/riders/${riderId}/kyc/${kycId}/verify`, {
+    const response = await api.patch(`${riderId}/kyc/${kycId}/verify`, {
       status,
       notes,
     });
@@ -403,7 +936,7 @@ class RiderService {
    * Get pending KYC submissions for admin review
    */
   async getPendingKYC(): Promise<APIResponse<RiderKYC[]>> {
-    const response = await api.get(`/admin/kyc/pending`);
+    const response = await api.get(`admin/kyc/pending`);
     return response.data;
   }
 
@@ -436,7 +969,7 @@ class RiderService {
     if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
     if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
 
-    const response = await api.get(`/riders/${riderId}/orders?${queryParams}`);
+    const response = await api.get(`${riderId}/orders?${queryParams}`);
     return response.data;
   }
 
@@ -472,9 +1005,7 @@ class RiderService {
     if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
     if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
 
-    const response = await api.get(
-      `/riders/${riderId}/earnings?${queryParams}`
-    );
+    const response = await api.get(`${riderId}/earnings?${queryParams}`);
     return response.data;
   }
 
@@ -486,9 +1017,7 @@ class RiderService {
     period?: "weekly" | "monthly" | "yearly"
   ): Promise<APIResponse<RiderEarningsSummary>> {
     const queryParams = period ? `?period=${period}` : "";
-    const response = await api.get(
-      `/riders/${riderId}/earnings/summary${queryParams}`
-    );
+    const response = await api.get(`${riderId}/earnings/summary${queryParams}`);
     return response.data;
   }
 
@@ -504,7 +1033,7 @@ class RiderService {
     vehicleId: string,
     hubId?: string
   ): Promise<APIResponse<Rider>> {
-    const response = await api.post(`/riders/${riderId}/assign-vehicle`, {
+    const response = await api.post(`${riderId}/assign-vehicle`, {
       vehicleId,
       hubId,
     });
@@ -515,7 +1044,7 @@ class RiderService {
    * Unassign vehicle from rider
    */
   async unassignVehicle(riderId: string): Promise<APIResponse<Rider>> {
-    const response = await api.delete(`/riders/${riderId}/assign-vehicle`);
+    const response = await api.delete(`${riderId}/assign-vehicle`);
     return response.data;
   }
 
@@ -528,7 +1057,7 @@ class RiderService {
   ): Promise<APIResponse<Rider>> {
     try {
       const response = await api.post(
-        `/admin/riders/${riderId}/assign-vehicle`,
+        `/admin/${riderId}/assign-vehicle`,
         assignmentData
       );
       return response.data;
@@ -543,9 +1072,7 @@ class RiderService {
    */
   async unassignVehicleFromRider(riderId: string): Promise<APIResponse<Rider>> {
     try {
-      const response = await api.delete(
-        `/admin/riders/${riderId}/assign-vehicle`
-      );
+      const response = await api.delete(`admin/${riderId}/assign-vehicle`);
       return response.data;
     } catch (error) {
       console.error("Error unassigning vehicle from rider:", error);
@@ -663,9 +1190,7 @@ class RiderService {
     riderId: string,
     period: "weekly" | "monthly" | "yearly"
   ): Promise<APIResponse<RiderPerformanceMetrics>> {
-    const response = await api.get(
-      `/riders/${riderId}/performance?period=${period}`
-    );
+    const response = await api.get(`${riderId}/performance?period=${period}`);
     return response.data;
   }
 
@@ -685,7 +1210,7 @@ class RiderService {
     if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
     if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
 
-    const response = await api.get(`/performance?${queryParams}`);
+    const response = await api.get(`performance?${queryParams}`);
     return response.data;
   }
 
@@ -698,7 +1223,7 @@ class RiderService {
    */
   async exportRiders(filters?: any): Promise<Blob> {
     const queryParams = new URLSearchParams(filters);
-    const response = await api.get(`/export/riders?${queryParams}`, {
+    const response = await api.get(`export/riders?${queryParams}`, {
       responseType: "blob",
     });
     return response.data;
@@ -717,7 +1242,7 @@ class RiderService {
   ): Promise<APIResponse<Rider>> {
     try {
       const response = await api.post(
-        `/admin/riders/${riderId}/assign-store`,
+        `/admin/${riderId}/assign-store`,
         storeData
       );
       return response.data;
@@ -732,9 +1257,7 @@ class RiderService {
    */
   async unassignStoreFromRider(riderId: string): Promise<APIResponse<Rider>> {
     try {
-      const response = await api.delete(
-        `/admin/riders/${riderId}/assign-store`
-      );
+      const response = await api.delete(`admin/${riderId}/assign-store`);
       return response.data;
     } catch (error) {
       console.error("Error unassigning store from rider:", error);
@@ -757,7 +1280,11 @@ class RiderService {
       completionRate: number;
     }>
   > {
-    const response = await api.get(`/stats`);
+    // Using the correct endpoint path which is /stats
+    // The baseURL is already set to ${RIDER_SERVICE_URL}/riders
+    // We need to make sure we're not adding an extra "riders" segment in the path
+    // We'll use "stats" directly
+    const response = await api.get(`stats`);
     return response.data;
   }
 }

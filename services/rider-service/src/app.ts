@@ -8,6 +8,9 @@ import bookingRoutes from "./routes/booking";
 import healthRoutes from "./routes/health";
 import adminRidersRoutes from "./routes/adminRiders";
 import citySyncRoutes from "./routes/citySyncRoutes";
+import completeRegistrationRoutes from "./routes/completeRegistration";
+import vehicleHistoryRoutes from "./routes/vehicleHistoryRoutes";
+import kycRoutes from "./routes/kycRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import {
   requestId,
@@ -34,6 +37,9 @@ const v1Router = express.Router();
 v1Router.use("/health", healthRoutes);
 v1Router.use("/rider-register", riderRegistrationRouter); // Comprehensive rider registration
 v1Router.use("/booking", bookingRoutes);
+v1Router.use("/registration", completeRegistrationRoutes); // New KYC verification and registration completion
+v1Router.use("/vehicle-history", vehicleHistoryRoutes); // Vehicle assignment history
+v1Router.use("/riders", kycRoutes); // KYC document upload and verification
 v1Router.use("/", adminRidersRoutes); // Admin rider management routes
 
 app.use("/api/v1", v1Router);

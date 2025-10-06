@@ -1,5 +1,7 @@
 export { default as riderService } from "./riderService";
 export { default as vehicleService } from "./vehicleService";
+export { default as vehicleHistoryService } from "./vehicleHistoryService";
+export { default as riderOrderService } from "./riderOrderService";
 export { default as sparePartsService } from "./sparePartsService";
 export { default as clientStoreService } from "./clientStoreService";
 export { oemService } from "./oemService";

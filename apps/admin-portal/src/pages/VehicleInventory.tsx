@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -57,8 +57,6 @@ import {
   Error as ErrorIcon,
   Schedule as PendingIcon,
   ClearAll as ClearIcon,
-  TableChart as TableIcon,
-  GridView as GridIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -122,6 +120,9 @@ interface VehicleFilters {
   batteryLevel?: string;
   maintenanceStatus?: string;
   assignedDriver?: string;
+  vehicleModel?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface SortConfig {
@@ -136,8 +137,19 @@ const VehicleInventoryPage: React.FC = () => {
   const navigate = useNavigate();
   const { hasCreatePermission, hasUpdatePermission, hasDeletePermission, hasReadPermission } = usePermissions();
 
-  // Check if user has read access to vehicles
-  if (!hasReadPermission('vehicle', 'vehicles')) {
+  // Check if user has read access to vehicles - Must check permissions before using other hooks
+  const hasVehicleAccess = hasReadPermission('vehicle', 'vehicles');
+
+  // Core State Management - All hooks must be defined before any conditional returns
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [totalVehicles, setTotalVehicles] = useState(0); // Total count from backend
+  const [stats, setStats] = useState<VehicleStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Render permission error if no access - moved after all hooks are defined
+  if (!hasVehicleAccess) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">
@@ -146,14 +158,6 @@ const VehicleInventoryPage: React.FC = () => {
       </Box>
     );
   }
-
-  // Core State Management
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [totalVehicles, setTotalVehicles] = useState(0); // Total count from backend
-  const [stats, setStats] = useState<VehicleStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Pagination & Sorting
   const [page, setPage] = useState(0);
@@ -170,7 +174,6 @@ const VehicleInventoryPage: React.FC = () => {
   });
 
   // UI State
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const refreshInterval = 30000; // 30 seconds
@@ -185,6 +188,12 @@ const VehicleInventoryPage: React.FC = () => {
     message: '',
     severity: 'info',
   });
+
+  // Create ref outside of useEffect and before any conditionals
+  const isInitialDataLoadRef = useRef(true);
+
+  // Debounced search to prevent API calls on every keystroke
+  const [searchInputValue, setSearchInputValue] = useState('');
 
   // Enhanced Status Colors - mapping backend operationalStatus to frontend status
   const statusConfig: Record<string, { color: any; icon: any; label: string }> = {
@@ -221,18 +230,39 @@ const VehicleInventoryPage: React.FC = () => {
       setError(null);
 
       // Load vehicles with backend pagination instead of client-side
+      // Map all filters properly for backend API
+      const apiFilters = {
+        search: searchQuery || undefined,
+        operationalStatus: filters.status || undefined,
+        oemType: filters.oem || undefined,
+        location: filters.location || undefined,
+        // Add mappings for quick filters
+        minMileage: quickFilters.lowBattery ? 0 : undefined,
+        maxMileage: quickFilters.lowBattery ? 200 : undefined, // Example threshold
+        vehicleModel: filters.vehicleModel || undefined,
+        serviceStatus: quickFilters.maintenanceDue ? 'Scheduled for Service' : undefined,
+        // Support date filtering
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        // Add mapping for year if present
+        ...(filters.year && { year: filters.year }),
+      };
+
+      // Debug logs for search filter
+      console.log('🔍 DEBUG VehicleInventory: Current search query state:', searchQuery);
+      if (searchQuery) {
+        console.log(`🔍 DEBUG VehicleInventory: Adding search filter: "${searchQuery}"`);
+      }
+
+      console.log('🔍 Sending filters to API:', apiFilters);
+
       const vehiclesResponse = await vehicleService.getVehicles(
-        {
-          search: searchQuery || undefined,
-          operationalStatus: filters.status || undefined,
-          oemType: filters.oem || undefined,
-          location: filters.location || undefined,
-        },
+        apiFilters,
         {
           page: page + 1, // Backend uses 1-based pagination
           limit: rowsPerPage, // Use actual rows per page for backend pagination
-          sortBy: 'updatedAt',
-          sortOrder: 'desc',
+          sortBy: sortConfig.key || 'updatedAt',
+          sortOrder: sortConfig.direction || 'desc',
         }
       );
 
@@ -328,7 +358,7 @@ const VehicleInventoryPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [searchQuery, filters, page, rowsPerPage]); // Add page and rowsPerPage dependencies
+  }, [filters, quickFilters, page, rowsPerPage, searchQuery, sortConfig.key, sortConfig.direction]);
 
   // Auto-refresh functionality
   useEffect(() => {
@@ -343,14 +373,22 @@ const VehicleInventoryPage: React.FC = () => {
   }, [autoRefresh, refreshInterval, loadVehicles]);
 
   // Effects
+  // Load data on initial render
   useEffect(() => {
     loadVehicles();
   }, []);
 
+  // Reload data when filters, pagination or search query change
+  // We don't need to depend on loadVehicles itself, which would cause excessive reloads
   useEffect(() => {
-    // Reload data when pagination or filters change
+    // Skip the initial render since we already load data above
+    if (isInitialDataLoadRef.current) {
+      isInitialDataLoadRef.current = false;
+      return;
+    }
+
     loadVehicles();
-  }, [loadVehicles]);
+  }, [filters, page, rowsPerPage, searchQuery, sortConfig.key, sortConfig.direction]);
 
   // Enhanced Event Handlers
   const handleRefresh = useCallback(async () => {
@@ -358,9 +396,19 @@ const VehicleInventoryPage: React.FC = () => {
     await loadVehicles();
   }, [loadVehicles]);
 
-  const handleSearch = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value);
+  // This function updates the input value without triggering API calls
+  const handleSearchInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInputValue(event.target.value);
   }, []);
+
+  // Debounced effect to update the actual search query after typing stops
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInputValue);
+    }, 500); // 500ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [searchInputValue]);
 
   const handleFilterChange = useCallback((filterType: keyof VehicleFilters, value: string) => {
     setFilters(prev => ({
@@ -390,6 +438,7 @@ const VehicleInventoryPage: React.FC = () => {
       maintenanceDue: false,
       recentlyUpdated: false,
     });
+    setSearchInputValue('');
     setSearchQuery('');
   }, []);
 
@@ -703,17 +752,23 @@ const VehicleInventoryPage: React.FC = () => {
                 <TextField
                   fullWidth
                   placeholder="Search vehicles by VIN, make, model, registration..."
-                  value={searchQuery}
-                  onChange={handleSearch}
+                  value={searchInputValue}
+                  onChange={handleSearchInputChange}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
                         <SearchIcon />
                       </InputAdornment>
                     ),
-                    endAdornment: searchQuery && (
+                    endAdornment: searchInputValue && (
                       <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSearchInputValue('');
+                            setSearchQuery('');
+                          }}
+                        >
                           <ClearIcon />
                         </IconButton>
                       </InputAdornment>
@@ -793,34 +848,11 @@ const VehicleInventoryPage: React.FC = () => {
 
         {/* Enhanced Vehicles Table */}
         <Paper variant="outlined">
-          <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6">
-              Vehicles ({totalVehicles})
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Tooltip title="Table view">
-                <IconButton
-                  color={viewMode === 'table' ? 'primary' : 'default'}
-                  onClick={() => setViewMode('table')}
-                >
-                  <TableIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Grid view">
-                <IconButton
-                  color={viewMode === 'grid' ? 'primary' : 'default'}
-                  onClick={() => setViewMode('grid')}
-                >
-                  <GridIcon />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Box>
 
           <TableContainer>
-            <Table size="medium">
+            <Table size="small">
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ '& th': { py: 1, px: 1.5 } }}>
                   <TableCell>Vehicle</TableCell>
                   <TableCell>
                     <TableSortLabel
@@ -853,7 +885,7 @@ const VehicleInventoryPage: React.FC = () => {
                   const BatteryIcon = getBatteryIcon(vehicle.batteryLevel);
 
                   return (
-                    <TableRow key={vehicle.id} hover sx={{ cursor: 'pointer' }}>
+                    <TableRow key={vehicle.id} hover sx={{ cursor: 'pointer', '& td': { py: 1, px: 1.5 } }}>
                       <TableCell onClick={() => handleViewVehicle(vehicle.id)}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Avatar sx={{ bgcolor: 'primary.light', width: 32, height: 32 }}>
@@ -1100,6 +1132,26 @@ const VehicleInventoryPage: React.FC = () => {
               renderInput={(params) => (
                 <TextField {...params} label="Location" fullWidth />
               )}
+            />
+
+            <TextField
+              label="Registration Start Date"
+              type="date"
+              value={filters.startDate || ''}
+              onChange={(e) => handleFilterChange('startDate', e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: filters.endDate || undefined }}
+            />
+
+            <TextField
+              label="Registration End Date"
+              type="date"
+              value={filters.endDate || ''}
+              onChange={(e) => handleFilterChange('endDate', e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: filters.startDate || undefined }}
             />
 
             <Box sx={{ mt: 'auto', pt: 2 }}>

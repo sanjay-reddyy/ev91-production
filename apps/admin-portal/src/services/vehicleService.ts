@@ -362,6 +362,11 @@ export interface VehicleFilters {
   purchaseDateFrom?: string;
   purchaseDateTo?: string;
   search?: string;
+  fleetOperatorId?: string;
+  hubId?: string;
+  status?: string; // Used in the UI as operationalStatus
+  oem?: string; // Used in the UI as oemType
+  year?: string | number; // Used to filter by manufacturing year
 }
 
 export interface PaginationParams {
@@ -394,13 +399,60 @@ export const vehicleService = {
         };
       }
 
-      const params = { ...filters, ...pagination };
+      // Map frontend filter names to backend expected parameter names
+      const mappedFilters = {
+        // Pass all parameters with their original names as backend now supports them
+        oemType: filters.oemType,
+        status: filters.status,
+        operationalStatus: filters.operationalStatus,
+        serviceStatus: filters.serviceStatus,
+        location: filters.location,
+        year: filters.year,
+        // Keep proper numeric range parameters
+        minMileage: filters.minMileage,
+        maxMileage: filters.maxMileage,
+        search: filters.search,
+        fleetOperatorId: filters.fleetOperatorId,
+        hubId: filters.hubId,
+
+        // Add support for new fields
+        modelId: filters.vehicleModel,
+      };
+
+      console.log("🔍 Frontend DEBUG: Original filters:", filters);
+      console.log("🔍 Frontend DEBUG: Mapped filters:", mappedFilters);
+
+      // Check specifically for search
+      if (filters.search) {
+        console.log(
+          `🔍 Frontend DEBUG: Search filter value: "${filters.search}"`
+        );
+      } else {
+        console.log("⚠️ Frontend DEBUG: No search filter provided");
+      }
+
+      // Remove undefined values
+      const cleanFilters = Object.fromEntries(
+        Object.entries(mappedFilters).filter(([_, v]) => v !== undefined)
+      );
+
+      // Ensure pagination parameters are properly formatted numbers
+      const paginationParams = {
+        page: pagination.page ? Number(pagination.page) : 1,
+        limit: pagination.limit ? Number(pagination.limit) : 25,
+        sortBy: pagination.sortBy || "updatedAt",
+        sortOrder: pagination.sortOrder || "desc",
+      };
+
+      const params = { ...cleanFilters, ...paginationParams };
       console.log("🔍 API Request Debug:", {
-        filters,
-        pagination,
+        originalFilters: filters,
+        mappedFilters: cleanFilters,
+        pagination: paginationParams,
         combinedParams: params,
         url: "/vehicles",
       });
+
       const response = await vehicleApi.get("/vehicles", { params });
       console.log("📡 API Response Debug:", {
         dataLength:
@@ -408,7 +460,24 @@ export const vehicleService = {
         totalFromPagination: response.data?.pagination?.totalItems,
         responseStructure: Object.keys(response.data || {}),
       });
-      return response.data;
+
+      // Ensure consistent response format
+      // If the backend sends both 'vehicles' and 'data', prioritize 'vehicles'
+      // If only one is present, use that one
+      // Always include 'pagination' if it exists
+      const formattedResponse = {
+        success: response.data.success,
+        vehicles: response.data.vehicles || response.data.data || [],
+        pagination: response.data.pagination || {
+          currentPage: params.page || 1,
+          totalItems: (response.data.vehicles || response.data.data || [])
+            .length,
+          totalPages: 1,
+        },
+        meta: response.data.meta,
+      };
+
+      return formattedResponse;
     } catch (error: any) {
       if (error.response?.status === 401) {
         console.warn(
@@ -1100,6 +1169,22 @@ export const vehicleService = {
       return {
         data: null,
         message: error.message || "Error fetching rider",
+      };
+    }
+  },
+
+  // Get vehicle rider history timeline
+  async getVehicleRiderHistory(vehicleId: string) {
+    try {
+      const response = await vehicleApi.get(
+        `/vehicles/${vehicleId}/rider-history`
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("Error fetching vehicle rider history:", error);
+      return {
+        data: [],
+        message: error.message || "Error fetching vehicle rider history",
       };
     }
   },

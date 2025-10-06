@@ -39,6 +39,11 @@ export interface QueryParams {
   location?: string;
   minAge?: number;
   maxAge?: number;
+  // Additional vehicle filter params
+  minMileage?: number;
+  maxMileage?: number;
+  purchaseDateFrom?: string;
+  purchaseDateTo?: string;
   // Service-specific query params
   vehicleId?: string;
   serviceType?: string;
@@ -46,6 +51,13 @@ export interface QueryParams {
   serviceCenter?: string;
   startDate?: string | Date;
   endDate?: string | Date;
+
+  // Additional frontend mapping parameters
+  oemType?: string; // Maps to oemId
+  oem?: string; // Also maps to oemId (alternative parameter name)
+  status?: string; // Maps to operationalStatus
+  currentRiderId?: string; // Maps to assignedRider
+  year?: string | number; // Filter by specific manufacturing year
 }
 
 export interface DateRange {

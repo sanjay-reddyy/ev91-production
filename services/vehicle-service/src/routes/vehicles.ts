@@ -11,6 +11,7 @@ import {
   assignVehicle,
   unassignVehicle,
   getVehicleHistory,
+  getVehicleRiderHistory,
   getVehicleStats,
   getAnalytics,
 } from "../controllers/vehicleController";
@@ -503,6 +504,47 @@ router.get(
   [param("id").notEmpty().withMessage("Vehicle ID is required")],
   validateRequest,
   getVehicleHistory
+);
+
+/**
+ * @swagger
+ * /api/v1/vehicles/{id}/rider-history:
+ *   get:
+ *     summary: Get vehicle rider assignment history with details
+ *     tags: [Vehicles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: includeMedia
+ *         schema:
+ *           type: boolean
+ *           default: true
+ *     responses:
+ *       200:
+ *         description: Vehicle rider history including handover details
+ */
+router.get(
+  "/:id/rider-history",
+  optionalAuth, // Allow public access for testing
+  [param("id").notEmpty().withMessage("Vehicle ID is required")],
+  validateRequest,
+  getVehicleRiderHistory
 );
 
 export default router;

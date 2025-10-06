@@ -316,7 +316,10 @@ export const getFleetPerformance = asyncHandler(async (req: AuthenticatedRequest
     // Calculate fleet KPIs
     const totalVehicles = vehicles.length;
     const availableVehicles = vehicles.filter(v => v.operationalStatus === 'Available').length;
-    const utilizationRate = totalVehicles > 0 ? ((totalVehicles - availableVehicles) / totalVehicles * 100) : 0;
+    const assignedVehicles = vehicles.filter(v => v.operationalStatus === 'Assigned').length;
+    
+    // Calculate utilization rate based on assigned vehicles only
+    const utilizationRate = totalVehicles > 0 ? (assignedVehicles / totalVehicles * 100) : 0;
     
     // Calculate maintenance costs
     const maintenanceCosts = vehicles.reduce((sum, vehicle) => {
@@ -327,9 +330,11 @@ export const getFleetPerformance = asyncHandler(async (req: AuthenticatedRequest
     
     // Calculate average age and mileage
     const totalAge = vehicles.reduce((sum, v) => sum + (v.ageInMonths || 0), 0);
-    const totalMileage = vehicles.reduce((sum, v) => sum + (v.mileage || 0), 0);
+    // Filter vehicles for mileage calculation (exclude retired and outliers)
+    const validVehiclesForMileage = vehicles.filter(v => v.operationalStatus !== 'Retired' && (v.mileage || 0) < 100000);
+    const totalMileage = validVehiclesForMileage.reduce((sum, v) => sum + (v.mileage || 0), 0);
     const averageAge = totalVehicles > 0 ? totalAge / totalVehicles : 0;
-    const averageMileage = totalVehicles > 0 ? totalMileage / totalVehicles : 0;
+    const averageMileage = validVehiclesForMileage.length > 0 ? totalMileage / validVehiclesForMileage.length : 0;
     
     // Calculate cost per vehicle and cost per km
     const costPerVehicle = totalVehicles > 0 ? maintenanceCosts / totalVehicles : 0;
@@ -339,6 +344,8 @@ export const getFleetPerformance = asyncHandler(async (req: AuthenticatedRequest
       fleet: {
         totalVehicles,
         availableVehicles,
+        assignedVehicles, // Added to include in response
+        validVehiclesForMileage: validVehiclesForMileage.length, // Added for mileage calculation transparency
         utilizationRate: parseFloat(utilizationRate.toFixed(2)),
         averageAge: parseFloat(averageAge.toFixed(1)),
         averageMileage: parseFloat(averageMileage.toFixed(0))

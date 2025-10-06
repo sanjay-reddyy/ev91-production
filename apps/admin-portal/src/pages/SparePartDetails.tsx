@@ -262,25 +262,25 @@ const SparePartDetails: React.FC = () => {
                       <Box display="flex" alignItems="center" gap={1} mb={2}>
                         <CategoryIcon color="action" />
                         <Typography variant="body2">
-                          <strong>Category:</strong> {sparePart?.category?.displayName || sparePart?.category?.name || 'N/A'}
+                          <span>Category: </span><strong>{sparePart?.category?.displayName || sparePart?.category?.name || 'N/A'}</strong>
                         </Typography>
                       </Box>
                       <Box display="flex" alignItems="center" gap={1} mb={2}>
                         <SupplierIcon color="action" />
                         <Typography variant="body2">
-                          <strong>Supplier:</strong> {sparePart?.supplier?.displayName || sparePart?.supplier?.name || 'N/A'}
+                          <span>Supplier: </span><strong>{sparePart?.supplier?.displayName || sparePart?.supplier?.name || 'N/A'}</strong>
                         </Typography>
                       </Box>
                     </Grid>
                     <Grid item xs={12} md={6}>
                       <Typography variant="body2" mb={1}>
-                        <strong>Cost Price:</strong> {formatCurrency(sparePart?.costPrice || 0)}
+                        <span>Cost Price: </span><strong>{formatCurrency(sparePart?.costPrice || 0)}</strong>
                       </Typography>
                       <Typography variant="body2" mb={1}>
-                        <strong>Selling Price:</strong> {formatCurrency(sparePart?.sellingPrice || 0)}
+                        <span>Selling Price: </span><strong>{formatCurrency(sparePart?.sellingPrice || 0)}</strong>
                       </Typography>
                       <Typography variant="body2" mb={1}>
-                        <strong>MRP:</strong> {formatCurrency(sparePart?.mrp || 0)}
+                        <span>MRP: </span><strong>{formatCurrency(sparePart?.mrp || 0)}</strong>
                       </Typography>
                     </Grid>
                   </Grid>
@@ -289,7 +289,7 @@ const SparePartDetails: React.FC = () => {
                     <>
                       <Divider sx={{ my: 2 }} />
                       <Typography variant="body2">
-                        <strong>Description:</strong> {sparePart.description}
+                        <span>Description: </span><strong>{sparePart.description}</strong>
                       </Typography>
                     </>
                   )}
@@ -333,22 +333,22 @@ const SparePartDetails: React.FC = () => {
                   </Typography>
                   {sparePart?.dimensions && (
                     <Typography variant="body2" mb={1}>
-                      <strong>Dimensions:</strong> {sparePart.dimensions}
+                      <span>Dimensions: </span><strong>{sparePart.dimensions}</strong>
                     </Typography>
                   )}
                   {sparePart?.weight && (
                     <Typography variant="body2" mb={1}>
-                      <strong>Weight:</strong> {sparePart.weight} kg
+                      <span>Weight: </span><strong>{sparePart.weight} kg</strong>
                     </Typography>
                   )}
                   {sparePart?.material && (
                     <Typography variant="body2" mb={1}>
-                      <strong>Material:</strong> {sparePart.material}
+                      <span>Material: </span><strong>{sparePart.material}</strong>
                     </Typography>
                   )}
                   {sparePart?.warranty && (
                     <Typography variant="body2" mb={1}>
-                      <strong>Warranty:</strong> {sparePart.warranty} months
+                      <span>Warranty: </span><strong>{sparePart.warranty} months</strong>
                     </Typography>
                   )}
                   <Typography variant="body2" mb={1}>
