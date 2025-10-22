@@ -105,6 +105,13 @@ model VehicleModel {
   isActive  Boolean @default(true)
   isPopular Boolean @default(false) // For prioritizing in UI
 
+  // EV Rental Fields (for platform rental program)
+  isAvailableForRent  Boolean @default(false) // Can this model be rented to riders?
+  baseRentalCost      Float? // Base monthly rental cost (before depreciation)
+  rentalCategory      String? // Economy, Standard, Premium, Cargo
+  rentalDescription   String? // Marketing description for rental program
+  minimumRentalPeriod Int? // Minimum rental period in months (default: 12)
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -150,17 +157,17 @@ model City {
   marketPotential     Float? // Estimated market size in INR
 
   // Event Sourcing Fields (for cross-service synchronization)
-  version           Int     @default(1) // For optimistic locking
-  lastModifiedBy    String? // User ID who last modified
-  eventSequence     Int     @default(0) // Auto-increment for event ordering
-  lastSyncAt        DateTime @default(now()) // Last sync timestamp
+  version        Int      @default(1) // For optimistic locking
+  lastModifiedBy String? // User ID who last modified
+  eventSequence  Int      @default(0) // Auto-increment for event ordering
+  lastSyncAt     DateTime @default(now()) // Last sync timestamp
 
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relationships
-  hubs Hub[]
+  hubs      Hub[]
   eventLogs CityEventLog[]
 
   @@map("cities")
@@ -177,9 +184,9 @@ model Hub {
   cityId String
 
   // Location Details (Mandatory)
-  address   String
-  pinCode   String
-  landmark  String?
+  address  String
+  pinCode  String
+  landmark String?
 
   // Geographic Coordinates (Mandatory)
   latitude  Float
@@ -404,8 +411,8 @@ model ServiceRecord {
   updatedAt DateTime @updatedAt
 
   // Relationships
-  vehicle        Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  mediaFiles     ServiceMedia[]
+  vehicle         Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  mediaFiles      ServiceMedia[]
   serviceRequests ServiceRequest[]
 
   @@map("service_records")
@@ -677,27 +684,27 @@ model FleetAnalytics {
 // Unified Service Request System
 // Main service request model that integrates scheduling and parts management
 model ServiceRequest {
-  id           String @id @default(cuid())
-  ticketNumber String @unique
+  id           String  @id @default(cuid())
+  ticketNumber String  @unique
   vehicleId    String
   requestedBy  String // User ID who created the request
   assignedTo   String? // Technician ID assigned to the service
 
   // Service Details
-  serviceType ServiceRequestType
-  priority    ServiceRequestPriority
-  status      ServiceRequestStatus @default(DRAFT)
-  title       String
-  description String
+  serviceType   ServiceRequestType
+  priority      ServiceRequestPriority
+  status        ServiceRequestStatus   @default(DRAFT)
+  title         String
+  description   String
   issueReported String?
-  symptoms    String? // JSON array
+  symptoms      String? // JSON array
 
   // Scheduling Information
-  requestedDate    DateTime?
-  scheduledDate    DateTime?
+  requestedDate     DateTime?
+  scheduledDate     DateTime?
   estimatedDuration Int? // in hours
-  actualStartTime  DateTime?
-  actualEndTime    DateTime?
+  actualStartTime   DateTime?
+  actualEndTime     DateTime?
 
   // Location and Resources
   serviceLocation String?
@@ -713,12 +720,12 @@ model ServiceRequest {
   actualTotalCost    Float?
 
   // Work Details
-  workPerformed           String?
-  completionNotes         String?
-  qualityCheckNotes       String?
-  customerApprovalRequired Boolean @default(false)
-  customerApproved        Boolean?
-  customerComments        String?
+  workPerformed            String?
+  completionNotes          String?
+  qualityCheckNotes        String?
+  customerApprovalRequired Boolean  @default(false)
+  customerApproved         Boolean?
+  customerComments         String?
 
   // Service Record Integration
   serviceRecordId String? // Links to actual service record when work is completed
@@ -734,13 +741,13 @@ model ServiceRequest {
   lastModifiedBy String
 
   // Relationships
-  vehicle         Vehicle               @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  serviceRecord   ServiceRecord?        @relation(fields: [serviceRecordId], references: [id])
-  partsRequests   ServicePartsRequest[]
-  partsUsed       ServicePartsUsed[]
-  approvals       ServiceApproval[]
-  attachments     ServiceAttachment[]
-  workflowSteps   ServiceWorkflowStep[]
+  vehicle       Vehicle               @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  serviceRecord ServiceRecord?        @relation(fields: [serviceRecordId], references: [id])
+  partsRequests ServicePartsRequest[]
+  partsUsed     ServicePartsUsed[]
+  approvals     ServiceApproval[]
+  attachments   ServiceAttachment[]
+  workflowSteps ServiceWorkflowStep[]
 
   @@map("service_requests")
   @@schema("vehicle")
@@ -748,30 +755,30 @@ model ServiceRequest {
 
 // Parts requests within a service request
 model ServicePartsRequest {
-  id               String @id @default(cuid())
-  serviceRequestId String
-  sparePartId      String
-  partName         String
-  partNumber       String
+  id                String            @id @default(cuid())
+  serviceRequestId  String
+  sparePartId       String
+  partName          String
+  partNumber        String
   requestedQuantity Int
-  approvedQuantity Int?
-  issuedQuantity   Int?
-  unitCost         Float?
-  totalCost        Float?
-  urgency          PartUrgency @default(Normal)
-  justification    String
-  status           PartRequestStatus @default(Pending)
-  requestedBy      String
-  approvedBy       String?
-  issuedBy         String?
-  requestedAt      DateTime @default(now())
-  approvedAt       DateTime?
-  issuedAt         DateTime?
-  notes            String?
+  approvedQuantity  Int?
+  issuedQuantity    Int?
+  unitCost          Float?
+  totalCost         Float?
+  urgency           PartUrgency       @default(Normal)
+  justification     String
+  status            PartRequestStatus @default(Pending)
+  requestedBy       String
+  approvedBy        String?
+  issuedBy          String?
+  requestedAt       DateTime          @default(now())
+  approvedAt        DateTime?
+  issuedAt          DateTime?
+  notes             String?
 
   // Cross-service integration fields
-  sparePartsRequestId String? // Links to spare-parts-service SparePartRequest
-  storeId            String? // Store where part should be sourced from
+  sparePartsRequestId   String? // Links to spare-parts-service SparePartRequest
+  storeId               String? // Store where part should be sourced from
   externalRequestStatus String? // Status from spare-parts-service
 
   // Relationships
@@ -783,7 +790,7 @@ model ServicePartsRequest {
 
 // Parts actually used during service
 model ServicePartsUsed {
-  id               String @id @default(cuid())
+  id               String    @id @default(cuid())
   serviceRequestId String
   sparePartId      String
   partName         String
@@ -794,15 +801,15 @@ model ServicePartsUsed {
   batchNumber      String?
   serialNumber     String?
   installedBy      String
-  installedAt      DateTime @default(now())
+  installedAt      DateTime  @default(now())
   warrantyPeriod   Int? // in months
   warrantyExpiry   DateTime?
   notes            String?
 
   // Cross-service integration fields
-  installedPartId   String? // Links to spare-parts-service InstalledPart
-  storeId          String? // Store where part was sourced from
-  supplierBatch    String? // Supplier batch information
+  installedPartId String? // Links to spare-parts-service InstalledPart
+  storeId         String? // Store where part was sourced from
+  supplierBatch   String? // Supplier batch information
 
   // Relationships
   serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
@@ -813,7 +820,7 @@ model ServicePartsUsed {
 
 // Approval workflow for service requests
 model ServiceApproval {
-  id               String @id @default(cuid())
+  id               String         @id @default(cuid())
   serviceRequestId String
   approvalType     ApprovalType
   requiredFor      String // What this approval is for
@@ -834,14 +841,14 @@ model ServiceApproval {
 
 // File attachments for service requests
 model ServiceAttachment {
-  id               String @id @default(cuid())
+  id               String             @id @default(cuid())
   serviceRequestId String
   fileName         String
   fileType         String
   fileSize         Int
   filePath         String
   uploadedBy       String
-  uploadedAt       DateTime @default(now())
+  uploadedAt       DateTime           @default(now())
   description      String?
   category         AttachmentCategory
 
@@ -854,7 +861,7 @@ model ServiceAttachment {
 
 // Workflow steps for service requests
 model ServiceWorkflowStep {
-  id               String @id @default(cuid())
+  id               String             @id @default(cuid())
   serviceRequestId String
   stepName         String
   stepType         WorkflowStepType
@@ -875,7 +882,7 @@ model ServiceWorkflowStep {
 
 // Service request templates for common requests
 model ServiceRequestTemplate {
-  id                String @id @default(cuid())
+  id                String                 @id @default(cuid())
   name              String
   description       String
   serviceType       ServiceRequestType
@@ -884,10 +891,10 @@ model ServiceRequestTemplate {
   requiredParts     String? // JSON array
   workSteps         String? // JSON array
   checklistItems    String? // JSON array
-  isActive          Boolean @default(true)
+  isActive          Boolean                @default(true)
   createdBy         String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   @@map("service_request_templates")
   @@schema("vehicle")
@@ -905,16 +912,16 @@ enum ServiceRequestType {
 }
 
 enum ServiceRequestStatus {
-  DRAFT         @map("Draft")
-  SUBMITTED     @map("Submitted")
-  APPROVED      @map("Approved")
-  PARTS_ORDERED @map("Parts Ordered")
-  SCHEDULED     @map("Scheduled")
-  IN_PROGRESS   @map("In Progress")
+  DRAFT          @map("Draft")
+  SUBMITTED      @map("Submitted")
+  APPROVED       @map("Approved")
+  PARTS_ORDERED  @map("Parts Ordered")
+  SCHEDULED      @map("Scheduled")
+  IN_PROGRESS    @map("In Progress")
   AWAITING_PARTS @map("Awaiting Parts")
-  COMPLETED     @map("Completed")
-  CANCELLED     @map("Cancelled")
-  ON_HOLD       @map("On Hold")
+  COMPLETED      @map("Completed")
+  CANCELLED      @map("Cancelled")
+  ON_HOLD        @map("On Hold")
 
   @@schema("vehicle")
 }
@@ -949,10 +956,10 @@ enum PartRequestStatus {
 }
 
 enum ApprovalType {
-  Customer   @map("Customer")
-  Manager    @map("Manager")
-  Technical  @map("Technical")
-  Financial  @map("Financial")
+  Customer  @map("Customer")
+  Manager   @map("Manager")
+  Technical @map("Technical")
+  Financial @map("Financial")
 
   @@schema("vehicle")
 }
@@ -966,12 +973,12 @@ enum ApprovalStatus {
 }
 
 enum AttachmentCategory {
-  Photo     @map("Photo")
-  Document  @map("Document")
-  Video     @map("Video")
-  Audio     @map("Audio")
-  Report    @map("Report")
-  Other     @map("Other")
+  Photo    @map("Photo")
+  Document @map("Document")
+  Video    @map("Video")
+  Audio    @map("Audio")
+  Report   @map("Report")
+  Other    @map("Other")
 
   @@schema("vehicle")
 }
@@ -986,29 +993,29 @@ enum WorkflowStepType {
 }
 
 enum WorkflowStepStatus {
-  Pending     @map("Pending")
-  InProgress  @map("In Progress")
-  Completed   @map("Completed")
-  Skipped     @map("Skipped")
-  Failed      @map("Failed")
+  Pending    @map("Pending")
+  InProgress @map("In Progress")
+  Completed  @map("Completed")
+  Skipped    @map("Skipped")
+  Failed     @map("Failed")
 
   @@schema("vehicle")
 }
 
 // City Event Log for sync recovery and event sourcing
 model CityEventLog {
-  id          String   @id @default(cuid())
-  eventId     String   @unique @map("event_id")
-  eventType   String   @map("event_type")
-  cityId      String   @map("city_id")
-  eventData   Json     @map("event_data")
-  timestamp   DateTime @default(now())
-  processed   Boolean  @default(false)
+  id          String    @id @default(cuid())
+  eventId     String    @unique @map("event_id")
+  eventType   String    @map("event_type")
+  cityId      String    @map("city_id")
+  eventData   Json      @map("event_data")
+  timestamp   DateTime  @default(now())
+  processed   Boolean   @default(false)
   processedAt DateTime? @map("processed_at")
-  retryCount  Int      @default(0) @map("retry_count")
+  retryCount  Int       @default(0) @map("retry_count")
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relation to City
   city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
@@ -1020,5 +1027,3 @@ model CityEventLog {
   @@map("city_event_logs")
   @@schema("vehicle")
 }
-
-

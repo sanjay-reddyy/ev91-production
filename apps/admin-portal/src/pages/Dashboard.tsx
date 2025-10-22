@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Box,
   Grid,
@@ -13,6 +15,8 @@ import {
   ListItemAvatar,
   ListItemText,
   LinearProgress,
+  CircularProgress,
+  Alert,
 } from '@mui/material'
 import {
   People as PeopleIcon,
@@ -21,6 +25,13 @@ import {
   Security as SecurityIcon,
   TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material'
+import { useAuth } from '../contexts/AuthContext'
+import {
+  getUserDepartment,
+  getDefaultDashboard,
+  getGreeting
+} from '../utils/dashboardHelpers'
+import { DepartmentType } from '../types/department'
 
 // Mock data - replace with real API calls
 const statsData = [
@@ -107,14 +118,68 @@ const quickActions = [
 ]
 
 export default function Dashboard() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [isRedirecting, setIsRedirecting] = useState(false)
+
+  useEffect(() => {
+    // Redirect users to their department-specific dashboard
+    if (user) {
+      const userDepartment = getUserDepartment(user)
+
+      if (userDepartment && userDepartment !== DepartmentType.MANAGEMENT) {
+        // Redirect to department-specific dashboard
+        setIsRedirecting(true)
+        const dashboardRoute = getDefaultDashboard(user)
+
+        // Small delay for smooth transition
+        setTimeout(() => {
+          navigate(dashboardRoute, { replace: true })
+        }, 500)
+      }
+    }
+  }, [user, navigate])
+
+  // Show loading while redirecting
+  if (isRedirecting) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '60vh',
+          gap: 2,
+        }}
+      >
+        <CircularProgress size={60} />
+        <Typography variant="h6" color="text.secondary">
+          Redirecting to your dashboard...
+        </Typography>
+      </Box>
+    )
+  }
+
+  // Welcome message with user name
+  const userName = user ? `${user.firstName} ${user.lastName}` : 'User'
+  const greeting = getGreeting()
+
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom>
-        Dashboard
+        {greeting}, {userName}!
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
         Welcome to the EV91 Admin Dashboard. Here's an overview of your platform.
       </Typography>
+
+      {/* Alert for department users */}
+      {user && getUserDepartment(user) && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          You have been granted access to specific department dashboards. Navigate using the sidebar menu.
+        </Alert>
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -206,7 +271,11 @@ export default function Dashboard() {
                     </Typography>
                   </CardContent>
                   <CardActions>
-                    <Button size="small" variant="contained">
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => navigate(action.link)}
+                    >
                       {action.action}
                     </Button>
                   </CardActions>

@@ -14,9 +14,9 @@ export function mapRider(rider: PrismaRider): Rider {
   // compute it from registrationStatus
   if (!("isActive" in rider)) {
     return {
-      ...rider,
-      isActive: rider.registrationStatus === "COMPLETED",
-    };
+      ...(rider as any),
+      isActive: (rider as any).registrationStatus === "COMPLETED",
+    } as Rider;
   }
 
   // Once database is migrated, this will use the actual field

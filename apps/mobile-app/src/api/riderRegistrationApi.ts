@@ -2,8 +2,13 @@
 // Updated to use unified rider-register endpoints with Twilio OTP
 // Professional SMS solution with complete registration flow
 
-import { useMutation, useQuery, UseMutationResult, UseQueryResult } from '@tanstack/react-query';
-import apiClient from './client';
+import {
+  useMutation,
+  useQuery,
+  UseMutationResult,
+  UseQueryResult,
+} from "@tanstack/react-query";
+import apiClient from "./client";
 
 // --- Types ---
 export interface RegistrationResponse {
@@ -67,6 +72,45 @@ export interface EsignResponse {
   success: boolean;
   message: string;
   providerResult: any;
+  registrationCompleted?: boolean; // ✅ NEW: Indicates if registration auto-completed
+}
+
+export interface RegistrationStatusResponse {
+  success: boolean;
+  data: {
+    riderId: string;
+    phone: string;
+    name: string;
+    registrationStatus: string;
+    isActive: boolean;
+    progress: number;
+    completedSteps: number;
+    totalSteps: number;
+    steps: Array<{
+      step: string;
+      completed: boolean;
+      required: boolean;
+      status?: string;
+      details?: string;
+    }>;
+    canComplete: boolean;
+    nextAction: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
+export interface CompleteRegistrationResponse {
+  success: boolean;
+  data?: {
+    completed: boolean;
+    message: string;
+    missing?: string[];
+    previousStatus?: string;
+    newStatus?: string;
+  };
+  error?: string;
+  message?: string;
 }
 
 // --- API Functions ---
@@ -77,9 +121,9 @@ export interface EsignResponse {
 export function useStartRegistration() {
   return useMutation({
     mutationFn: async (data: StartRegistrationRequest) => {
-      const response = await apiClient.post('/api/rider-register/start', data);
+      const response = await apiClient.post("/api/rider-register/start", data);
       return response.data as RegistrationResponse;
-    }
+    },
   });
 }
 
@@ -89,9 +133,12 @@ export function useStartRegistration() {
 export function useVerifyOtp() {
   return useMutation({
     mutationFn: async (data: VerifyOtpRequest) => {
-      const response = await apiClient.post('/api/rider-register/verify-otp', data);
+      const response = await apiClient.post(
+        "/api/rider-register/verify-otp",
+        data
+      );
       return response.data as RegistrationResponse;
-    }
+    },
   });
 }
 
@@ -101,9 +148,11 @@ export function useVerifyOtp() {
 export function useResendOtp() {
   return useMutation({
     mutationFn: async ({ tempId }: { tempId: string }) => {
-      const response = await apiClient.post('/api/rider-register/resend-otp', { tempId });
+      const response = await apiClient.post("/api/rider-register/resend-otp", {
+        tempId,
+      });
       return response.data as RegistrationResponse;
-    }
+    },
   });
 }
 
@@ -112,18 +161,18 @@ export function useResendOtp() {
  */
 function convertDateToISO(dateStr: string): string {
   if (!dateStr) return dateStr;
-  
+
   // Check if already in ISO format
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return dateStr;
   }
-  
+
   // Convert DD/MM/YYYY to YYYY-MM-DD
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-    const [day, month, year] = dateStr.split('/');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    const [day, month, year] = dateStr.split("/");
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
-  
+
   return dateStr;
 }
 
@@ -131,22 +180,25 @@ function convertDateToISO(dateStr: string): string {
  * Parse validation errors from API response
  */
 function parseValidationError(error: any): string {
-  if (error.response?.data?.details && Array.isArray(error.response.data.details)) {
+  if (
+    error.response?.data?.details &&
+    Array.isArray(error.response.data.details)
+  ) {
     const validationErrors = error.response.data.details
       .map((detail: any) => detail.msg || detail.message)
       .filter(Boolean)
-      .join(', ');
-    
+      .join(", ");
+
     if (validationErrors) {
       return `Validation error: ${validationErrors}`;
     }
   }
-  
+
   if (error.response?.data?.error) {
     return error.response.data.error;
   }
-  
-  return error.message || 'An unexpected error occurred';
+
+  return error.message || "An unexpected error occurred";
 }
 
 /**
@@ -154,22 +206,28 @@ function parseValidationError(error: any): string {
  */
 export function useSaveProfile() {
   return useMutation({
-    mutationFn: async ({ riderId, ...profileData }: RiderProfileData & { riderId: string }) => {
+    mutationFn: async ({
+      riderId,
+      ...profileData
+    }: RiderProfileData & { riderId: string }) => {
       try {
         // Convert DOB format before sending
         const convertedData = {
           ...profileData,
-          dob: convertDateToISO(profileData.dob)
+          dob: convertDateToISO(profileData.dob),
         };
-        
-        const response = await apiClient.post(`/api/rider-register/profile/${riderId}`, convertedData);
+
+        const response = await apiClient.post(
+          `/api/rider-register/profile/${riderId}`,
+          convertedData
+        );
         return response.data as RegistrationResponse;
       } catch (error) {
         // Enhanced error handling for better user experience
         const errorMessage = parseValidationError(error);
         throw new Error(errorMessage);
       }
-    }
+    },
   });
 }
 
@@ -178,16 +236,22 @@ export function useSaveProfile() {
  */
 export function useSaveEmergencyContact() {
   return useMutation({
-    mutationFn: async ({ riderId, ...emergencyData }: EmergencyContactData & { riderId: string }) => {
+    mutationFn: async ({
+      riderId,
+      ...emergencyData
+    }: EmergencyContactData & { riderId: string }) => {
       try {
-        const response = await apiClient.post(`/api/rider-register/emergency-contact/${riderId}`, emergencyData);
+        const response = await apiClient.post(
+          `/api/rider-register/emergency-contact/${riderId}`,
+          emergencyData
+        );
         return response.data as RegistrationResponse;
       } catch (error) {
         // Enhanced error handling for better user experience
         const errorMessage = parseValidationError(error);
         throw new Error(errorMessage);
       }
-    }
+    },
   });
 }
 
@@ -196,19 +260,21 @@ export function useSaveEmergencyContact() {
  */
 export function useGetProfile(riderId: string, enabled = true) {
   return useQuery({
-    queryKey: ['riderProfile', riderId],
+    queryKey: ["riderProfile", riderId],
     queryFn: async () => {
       if (!riderId) {
-        throw new Error('Rider ID is required');
+        throw new Error("Rider ID is required");
       }
-      
+
       try {
-        const response = await apiClient.get(`/api/rider-register/profile/${riderId}`);
-        
+        const response = await apiClient.get(
+          `/api/rider-register/profile/${riderId}`
+        );
+
         if (!response.data.success) {
-          throw new Error(response.data.error || 'Failed to fetch profile');
+          throw new Error(response.data.error || "Failed to fetch profile");
         }
-        
+
         return response.data.data.rider;
       } catch (error: any) {
         // If profile doesn't exist yet (404), return null instead of throwing
@@ -226,7 +292,7 @@ export function useGetProfile(riderId: string, enabled = true) {
       }
       return failureCount < 2;
     },
-    staleTime: 5 * 60 * 1000 // 5 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
@@ -235,29 +301,29 @@ export function useGetProfile(riderId: string, enabled = true) {
  */
 export function useUploadKycDocument() {
   return useMutation({
-    mutationFn: async ({ 
-      riderId, 
-      documentType, 
-      file 
-    }: { 
-      riderId: string; 
-      documentType: string; 
+    mutationFn: async ({
+      riderId,
+      documentType,
+      file,
+    }: {
+      riderId: string;
+      documentType: string;
       file: any; // Accept React Native file object
     }) => {
       const formData = new FormData();
-      formData.append('file', file);
-      
+      formData.append("file", file);
+
       const response = await apiClient.post(
-        `/api/rider-register/kyc/document/${riderId}/${documentType}`, 
+        `/api/rider-register/kyc/document/${riderId}/${documentType}`,
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            "Content-Type": "multipart/form-data",
           },
         }
       );
       return response.data as KycDocumentUploadResponse;
-    }
+    },
   });
 }
 
@@ -266,9 +332,11 @@ export function useUploadKycDocument() {
  */
 export function useKycStatus(riderId: string, enabled = true) {
   return useQuery({
-    queryKey: ['kycStatus', riderId],
+    queryKey: ["kycStatus", riderId],
     queryFn: async () => {
-      const response = await apiClient.get(`/api/rider-register/kyc-status/${riderId}`);
+      const response = await apiClient.get(
+        `/api/rider-register/kyc-status/${riderId}`
+      );
       return response.data as KycStatusResponse;
     },
     enabled,
@@ -282,9 +350,11 @@ export function useKycStatus(riderId: string, enabled = true) {
 export function useSubmitKyc() {
   return useMutation({
     mutationFn: async ({ riderId }: { riderId: string }) => {
-      const response = await apiClient.post(`/api/rider-register/kyc/submit/${riderId}`);
+      const response = await apiClient.post(
+        `/api/rider-register/kyc/submit/${riderId}`
+      );
       return response.data;
-    }
+    },
   });
 }
 
@@ -293,9 +363,63 @@ export function useSubmitKyc() {
  */
 export function useEsignAgreement() {
   return useMutation({
-    mutationFn: async ({ riderId, agreementData }: { riderId: string, agreementData: any }) => {
-      const response = await apiClient.post('/api/rider-register/esign', { riderId, agreementData });
+    mutationFn: async ({
+      riderId,
+      agreementData,
+    }: {
+      riderId: string;
+      agreementData: any;
+    }) => {
+      const response = await apiClient.post("/api/rider-register/esign", {
+        riderId,
+        agreementData,
+      });
       return response.data as EsignResponse;
-    }
+    },
+  });
+}
+
+/**
+ * Get detailed registration status with step-by-step progress
+ * ✅ NEW: Polls registration status to detect automatic completion
+ */
+export function useRegistrationStatus(riderId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["registrationStatus", riderId],
+    queryFn: async () => {
+      if (!riderId) {
+        throw new Error("Rider ID is required");
+      }
+
+      const response = await apiClient.get(
+        `/api/rider-register/registration-status/${riderId}`
+      );
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.error || "Failed to fetch registration status"
+        );
+      }
+
+      return response.data.data;
+    },
+    enabled: enabled && !!riderId,
+    refetchInterval: 3000, // Poll every 3 seconds to detect automatic completion
+    retry: 2,
+  });
+}
+
+/**
+ * Manually trigger registration completion check
+ * ✅ NEW: Allows manual retry if automatic completion fails
+ */
+export function useCompleteRegistration() {
+  return useMutation({
+    mutationFn: async ({ riderId }: { riderId: string }) => {
+      const response = await apiClient.post(
+        `/api/rider-register/complete-registration/${riderId}`
+      );
+      return response.data as CompleteRegistrationResponse;
+    },
   });
 }

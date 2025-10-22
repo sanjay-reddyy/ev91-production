@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from "express";
 import {
   getAllVehicleModels,
   getVehicleModelById,
@@ -7,33 +7,46 @@ import {
   updateVehicleModel,
   deleteVehicleModel,
   getVehicleModelSpecs,
-  getModelMetadata
-} from '../controllers/vehicleModelController';
+  getModelMetadata,
+  // EV Rental endpoints
+  getAvailableRentalModels,
+  calculateRentalCost,
+  getAvailableVehiclesForModel,
+} from "../controllers/vehicleModelController";
 
 const router = Router();
 
 // GET /api/vehicle-models - Get all vehicle models with optional filters
-router.get('/', getAllVehicleModels);
+router.get("/", getAllVehicleModels);
 
 // GET /api/vehicle-models/metadata - Get model categories, segments, etc.
-router.get('/metadata', getModelMetadata);
+router.get("/metadata", getModelMetadata);
+
+// GET /api/vehicle-models/available-for-rent - Get EV rental available models
+router.get("/available-for-rent", getAvailableRentalModels);
 
 // GET /api/vehicle-models/oem/:oemId - Get vehicle models by OEM ID
-router.get('/oem/:oemId', getVehicleModelsByOEM);
+router.get("/oem/:oemId", getVehicleModelsByOEM);
 
 // GET /api/vehicle-models/:id - Get vehicle model by ID
-router.get('/:id', getVehicleModelById);
+router.get("/:id", getVehicleModelById);
 
 // GET /api/vehicle-models/:id/specs - Get vehicle model specifications (for autofill)
-router.get('/:id/specs', getVehicleModelSpecs);
+router.get("/:id/specs", getVehicleModelSpecs);
+
+// GET /api/vehicle-models/:id/rental-cost - Calculate rental cost with depreciation
+router.get("/:id/rental-cost", calculateRentalCost);
+
+// GET /api/vehicle-models/:id/available-vehicles - Get available vehicles for this model
+router.get("/:id/available-vehicles", getAvailableVehiclesForModel);
 
 // POST /api/vehicle-models - Create new vehicle model
-router.post('/', createVehicleModel);
+router.post("/", createVehicleModel);
 
 // PUT /api/vehicle-models/:id - Update vehicle model
-router.put('/:id', updateVehicleModel);
+router.put("/:id", updateVehicleModel);
 
 // DELETE /api/vehicle-models/:id - Delete vehicle model (soft delete by default)
-router.delete('/:id', deleteVehicleModel);
+router.delete("/:id", deleteVehicleModel);
 
 export default router;

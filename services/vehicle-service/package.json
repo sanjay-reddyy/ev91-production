@@ -19,6 +19,7 @@
     "prisma:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@ev91/shared-utils": "file:../../packages/shared-utils",
     "@prisma/client": "^6.12.0",
     "aws-sdk": "^2.1692.0",
     "bcrypt": "^5.1.1",

@@ -44,6 +44,7 @@ api.interceptors.response.use(
 // Types for Rider Management
 export interface Rider {
   id: string;
+  publicRiderId?: string | null; // Human-readable rider ID (e.g., MAA-25-R000001)
   phone: string;
   phoneVerified: boolean;
   name: string | null;
@@ -64,6 +65,7 @@ export interface Rider {
   kycStatus: "pending" | "verified" | "rejected" | "incomplete";
   agreementSigned: boolean;
   isActive: boolean;
+  selfie?: string | null; // Profile picture/selfie URL
   createdAt: string;
   updatedAt: string;
   // Vehicle Assignment
@@ -76,6 +78,13 @@ export interface Rider {
   storeAssignmentNotes: string | null;
   assignedStore?: StoreAssignment;
   assignedClient?: ClientAssignment;
+  // EV Rental Fields
+  needsEvRental?: boolean;
+  vehiclePreference?: string | null;
+  preferredVehicleModelId?: string | null;
+  workType?: "FULL_TIME" | "PART_TIME" | null;
+  rentalStatus?: string;
+  ownVehicleType?: string | null;
   // Rider Performance Metrics
   totalOrders?: number;
   averageRating?: number;
@@ -140,6 +149,38 @@ export interface RiderKYC {
   documentPreviewUrl?: string; // URL for thumbnail/preview
   isValid?: boolean; // Whether document is valid (based on verification)
   expiryDate?: string | null; // Document expiry date if applicable
+}
+
+export interface RiderBankDetails {
+  id: string;
+  riderId: string;
+  accountHolderName: string;
+  accountNumber: string;
+  accountType: "SAVINGS" | "CURRENT";
+  ifscCode: string;
+  bankName: string;
+  branchName: string | null;
+  branchAddress: string | null;
+  verificationStatus: "pending" | "verified" | "rejected";
+  verificationDate: string | null;
+  verificationNotes: string | null;
+  verifiedBy: string | null;
+  proofDocumentType: "PASSBOOK" | "CANCELLED_CHEQUE" | "BANK_STATEMENT" | null;
+  proofDocumentUrl: string | null;
+  isPrimary: boolean;
+  isActive: boolean;
+  notes: string | null;
+  addedBy: string | null;
+  lastEditedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Related data
+  rider?: {
+    id: string;
+    name: string;
+    phone: string;
+    publicRiderId: string | null;
+  };
 }
 
 export interface RiderOrder {
@@ -275,6 +316,7 @@ class RiderService {
     kycStatus?: string;
     isActive?: boolean;
     city?: string;
+    storeId?: string;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }): Promise<APIResponse<Rider[]>> {
@@ -336,6 +378,11 @@ class RiderService {
         queryParams.append("city", params.city);
       }
 
+      if (params?.storeId) {
+        console.log(`Adding storeId filter: ${params.storeId}`);
+        queryParams.append("storeId", params.storeId);
+      }
+
       if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
       if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
 
@@ -345,11 +392,11 @@ class RiderService {
       console.log("🔍 API Request Debug:", {
         url: "/riders",
         params: Object.fromEntries(queryParams.entries()),
-        fullUrl: `/riders?${queryParams.toString()}`,
+        fullUrl: `/?${queryParams.toString()}`,
       });
 
       // Make the API call with our filters
-      const response = await api.get(`?${queryParams}`);
+      const response = await api.get(`/?${queryParams}`);
 
       // Enhanced response debugging
       console.log("📡 API Response Debug:", {
@@ -692,8 +739,10 @@ class RiderService {
         options
       );
 
+      // Path: /{riderId}/complete-registration
+      // Combined with baseURL (/api/riders), this becomes: /api/riders/{riderId}/complete-registration
       const response = await api.patch(
-        `/admin/${riderId}/complete-registration`,
+        `/${riderId}/complete-registration`,
         options
       );
 
@@ -725,30 +774,50 @@ class RiderService {
     cacheBuster?: string
   ): Promise<
     APIResponse<{
+      riderId: string;
+      phone: string;
+      name: string;
       registrationStatus: string;
       isActive: boolean;
       kycStatus: string;
-      missingFields: string[];
+      progress: number;
       completionPercentage: number;
+      completedSteps: number;
+      totalSteps: number;
+      steps: Array<{
+        step: string;
+        completed: boolean;
+        required: boolean;
+        status: string;
+        details?: string;
+      }>;
+      canComplete: boolean;
+      missingFields: string[];
+      nextAction: string | null;
+      createdAt: string;
+      updatedAt: string;
     }>
   > {
     // Based on examining app.ts and completeRegistration.ts:
     // 1. The route for registration status is defined in completeRegistration.ts as "/riders/:riderId/status"
     // 2. In app.ts, completeRegistrationRoutes are mounted at "/api/v1/registration"
     // 3. The API Gateway routes "/api/riders/*" to the rider service
-    // 4. The rider service expects "/api/v1/registration/riders/:riderId/status"
+    // 4. The backend path is "/api/v1/registration/riders/:riderId/status"
+    // 5. To access this through the API Gateway at /api/riders, we use "/registration/riders/:riderId/status"
 
-    // Use the standard api client which already has the correct baseURL
-    // Our baseURL is "${RIDER_SERVICE_URL}/riders", so we need to go up one level
-    // and access the registration path at the same level
-
+    // Since our baseURL is already "http://localhost:8000/api/riders",
+    // we can directly access the registration path relative to the riders endpoint
     const url = cacheBuster
-      ? `../registration/riders/${riderId}/status?${cacheBuster}`
-      : `../registration/riders/${riderId}/status`;
+      ? `/registration/riders/${riderId}/status?${cacheBuster}`
+      : `/registration/riders/${riderId}/status`;
 
     console.log(
       `[riderService] Fetching registration status for rider ${riderId}`,
-      { withCacheBuster: !!cacheBuster, url }
+      {
+        withCacheBuster: !!cacheBuster,
+        url,
+        fullUrl: `${api.defaults.baseURL}${url}`,
+      }
     );
 
     const response = await api.get(url);
@@ -835,7 +904,8 @@ class RiderService {
    */
   async submitKYC(
     riderId: string,
-    kycData: RiderKYCSubmission
+    kycData: RiderKYCSubmission,
+    onProgressUpdate?: (progress: number) => void
   ): Promise<APIResponse<RiderKYC>> {
     try {
       console.log(
@@ -850,25 +920,85 @@ class RiderService {
         }
       );
 
+      // If no file is provided, we can't proceed
+      if (!kycData.documentImage) {
+        throw new Error("No document image provided");
+      }
+
+      // Check if we should use the new chunked upload for large files
+      const isLargeFile = kycData.documentImage.size > 2 * 1024 * 1024; // Over 2MB
+
+      // For smaller files or if import fails, fall back to the standard upload method
+      let response;
+
+      if (isLargeFile) {
+        try {
+          // Dynamically import the chunked upload utility to avoid blocking initial load
+          const { uploadFileInChunks } = await import("../utils/fileUploader");
+
+          console.log(
+            `[riderService] Using chunked upload for large file (${(
+              kycData.documentImage.size /
+              1024 /
+              1024
+            ).toFixed(1)}MB)`
+          );
+
+          // Prepare form fields
+          const formFields = {
+            documentType: kycData.documentType,
+            documentNumber: kycData.documentNumber,
+          };
+
+          // Use chunked upload with progress reporting
+          const result = await uploadFileInChunks<APIResponse<RiderKYC>>(
+            api,
+            `${riderId}/kyc`,
+            formFields,
+            {
+              file: kycData.documentImage,
+              onProgress: (progress) => {
+                console.log(`[riderService] Upload progress: ${progress}%`);
+                onProgressUpdate?.(progress);
+              },
+            }
+          );
+
+          return result;
+        } catch (importError) {
+          console.error(
+            "[riderService] Failed to use chunked upload, falling back to standard upload:",
+            importError
+          );
+          // Continue with standard upload if chunked upload fails
+        }
+      }
+
+      // Standard upload method for smaller files or as fallback
+      console.log(`[riderService] Using standard upload method`);
+
       // Create a properly formatted FormData object
       const formData = new FormData();
       formData.append("documentType", kycData.documentType);
       formData.append("documentNumber", kycData.documentNumber);
+      formData.append("file", kycData.documentImage);
 
-      if (kycData.documentImage) {
-        // Make sure we're sending the file with the correct field name and file properties
-        formData.append("file", kycData.documentImage);
-      }
+      // Configure request with progress tracking
+      const config = {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 180000, // 3 minutes - increased to allow for S3 upload retries
+        onUploadProgress: (progressEvent: any) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          console.log(`[riderService] Upload progress: ${percentCompleted}%`);
+          onProgressUpdate?.(percentCompleted);
+        },
+      };
 
       // Remove the leading slash to avoid path issues with baseURL
       // The baseURL is already configured to include /api/riders
-      const response = await api.post(`${riderId}/kyc`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        // Increase timeout for file uploads
-        timeout: 30000,
-      });
+      response = await api.post(`${riderId}/kyc`, formData, config);
 
       console.log(`[riderService] KYC document submission successful:`, {
         success: response.data?.success,
@@ -1056,10 +1186,26 @@ class RiderService {
     assignmentData: { vehicleId: string; hubId?: string }
   ): Promise<APIResponse<Rider>> {
     try {
-      const response = await api.post(
-        `/admin/${riderId}/assign-vehicle`,
-        assignmentData
-      );
+      // Get user name from localStorage - use only the name field
+      let assignedBy = "admin";
+      try {
+        const userJson = localStorage.getItem("user");
+        if (userJson) {
+          const userData = JSON.parse(userJson);
+          // Only use the name field, not email/username/id
+          assignedBy = userData.name || "admin";
+        }
+      } catch (e) {
+        console.warn("Failed to parse user from localStorage:", e);
+      }
+
+      // Path: /{riderId}/assign-vehicle
+      // Combined with baseURL (/api/riders), this becomes: /api/riders/{riderId}/assign-vehicle
+      const response = await api.post(`/${riderId}/assign-vehicle`, {
+        ...assignmentData,
+        assignedBy,
+        updatedBy: assignedBy,
+      });
       return response.data;
     } catch (error) {
       console.error("Error assigning vehicle to rider:", error);
@@ -1069,10 +1215,60 @@ class RiderService {
 
   /**
    * Unassign vehicle from rider
+   * @param riderId The rider ID
+   * @param reason The reason for unassigning the vehicle
    */
-  async unassignVehicleFromRider(riderId: string): Promise<APIResponse<Rider>> {
+  async unassignVehicleFromRider(
+    riderId: string,
+    reason?: string
+  ): Promise<APIResponse<Rider>> {
     try {
-      const response = await api.delete(`admin/${riderId}/assign-vehicle`);
+      // Path: /{riderId}/assign-vehicle
+      // Combined with baseURL (/api/riders), this becomes: /api/riders/{riderId}/assign-vehicle
+      // Which the API Gateway routes to rider-service /api/v1/riders/{riderId}/assign-vehicle
+
+      // Get user information from localStorage - use only the name field
+      let user = "admin";
+      try {
+        const userJson = localStorage.getItem("user");
+        if (userJson) {
+          const userData = JSON.parse(userJson);
+          // Only use the name field, not email/username/id
+          user = userData.name || "admin";
+        }
+      } catch (e) {
+        console.warn("Failed to parse user from localStorage:", e);
+      }
+
+      // Send reason and user info in request body if provided
+      // Using multiple field names for backend compatibility
+      const requestConfig = reason
+        ? {
+            data: {
+              // Reason fields (different backends may expect different names)
+              reason: reason,
+              notes: reason,
+
+              // User fields (different backends may expect different names)
+              unassignedBy: user,
+              returnedBy: user,
+              updatedBy: user,
+
+              // Additional metadata
+              timestamp: new Date().toISOString(),
+            },
+          }
+        : {};
+
+      console.log(
+        "[riderService] Unassigning vehicle with data:",
+        requestConfig.data
+      );
+
+      const response = await api.delete(
+        `/${riderId}/assign-vehicle`,
+        requestConfig
+      );
       return response.data;
     } catch (error) {
       console.error("Error unassigning vehicle from rider:", error);
@@ -1081,60 +1277,33 @@ class RiderService {
   }
 
   /**
-   * Get available vehicles (existing method - keeping for reference)
+   * Get available vehicles for assignment
    */
   async getAvailableVehicles(
     hubId?: string
   ): Promise<APIResponse<VehicleAssignment[]>> {
     try {
-      // Call vehicle service directly
-      const vehicleServiceUrl = "http://localhost:4004/api/v1/vehicles";
+      // Use rider service endpoint which has proper vehicle transformation
       const params = new URLSearchParams();
-
-      // Filter by operational status
-      params.append("operationalStatus", "Available");
-
-      // Filter by hub if provided
       if (hubId) {
         params.append("hubId", hubId);
       }
 
-      const response = await axios.get(
-        `${vehicleServiceUrl}?${params.toString()}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const url = `/vehicles/available${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+      console.log("getAvailableVehicles - calling:", url);
 
-      // Transform the response to match VehicleAssignment interface
+      const response = await api.get(url);
+
       console.log("getAvailableVehicles - API response:", response.data);
       const vehicles = response.data.data || [];
-      console.log("getAvailableVehicles - vehicles to transform:", vehicles);
-      const transformedVehicles = vehicles.map((vehicle: any) => ({
-        id: vehicle.id,
-        make: vehicle.model?.oem?.name || "Unknown",
-        model: vehicle.model?.name || "Unknown",
-        registrationNumber: vehicle.registrationNumber,
-        vehicleType: vehicle.vehicleType || "Unknown",
-        fuelType: vehicle.model?.fuelType || "Unknown",
-        assignedDate: vehicle.assignedDate || "",
-        status: vehicle.serviceStatus,
-        operationalStatus: vehicle.operationalStatus,
-        hubId: vehicle.hubId,
-        hubName: vehicle.hub?.name,
-      }));
-
-      console.log(
-        "getAvailableVehicles - transformed vehicles:",
-        transformedVehicles
-      );
+      console.log("getAvailableVehicles - vehicles received:", vehicles);
 
       return {
         success: true,
         message: "Available vehicles fetched successfully",
-        data: transformedVehicles,
+        data: vehicles,
       };
     } catch (error: any) {
       console.error("Error fetching available vehicles:", error);
@@ -1151,14 +1320,8 @@ class RiderService {
    */
   async getHubs(): Promise<APIResponse<any[]>> {
     try {
-      // Call vehicle service directly since it has optionalAuth
-      const vehicleServiceUrl = "http://localhost:4004/api/v1/hubs";
-
-      const response = await axios.get(vehicleServiceUrl, {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      // Use rider service endpoint which transforms hub data with city names
+      const response = await api.get("/hubs");
 
       console.log("Raw hub response:", response.data);
       const hubsData = response.data.data || [];
@@ -1241,10 +1404,9 @@ class RiderService {
     }
   ): Promise<APIResponse<Rider>> {
     try {
-      const response = await api.post(
-        `/admin/${riderId}/assign-store`,
-        storeData
-      );
+      // Path: /{riderId}/assign-store
+      // Combined with baseURL (/api/riders), this becomes: /api/riders/{riderId}/assign-store
+      const response = await api.post(`/${riderId}/assign-store`, storeData);
       return response.data;
     } catch (error) {
       console.error("Error assigning store to rider:", error);
@@ -1257,7 +1419,9 @@ class RiderService {
    */
   async unassignStoreFromRider(riderId: string): Promise<APIResponse<Rider>> {
     try {
-      const response = await api.delete(`admin/${riderId}/assign-store`);
+      // Path: /{riderId}/assign-store
+      // Combined with baseURL (/api/riders), this becomes: /api/riders/{riderId}/assign-store
+      const response = await api.delete(`/${riderId}/assign-store`);
       return response.data;
     } catch (error) {
       console.error("Error unassigning store from rider:", error);
@@ -1286,6 +1450,212 @@ class RiderService {
     // We'll use "stats" directly
     const response = await api.get(`stats`);
     return response.data;
+  }
+
+  // ==========================================
+  // BANK DETAILS MANAGEMENT
+  // ==========================================
+
+  /**
+   * Add bank account details for a rider
+   */
+  async addBankDetails(
+    riderId: string,
+    bankData: {
+      accountHolderName: string;
+      accountNumber: string;
+      accountType: "SAVINGS" | "CURRENT";
+      ifscCode: string;
+      bankName: string;
+      branchName?: string;
+      branchAddress?: string;
+      isPrimary?: boolean;
+      notes?: string;
+    },
+    proofDocument?: File,
+    proofType?: "PASSBOOK" | "CANCELLED_CHEQUE" | "BANK_STATEMENT"
+  ): Promise<APIResponse<RiderBankDetails>> {
+    try {
+      const formData = new FormData();
+      formData.append("riderId", riderId);
+      formData.append("accountHolderName", bankData.accountHolderName);
+      formData.append("accountNumber", bankData.accountNumber);
+      formData.append("accountType", bankData.accountType);
+      formData.append("ifscCode", bankData.ifscCode);
+      formData.append("bankName", bankData.bankName);
+      if (bankData.branchName)
+        formData.append("branchName", bankData.branchName);
+      if (bankData.branchAddress)
+        formData.append("branchAddress", bankData.branchAddress);
+      if (bankData.isPrimary !== undefined)
+        formData.append("isPrimary", String(bankData.isPrimary));
+      if (bankData.notes) formData.append("notes", bankData.notes);
+      if (proofDocument && proofType) {
+        formData.append("proofDocument", proofDocument);
+        formData.append("proofType", proofType);
+      }
+
+      const response = await api.post(`/bank-details`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error adding bank details:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update bank account details
+   */
+  async updateBankDetails(
+    bankDetailsId: string,
+    updates: Partial<{
+      accountHolderName: string;
+      accountNumber: string;
+      accountType: "SAVINGS" | "CURRENT";
+      ifscCode: string;
+      bankName: string;
+      branchName: string;
+      branchAddress: string;
+      isPrimary: boolean;
+      notes: string;
+      verificationStatus: "pending" | "verified" | "rejected";
+      verificationNotes: string;
+    }>,
+    proofDocument?: File,
+    proofType?: "PASSBOOK" | "CANCELLED_CHEQUE" | "BANK_STATEMENT"
+  ): Promise<APIResponse<RiderBankDetails>> {
+    try {
+      const formData = new FormData();
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value !== undefined) {
+          formData.append(key, String(value));
+        }
+      });
+      if (proofDocument && proofType) {
+        formData.append("proofDocument", proofDocument);
+        formData.append("proofType", proofType);
+      }
+
+      const response = await api.put(
+        `/bank-details/${bankDetailsId}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating bank details:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all bank accounts for a rider
+   */
+  async getRiderBankDetails(
+    riderId: string
+  ): Promise<APIResponse<RiderBankDetails[]>> {
+    try {
+      const response = await api.get(`/bank-details/rider/${riderId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching rider bank details:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get specific bank account by ID
+   */
+  async getBankDetailsById(
+    bankDetailsId: string
+  ): Promise<APIResponse<RiderBankDetails>> {
+    try {
+      const response = await api.get(`/bank-details/${bankDetailsId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching bank details:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete (deactivate) bank account details
+   */
+  async deleteBankDetails(bankDetailsId: string): Promise<APIResponse<void>> {
+    try {
+      const response = await api.delete(`/bank-details/${bankDetailsId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting bank details:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set a bank account as primary
+   */
+  async setPrimaryAccount(
+    bankDetailsId: string
+  ): Promise<APIResponse<RiderBankDetails>> {
+    try {
+      const response = await api.patch(
+        `/bank-details/${bankDetailsId}/set-primary`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error setting primary account:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify bank account details
+   */
+  async verifyBankDetails(
+    bankDetailsId: string,
+    verificationNotes?: string
+  ): Promise<APIResponse<RiderBankDetails>> {
+    try {
+      const response = await api.patch(
+        `/bank-details/${bankDetailsId}/verify`,
+        {
+          verificationNotes,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error verifying bank details:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reject bank account details
+   */
+  async rejectBankDetails(
+    bankDetailsId: string,
+    verificationNotes: string
+  ): Promise<APIResponse<RiderBankDetails>> {
+    try {
+      const response = await api.patch(
+        `/bank-details/${bankDetailsId}/reject`,
+        {
+          verificationNotes,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error rejecting bank details:", error);
+      throw error;
+    }
   }
 }
 

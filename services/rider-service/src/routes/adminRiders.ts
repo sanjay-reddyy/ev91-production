@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { prisma } from "../config/database";
 import axios from "axios";
 import { mapRider } from "../models/riderModels";
+import { generateRiderId } from "../services/riderIdGenerator";
 
 const router = express.Router();
 
@@ -51,6 +52,8 @@ router.get("/riders", async (req: Request, res: Response) => {
       where.OR = [
         { name: { contains: search as string, mode: "insensitive" } },
         { phone: { contains: search as string } },
+        { publicRiderId: { contains: search as string, mode: "insensitive" } },
+        { email: { contains: search as string, mode: "insensitive" } },
       ];
     }
 
@@ -59,6 +62,11 @@ router.get("/riders", async (req: Request, res: Response) => {
     }
 
     if (kycStatus) {
+      console.log("🔍 BACKEND - KYC Status filter applied:", {
+        received: kycStatus,
+        type: typeof kycStatus,
+        willQuery: kycStatus,
+      });
       where.kycStatus = kycStatus;
     }
 
@@ -66,9 +74,15 @@ router.get("/riders", async (req: Request, res: Response) => {
       where.city = { contains: city as string, mode: "insensitive" };
     }
 
+    // Store filter
+    const storeId = req.query.storeId as string;
+    if (storeId) {
+      where.assignedStoreId = storeId;
+    }
+
     console.log("Query where clause:", JSON.stringify(where));
 
-    // Get riders with pagination
+    // Get riders with pagination and include KYC documents for verified selfies
     const [riders, totalCount] = await Promise.all([
       prisma.rider.findMany({
         where,
@@ -76,6 +90,18 @@ router.get("/riders", async (req: Request, res: Response) => {
         take: limitNum,
         orderBy: {
           [sortBy as string]: sortOrder === "desc" ? "desc" : "asc",
+        },
+        include: {
+          kycDocuments: {
+            where: {
+              documentType: "selfie",
+              verificationStatus: "verified",
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+            take: 1,
+          },
         },
       }),
       prisma.rider.count({ where }),
@@ -98,6 +124,18 @@ router.get("/riders", async (req: Request, res: Response) => {
           orderBy: {
             [sortBy as string]: sortOrder === "desc" ? "desc" : "asc",
           },
+          include: {
+            kycDocuments: {
+              where: {
+                documentType: "selfie",
+                verificationStatus: "verified",
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+              take: 1,
+            },
+          },
         });
 
         if (firstPageRiders.length > 0) {
@@ -105,16 +143,107 @@ router.get("/riders", async (req: Request, res: Response) => {
             `Retrieved ${firstPageRiders.length} riders from the first page as fallback`
           );
 
-          // Add basic metrics
-          const ridersWithMetrics = firstPageRiders.map((rider) => ({
-            ...rider,
-            // Use actual isActive value from the database, ensure it's a proper boolean
-            isActive: rider.isActive === true,
-            totalOrders: 0,
-            averageRating: 0,
-            totalEarnings: 0,
-            completionRate: 0,
-          }));
+          // Fetch store information for fallback riders
+          const clientStoreServiceUrl =
+            process.env.CLIENT_STORE_SERVICE_URL || "http://localhost:3006";
+          const vehicleServiceUrl =
+            process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+          const ridersWithMetrics = await Promise.all(
+            firstPageRiders.map(async (rider: any) => {
+              let assignedStore = null;
+              let assignedVehicle = null;
+
+              // Fetch store details if rider has an assigned store
+              if (rider.assignedStoreId) {
+                try {
+                  const storeResponse = await axios.get(
+                    `${clientStoreServiceUrl}/internal/stores/${rider.assignedStoreId}`,
+                    {
+                      timeout: 3000,
+                      headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                      },
+                    }
+                  );
+
+                  if (storeResponse.data.success && storeResponse.data.data) {
+                    const storeData = storeResponse.data.data;
+                    assignedStore = {
+                      id: storeData.id,
+                      storeName: storeData.storeName,
+                      storeCode: storeData.storeCode,
+                      city: storeData.city,
+                    };
+                  }
+                } catch (storeError) {
+                  console.warn(
+                    `Could not fetch store details for rider ${rider.id}:`,
+                    storeError instanceof Error
+                      ? storeError.message
+                      : "Unknown error"
+                  );
+                }
+              }
+
+              // Fetch vehicle details if rider has an assigned vehicle
+              if (rider.assignedVehicleId) {
+                try {
+                  const vehicleResponse = await axios.get(
+                    `${vehicleServiceUrl}/api/v1/vehicles/${rider.assignedVehicleId}`,
+                    {
+                      timeout: 3000,
+                      headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                      },
+                    }
+                  );
+
+                  if (
+                    vehicleResponse.data.success &&
+                    vehicleResponse.data.data
+                  ) {
+                    const vehicleData = vehicleResponse.data.data;
+                    assignedVehicle = {
+                      id: vehicleData.id,
+                      registrationNumber: vehicleData.registrationNumber,
+                      operationalStatus: vehicleData.operationalStatus,
+                    };
+                  }
+                } catch (vehicleError) {
+                  console.warn(
+                    `Could not fetch vehicle details for rider ${rider.id}:`,
+                    vehicleError instanceof Error
+                      ? vehicleError.message
+                      : "Unknown error"
+                  );
+                }
+              }
+
+              return {
+                ...rider,
+                // Use actual isActive value from the database, ensure it's a proper boolean
+                isActive: rider.isActive === true,
+                // Extract the latest verified selfie URL from KYC documents
+                selfie:
+                  rider.kycDocuments?.[0]?.documentImageUrl ||
+                  rider.selfie ||
+                  null,
+                // Remove kycDocuments from response to avoid sending too much data
+                kycDocuments: undefined,
+                // Add store information
+                assignedStore,
+                // Add vehicle information
+                assignedVehicle,
+                totalOrders: 0,
+                averageRating: 0,
+                totalEarnings: 0,
+                completionRate: 0,
+              };
+            })
+          );
 
           // Return the first page data but indicate we had a pagination issue
           return res.json({
@@ -132,20 +261,106 @@ router.get("/riders", async (req: Request, res: Response) => {
       }
     }
 
-    // Add basic metrics (will be enhanced later)
-    const ridersWithMetrics = riders.map((rider) => ({
-      ...rider,
-      // Use actual isActive value from the database, ensure it's a proper boolean
-      isActive: rider.isActive === true,
-      totalOrders: 0,
-      averageRating: 0,
-      totalEarnings: 0,
-      completionRate: 0,
-    }));
+    // Fetch store information for riders with assigned stores
+    const clientStoreServiceUrl =
+      process.env.CLIENT_STORE_SERVICE_URL || "http://localhost:3006";
+    const vehicleServiceUrl =
+      process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+    const ridersWithStoreInfo = await Promise.all(
+      riders.map(async (rider: any) => {
+        let assignedStore = null;
+        let assignedVehicle = null;
+
+        // Fetch store details if rider has an assigned store
+        if (rider.assignedStoreId) {
+          try {
+            const storeResponse = await axios.get(
+              `${clientStoreServiceUrl}/internal/stores/${rider.assignedStoreId}`,
+              {
+                timeout: 3000,
+                headers: {
+                  Accept: "application/json",
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            if (storeResponse.data.success && storeResponse.data.data) {
+              const storeData = storeResponse.data.data;
+              assignedStore = {
+                id: storeData.id,
+                storeName: storeData.storeName,
+                storeCode: storeData.storeCode,
+                city: storeData.city,
+              };
+            }
+          } catch (storeError) {
+            console.warn(
+              `Could not fetch store details for rider ${rider.id}:`,
+              storeError instanceof Error ? storeError.message : "Unknown error"
+            );
+            // Don't fail the request, just don't include store details
+          }
+        }
+
+        // Fetch vehicle details if rider has an assigned vehicle
+        if (rider.assignedVehicleId) {
+          try {
+            const vehicleResponse = await axios.get(
+              `${vehicleServiceUrl}/api/v1/vehicles/${rider.assignedVehicleId}`,
+              {
+                timeout: 3000,
+                headers: {
+                  Accept: "application/json",
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            if (vehicleResponse.data.success && vehicleResponse.data.data) {
+              const vehicleData = vehicleResponse.data.data;
+              assignedVehicle = {
+                id: vehicleData.id,
+                registrationNumber: vehicleData.registrationNumber,
+                operationalStatus: vehicleData.operationalStatus,
+              };
+            }
+          } catch (vehicleError) {
+            console.warn(
+              `Could not fetch vehicle details for rider ${rider.id}:`,
+              vehicleError instanceof Error
+                ? vehicleError.message
+                : "Unknown error"
+            );
+            // Don't fail the request, just don't include vehicle details
+          }
+        }
+
+        return {
+          ...rider,
+          // Use actual isActive value from the database, ensure it's a proper boolean
+          isActive: rider.isActive === true,
+          // Extract the latest verified selfie URL from KYC documents
+          selfie:
+            rider.kycDocuments?.[0]?.documentImageUrl || rider.selfie || null,
+          // Remove kycDocuments from response to avoid sending too much data
+          kycDocuments: undefined,
+          // Add store information
+          assignedStore,
+          // Add vehicle information
+          assignedVehicle,
+          totalOrders: 0,
+          averageRating: 0,
+          totalEarnings: 0,
+          completionRate: 0,
+        };
+      })
+    );
 
     res.json({
       success: true,
-      data: ridersWithMetrics,
+      data: ridersWithStoreInfo,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -158,6 +373,65 @@ router.get("/riders", async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch riders",
+    });
+  }
+});
+
+/**
+ * Check if document numbers are unique (for frontend validation)
+ */
+router.get("/riders/check-unique", async (req: Request, res: Response) => {
+  try {
+    const { aadhaar, pan, dl, riderId } = req.query;
+
+    const duplicates: { field: string; value: string }[] = [];
+
+    // Check Aadhaar uniqueness
+    if (aadhaar) {
+      const where: any = { aadhaar: aadhaar as string };
+      if (riderId) {
+        where.NOT = { id: riderId as string };
+      }
+      const existing = await prisma.rider.findFirst({ where });
+      if (existing) {
+        duplicates.push({ field: "aadhaar", value: aadhaar as string });
+      }
+    }
+
+    // Check PAN uniqueness
+    if (pan) {
+      const where: any = { pan: pan as string };
+      if (riderId) {
+        where.NOT = { id: riderId as string };
+      }
+      const existing = await prisma.rider.findFirst({ where });
+      if (existing) {
+        duplicates.push({ field: "pan", value: pan as string });
+      }
+    }
+
+    // Check DL uniqueness
+    if (dl) {
+      const where: any = { dl: dl as string };
+      if (riderId) {
+        where.NOT = { id: riderId as string };
+      }
+      const existing = await prisma.rider.findFirst({ where });
+      if (existing) {
+        duplicates.push({ field: "dl", value: dl as string });
+      }
+    }
+
+    res.json({
+      success: true,
+      isUnique: duplicates.length === 0,
+      duplicates,
+    });
+  } catch (error) {
+    console.error("Error checking uniqueness:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to check uniqueness",
     });
   }
 });
@@ -183,6 +457,17 @@ router.post("/riders", async (req: Request, res: Response) => {
       emergencyName,
       emergencyPhone,
       emergencyRelation,
+      // EV Rental fields
+      needsEvRental,
+      vehiclePreference,
+      preferredVehicleModelId,
+      ownVehicleType,
+      // Work schedule field
+      workType,
+      // Store assignment fields
+      assignedStoreId,
+      assignedClientId,
+      storeAssignmentNotes,
     } = req.body;
 
     // Validate required fields
@@ -219,28 +504,92 @@ router.post("/riders", async (req: Request, res: Response) => {
       });
     }
 
+    // Check for duplicate Aadhaar
+    if (aadharNumber) {
+      const existingAadhaar = await prisma.rider.findUnique({
+        where: { aadhaar: aadharNumber },
+      });
+
+      if (existingAadhaar) {
+        return res.status(409).json({
+          success: false,
+          message: "A rider with this Aadhaar number already exists",
+        });
+      }
+    }
+
+    // Check for duplicate PAN
+    if (panNumber) {
+      const existingPAN = await prisma.rider.findUnique({
+        where: { pan: panNumber },
+      });
+
+      if (existingPAN) {
+        return res.status(409).json({
+          success: false,
+          message: "A rider with this PAN number already exists",
+        });
+      }
+    }
+
+    // Check for duplicate Driving License
+    if (drivingLicenseNumber) {
+      const existingDL = await prisma.rider.findUnique({
+        where: { dl: drivingLicenseNumber },
+      });
+
+      if (existingDL) {
+        return res.status(409).json({
+          success: false,
+          message: "A rider with this Driving License number already exists",
+        });
+      }
+    }
+
+    // Generate publicRiderId using existing riderIdGenerator service
+    const publicRiderId = await generateRiderId({
+      city: city,
+      createdAt: new Date(),
+    });
+
+    console.log(
+      `✅ Generated publicRiderId: ${publicRiderId} for rider: ${name} (${city})`
+    );
+
     // Create new rider
     const rider = await prisma.rider.create({
       data: {
+        publicRiderId, // Add generated public rider ID
         name,
         phone,
+        email: email || null, // Add email field
         dob, // Keep as string to match schema
         address1,
         address2: address2 || null,
         city,
         state,
         pincode,
-        aadhaar: aadharNumber, // Map to correct field name
-        pan: panNumber, // Map to correct field name
-        dl: drivingLicenseNumber, // Map to correct field name
+        aadhaar: aadharNumber || null, // Map to correct field name, null if empty
+        pan: panNumber || null, // Map to correct field name, null if empty
+        dl: drivingLicenseNumber || null, // Map to correct field name, null if empty
         emergencyName,
         emergencyPhone,
         emergencyRelation,
-        registrationStatus: "KYC_COMPLETED", // Admin-created riders are pre-approved
-        kycStatus: "pending", // KYC still needs to be verified
+        registrationStatus: "PENDING", // Registration starts as pending, will update to COMPLETED when KYC is verified
+        kycStatus: "incomplete", // KYC is incomplete until documents are uploaded
         phoneVerified: true, // Assume phone is verified when admin creates
         consent: true, // Assume consent when admin creates
         agreementSigned: true,
+        // EV Rental fields
+        needsEvRental: needsEvRental || false,
+        vehiclePreference: vehiclePreference || null,
+        preferredVehicleModelId: preferredVehicleModelId || null,
+        // Work schedule field
+        workType: workType || null,
+        // Store assignment fields
+        assignedStoreId: assignedStoreId || null,
+        assignedClientId: assignedClientId || null,
+        storeAssignmentNotes: storeAssignmentNotes || null,
       },
     });
 
@@ -249,11 +598,23 @@ router.post("/riders", async (req: Request, res: Response) => {
       message: "Rider created successfully",
       data: rider,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating rider:", error);
+
+    // Check if it's a Prisma unique constraint error
+    if (error.code === "P2002") {
+      const field = error.meta?.target?.[0] || "unknown field";
+      return res.status(409).json({
+        success: false,
+        message: `A rider with this ${field} already exists`,
+        error: `Duplicate ${field}`,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Internal server error",
+      error: error.message || "Unknown error",
     });
   }
 });
@@ -280,6 +641,17 @@ router.put("/riders/:riderId", async (req: Request, res: Response) => {
       emergencyName,
       emergencyPhone,
       emergencyRelation,
+      // EV Rental fields
+      needsEvRental,
+      vehiclePreference,
+      preferredVehicleModelId,
+      ownVehicleType,
+      // Work schedule field
+      workType,
+      // Store assignment fields
+      assignedStoreId,
+      assignedClientId,
+      storeAssignmentNotes,
     } = req.body;
 
     // Check if rider exists
@@ -308,25 +680,118 @@ router.put("/riders/:riderId", async (req: Request, res: Response) => {
       }
     }
 
+    // If Aadhaar is being updated, check for conflicts
+    if (aadharNumber && aadharNumber !== existingRider.aadhaar) {
+      const aadhaarConflict = await prisma.rider.findUnique({
+        where: { aadhaar: aadharNumber },
+      });
+
+      if (aadhaarConflict) {
+        return res.status(409).json({
+          success: false,
+          message: "Another rider with this Aadhaar number already exists",
+        });
+      }
+    }
+
+    // If PAN is being updated, check for conflicts
+    if (panNumber && panNumber !== existingRider.pan) {
+      const panConflict = await prisma.rider.findUnique({
+        where: { pan: panNumber },
+      });
+
+      if (panConflict) {
+        return res.status(409).json({
+          success: false,
+          message: "Another rider with this PAN number already exists",
+        });
+      }
+    }
+
+    // If DL is being updated, check for conflicts
+    if (drivingLicenseNumber && drivingLicenseNumber !== existingRider.dl) {
+      const dlConflict = await prisma.rider.findUnique({
+        where: { dl: drivingLicenseNumber },
+      });
+
+      if (dlConflict) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "Another rider with this Driving License number already exists",
+        });
+      }
+    }
+
+    // Prepare update data
+    const updateData: any = {
+      name,
+      phone,
+      email: email || null, // Add email field
+      dob,
+      address1,
+      address2: address2 || null,
+      city,
+      state,
+      pincode,
+      aadhaar: aadharNumber || null,
+      pan: panNumber || null,
+      dl: drivingLicenseNumber || null,
+      emergencyName,
+      emergencyPhone,
+      emergencyRelation,
+    };
+
+    // Add EV Rental fields if provided
+    if (needsEvRental !== undefined) {
+      updateData.needsEvRental = needsEvRental;
+    }
+    if (vehiclePreference !== undefined) {
+      updateData.vehiclePreference = vehiclePreference || null;
+    }
+    if (preferredVehicleModelId !== undefined) {
+      updateData.preferredVehicleModelId = preferredVehicleModelId || null;
+    }
+    // Handle ownVehicleType: when needsEvRental is false, store ownVehicleType in vehiclePreference
+    if (ownVehicleType !== undefined && needsEvRental === false) {
+      updateData.vehiclePreference = ownVehicleType || null;
+    }
+
+    // Add workType field if provided
+    if (workType !== undefined) {
+      updateData.workType = workType || null;
+    }
+
+    // Add store assignment fields if provided
+    if (assignedStoreId !== undefined) {
+      updateData.assignedStoreId = assignedStoreId;
+    }
+    if (assignedClientId !== undefined) {
+      updateData.assignedClientId = assignedClientId;
+    }
+    if (storeAssignmentNotes !== undefined) {
+      updateData.storeAssignmentNotes = storeAssignmentNotes;
+    }
+
+    console.log("[adminRiders] Updating rider with data:", {
+      riderId,
+      hasVehiclePreference: !!vehiclePreference,
+      hasPreferredModel: !!preferredVehicleModelId,
+      hasStoreAssignment: !!(assignedStoreId && assignedClientId),
+      needsEvRental,
+    });
+
     // Update rider
     const updatedRider = await prisma.rider.update({
       where: { id: riderId },
-      data: {
-        name,
-        phone,
-        dob,
-        address1,
-        address2: address2 || null,
-        city,
-        state,
-        pincode,
-        aadhaar: aadharNumber,
-        pan: panNumber,
-        dl: drivingLicenseNumber,
-        emergencyName,
-        emergencyPhone,
-        emergencyRelation,
-      },
+      data: updateData,
+    });
+
+    console.log("[adminRiders] ✅ Rider updated successfully:", {
+      id: updatedRider.id,
+      vehiclePreference: updatedRider.vehiclePreference,
+      preferredVehicleModelId: updatedRider.preferredVehicleModelId,
+      assignedStoreId: updatedRider.assignedStoreId,
     });
 
     res.json({
@@ -334,11 +799,23 @@ router.put("/riders/:riderId", async (req: Request, res: Response) => {
       message: "Rider updated successfully",
       data: updatedRider,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating rider:", error);
+
+    // Check if it's a Prisma unique constraint error
+    if (error.code === "P2002") {
+      const field = error.meta?.target?.[0] || "unknown field";
+      return res.status(409).json({
+        success: false,
+        message: `A rider with this ${field} already exists`,
+        error: `Duplicate ${field}`,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Internal server error",
+      error: error.message || "Unknown error",
     });
   }
 });
@@ -379,7 +856,7 @@ router.get("/riders/:riderId", async (req: Request, res: Response) => {
       ...rider,
       // Use actual isActive value from the database, ensure it's a proper boolean
       isActive: strictIsActive,
-      email: null, // Not in current schema
+      email: rider.email, // Email field from database
       phoneVerified: rider.phoneVerified,
       address1: rider.address1,
       address2: rider.address2,
@@ -391,6 +868,9 @@ router.get("/riders/:riderId", async (req: Request, res: Response) => {
       assignedClientId: rider.assignedClientId,
       storeAssignmentDate: rider.storeAssignmentDate?.toISOString(),
       storeAssignmentNotes: rider.storeAssignmentNotes,
+      // Map vehiclePreference to ownVehicleType for frontend compatibility
+      // When needsEvRental is false, vehiclePreference contains the own vehicle type
+      ownVehicleType: !rider.needsEvRental ? rider.vehiclePreference : null,
     };
 
     // If rider has an assigned vehicle, fetch vehicle details
@@ -804,6 +1284,7 @@ router.get("/vehicles/available", async (req: Request, res: Response) => {
     }
 
     console.log(`🚗 Fetching vehicles from: ${apiUrl}`);
+    console.log(`🚗 Hub ID filter: ${hubId || "none"}`);
 
     const response = await axios.get(apiUrl, {
       timeout: 10000,
@@ -813,19 +1294,39 @@ router.get("/vehicles/available", async (req: Request, res: Response) => {
       },
     });
 
+    console.log(`🚗 Raw response status: ${response.status}`);
+    console.log(`🚗 Raw response data type: ${typeof response.data}`);
+    console.log(
+      `🚗 Raw response data:`,
+      JSON.stringify(response.data).substring(0, 200)
+    );
+
     const vehicleData = response.data as {
       success: boolean;
-      data: any[];
+      vehicles: any[]; // ✅ Changed from 'data' to 'vehicles'
     };
 
     console.log(
       `✅ Vehicle Service responded with ${
-        vehicleData.data?.length || 0
+        vehicleData.vehicles?.length || 0
       } vehicles`
     );
 
+    // Check if we got valid data
+    if (!vehicleData.vehicles || !Array.isArray(vehicleData.vehicles)) {
+      console.warn(
+        "⚠️ Vehicle service returned invalid data format:",
+        vehicleData
+      );
+      return res.json({
+        success: true,
+        data: [],
+        message: "No vehicles data received from vehicle service",
+      });
+    }
+
     // Transform the data to match frontend expectations
-    const vehicles = vehicleData.data.map((vehicle: any) => ({
+    const vehicles = vehicleData.vehicles.map((vehicle: any) => ({
       id: vehicle.id,
       make: vehicle.model?.oem?.name || "Unknown",
       model: vehicle.model?.name || "Unknown",
@@ -842,6 +1343,7 @@ router.get("/vehicles/available", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("❌ Error in vehicles endpoint:", error.message);
+    console.error("Full error:", error);
 
     res.status(500).json({
       success: false,
@@ -959,6 +1461,8 @@ router.post(
         batteryPercentageStart,
         conditionOnAssign,
         notes,
+        assignedBy,
+        updatedBy,
       } = req.body;
 
       if (!vehicleId) {
@@ -967,6 +1471,107 @@ router.post(
           message: "Vehicle ID is required",
         });
       }
+
+      // ✅ NEW: Check rider eligibility for vehicle assignment
+      const riderCheck = await prisma.rider.findUnique({
+        where: { id: riderId },
+      });
+
+      if (!riderCheck) {
+        return res.status(404).json({
+          success: false,
+          message: "Rider not found",
+        });
+      }
+
+      // Check if registration is completed
+      if (riderCheck.registrationStatus !== "COMPLETED") {
+        return res.status(400).json({
+          success: false,
+          message: `Vehicle assignment not allowed. Rider registration status is ${riderCheck.registrationStatus}. Complete the registration first.`,
+        });
+      }
+
+      // Check if rider is active
+      const riderIsActive = await prisma.$queryRaw<
+        Array<{ isActive: boolean }>
+      >`
+        SELECT "isActive" FROM "rider"."Rider" WHERE "id" = ${riderId}
+      `;
+
+      const isActive = riderIsActive[0]?.isActive ?? false;
+
+      if (!isActive) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Vehicle assignment not allowed. Rider account is deactivated. Please activate the rider first.",
+        });
+      }
+
+      // Check if rider has EV rental preference enabled
+      if (!riderCheck.needsEvRental) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Vehicle assignment not allowed. Rider must have vehicle preference set to 'Yes' for EV rental. Please update the vehicle preference first.",
+        });
+      }
+
+      // Fetch hub information if hubId is provided (for history tracking)
+      let hubCode = null;
+      let hubName = null;
+
+      console.log(`🔍 [HUB FETCH] hubId provided: ${hubId}`);
+
+      if (hubId) {
+        console.log(
+          `🔍 [HUB FETCH] Attempting to fetch hub details for hubId: ${hubId}`
+        );
+        try {
+          const vehicleServiceUrl =
+            process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+          console.log(
+            `🔍 [HUB FETCH] Vehicle Service URL: ${vehicleServiceUrl}`
+          );
+
+          const hubResponse = await axios.get(
+            `${vehicleServiceUrl}/api/v1/hubs/${hubId}`,
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          console.log(
+            `🔍 [HUB FETCH] Hub response received:`,
+            hubResponse.data
+          );
+
+          if (hubResponse.data?.data) {
+            hubCode = hubResponse.data.data.code;
+            hubName = hubResponse.data.data.name;
+            console.log(
+              `✅ [HUB FETCH] Hub info fetched - Code: ${hubCode}, Name: ${hubName}`
+            );
+          } else {
+            console.warn(`⚠️  [HUB FETCH] No data in hub response`);
+          }
+        } catch (hubError) {
+          console.error(
+            `❌ [HUB FETCH] Could not fetch hub information from vehicle service:`,
+            hubError
+          );
+        }
+      } else {
+        console.log(`ℹ️  [HUB FETCH] No hubId provided, skipping hub fetch`);
+      }
+
+      console.log(
+        `🔍 [HUB FETCH] Final values - hubCode: ${hubCode}, hubName: ${hubName}`
+      );
 
       // Update rider with vehicle assignment
       const rider = await prisma.rider.update({
@@ -1042,6 +1647,9 @@ router.post(
               process.env.PORT || 4005
             }/api/v1/vehicle-history`;
 
+            // Use assignedBy from request body, fallback to "admin" only if not provided
+            const finalAssignedBy = assignedBy || updatedBy || "admin";
+
             // Call the API to create a new vehicle assignment
             await axios.post(
               `${riderVehicleHistoryServiceUrl}/riders/${riderId}/vehicle-assignments`,
@@ -1052,10 +1660,12 @@ router.post(
                 vehicleModel: vehicleDetails.vehicleModel,
                 notes,
                 hubId,
+                hubCode,
+                hubName,
                 startMileage,
                 batteryPercentageStart,
                 conditionOnAssign,
-                assignedBy: "admin",
+                assignedBy: finalAssignedBy,
               },
               {
                 headers: {
@@ -1119,6 +1729,8 @@ router.post(
         batteryPercentageStart,
         conditionOnAssign,
         notes,
+        assignedBy,
+        updatedBy,
       } = req.body;
 
       if (!vehicleId) {
@@ -1127,6 +1739,111 @@ router.post(
           message: "Vehicle ID is required",
         });
       }
+
+      // ✅ NEW: Check rider eligibility for vehicle assignment
+      const riderCheck = await prisma.rider.findUnique({
+        where: { id: riderId },
+      });
+
+      if (!riderCheck) {
+        return res.status(404).json({
+          success: false,
+          message: "Rider not found",
+        });
+      }
+
+      // Check if registration is completed
+      if (riderCheck.registrationStatus !== "COMPLETED") {
+        return res.status(400).json({
+          success: false,
+          message: `Vehicle assignment not allowed. Rider registration status is ${riderCheck.registrationStatus}. Complete the registration first.`,
+        });
+      }
+
+      // Check if rider is active
+      const riderIsActive = await prisma.$queryRaw<
+        Array<{ isActive: boolean }>
+      >`
+        SELECT "isActive" FROM "rider"."Rider" WHERE "id" = ${riderId}
+      `;
+
+      const isActive = riderIsActive[0]?.isActive ?? false;
+
+      if (!isActive) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Vehicle assignment not allowed. Rider account is deactivated. Please activate the rider first.",
+        });
+      }
+
+      // Check if rider has EV rental preference enabled
+      if (!riderCheck.needsEvRental) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Vehicle assignment not allowed. Rider must have vehicle preference set to 'Yes' for EV rental. Please update the vehicle preference first.",
+        });
+      }
+
+      // Fetch hub information if hubId is provided (for history tracking)
+      let hubCode = null;
+      let hubName = null;
+
+      console.log(`🔍 [ADMIN ROUTE - HUB FETCH] hubId provided: ${hubId}`);
+
+      if (hubId) {
+        console.log(
+          `🔍 [ADMIN ROUTE - HUB FETCH] Attempting to fetch hub details for hubId: ${hubId}`
+        );
+        try {
+          const vehicleServiceUrl =
+            process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
+
+          console.log(
+            `🔍 [ADMIN ROUTE - HUB FETCH] Vehicle Service URL: ${vehicleServiceUrl}`
+          );
+
+          const hubResponse = await axios.get(
+            `${vehicleServiceUrl}/api/v1/hubs/${hubId}`,
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          console.log(
+            `🔍 [ADMIN ROUTE - HUB FETCH] Hub response received:`,
+            hubResponse.data
+          );
+
+          if (hubResponse.data?.data) {
+            hubCode = hubResponse.data.data.code;
+            hubName = hubResponse.data.data.name;
+            console.log(
+              `✅ [ADMIN ROUTE - HUB FETCH] Hub info fetched - Code: ${hubCode}, Name: ${hubName}`
+            );
+          } else {
+            console.warn(
+              `⚠️  [ADMIN ROUTE - HUB FETCH] No data in hub response`
+            );
+          }
+        } catch (hubError) {
+          console.error(
+            `❌ [ADMIN ROUTE - HUB FETCH] Could not fetch hub information from vehicle service:`,
+            hubError
+          );
+        }
+      } else {
+        console.log(
+          `ℹ️  [ADMIN ROUTE - HUB FETCH] No hubId provided, skipping hub fetch`
+        );
+      }
+
+      console.log(
+        `🔍 [ADMIN ROUTE - HUB FETCH] Final values - hubCode: ${hubCode}, hubName: ${hubName}`
+      );
 
       // Update rider with vehicle assignment
       const rider = await prisma.rider.update({
@@ -1202,6 +1919,9 @@ router.post(
               process.env.PORT || 4005
             }/api/v1/vehicle-history`;
 
+            // Use assignedBy from request body, fallback to "admin" only if not provided
+            const finalAssignedBy = assignedBy || updatedBy || "admin";
+
             // Call the API to create a new vehicle assignment
             await axios.post(
               `${riderVehicleHistoryServiceUrl}/riders/${riderId}/vehicle-assignments`,
@@ -1212,10 +1932,12 @@ router.post(
                 vehicleModel: vehicleDetails.vehicleModel,
                 notes,
                 hubId,
+                hubCode,
+                hubName,
                 startMileage,
                 batteryPercentageStart,
                 conditionOnAssign,
-                assignedBy: "admin",
+                assignedBy: finalAssignedBy,
               },
               {
                 headers: {
@@ -1269,6 +1991,33 @@ router.delete(
   async (req: Request, res: Response) => {
     try {
       const { riderId } = req.params;
+
+      console.log(`========== UNASSIGNMENT REQUEST - ROUTE LAYER ==========`);
+      console.log(`Rider ID: ${riderId}`);
+      console.log(`Request Body:`, JSON.stringify(req.body, null, 2));
+
+      // Extract reason and user info from request body
+      const { reason, notes, returnedBy, unassignedBy, updatedBy } = req.body;
+
+      // Use provided values with fallbacks
+      const finalNotes = notes || reason || "Unassigned via admin panel";
+      const finalReturnedBy =
+        returnedBy || unassignedBy || updatedBy || "admin";
+
+      console.log(`Extracted values:`, {
+        reason,
+        notes,
+        returnedBy,
+        unassignedBy,
+        updatedBy,
+        finalNotes,
+        finalReturnedBy,
+      });
+
+      console.log(`Unassigning vehicle from rider ${riderId}:`, {
+        notes: finalNotes,
+        returnedBy: finalReturnedBy,
+      });
 
       // Get current rider to get vehicle ID
       const currentRider = await prisma.rider.findUnique({
@@ -1333,13 +2082,27 @@ router.delete(
 
             const activeAssignment = activeResponse.data?.data;
 
+            console.log(`Found active assignment:`, {
+              id: activeAssignment?.id,
+              riderId: activeAssignment?.riderId,
+              vehicleId: activeAssignment?.vehicleId,
+              hubCode: activeAssignment?.hubCode,
+              hubName: activeAssignment?.hubName,
+            });
+
             if (activeAssignment?.id) {
-              // Return the vehicle using the vehicle history API
-              await axios.patch(
+              console.log(`Calling vehicle history API to return vehicle:`, {
+                assignmentId: activeAssignment.id,
+                notes: finalNotes,
+                returnedBy: finalReturnedBy,
+              });
+
+              // Return the vehicle using the vehicle history API with user-provided data
+              const returnResponse = await axios.patch(
                 `${riderVehicleHistoryServiceUrl}/vehicle-assignments/${activeAssignment.id}/return`,
                 {
-                  notes: "Unassigned via admin panel",
-                  returnedBy: "admin",
+                  notes: finalNotes, // Use from request body
+                  returnedBy: finalReturnedBy, // Use from request body
                 },
                 {
                   headers: {
@@ -1348,7 +2111,14 @@ router.delete(
                 }
               );
 
-              console.log(`✅ Vehicle history updated for rider ${riderId}`);
+              console.log(
+                `✅ Vehicle history API response:`,
+                returnResponse.data
+              );
+
+              console.log(
+                `✅ Vehicle history updated for rider ${riderId} with notes: "${finalNotes}" by ${finalReturnedBy}`
+              );
             }
           } catch (historyError) {
             console.warn("Could not update vehicle history:", historyError);
@@ -1388,6 +2158,38 @@ router.delete(
   async (req: Request, res: Response) => {
     try {
       const { riderId } = req.params;
+
+      console.log(
+        `========== UNASSIGNMENT REQUEST - ROUTE LAYER (ADMIN PREFIX) ==========`
+      );
+      console.log(`Rider ID: ${riderId}`);
+      console.log(`Request Body:`, JSON.stringify(req.body, null, 2));
+
+      // Extract reason and user info from request body
+      const { reason, notes, returnedBy, unassignedBy, updatedBy } = req.body;
+
+      // Use provided values with fallbacks
+      const finalNotes = notes || reason || "Unassigned via admin panel";
+      const finalReturnedBy =
+        returnedBy || unassignedBy || updatedBy || "admin";
+
+      console.log(`Extracted values:`, {
+        reason,
+        notes,
+        returnedBy,
+        unassignedBy,
+        updatedBy,
+        finalNotes,
+        finalReturnedBy,
+      });
+
+      console.log(
+        `Unassigning vehicle from rider ${riderId} (admin prefix route):`,
+        {
+          notes: finalNotes,
+          returnedBy: finalReturnedBy,
+        }
+      );
 
       // Get current rider to get vehicle ID
       const currentRider = await prisma.rider.findUnique({
@@ -1461,12 +2263,12 @@ router.delete(
         const activeAssignment = activeResponse.data?.data;
 
         if (activeAssignment?.id) {
-          // Return the vehicle using the vehicle history API
+          // Return the vehicle using the vehicle history API with user-provided data
           await axios.patch(
             `${riderVehicleHistoryServiceUrl}/vehicle-assignments/${activeAssignment.id}/return`,
             {
-              notes: "Unassigned via admin panel",
-              returnedBy: "admin",
+              notes: finalNotes, // Use from request body
+              returnedBy: finalReturnedBy, // Use from request body
             },
             {
               headers: {
@@ -1475,7 +2277,9 @@ router.delete(
             }
           );
 
-          console.log(`✅ Vehicle history updated for rider ${riderId}`);
+          console.log(
+            `✅ Vehicle history updated for rider ${riderId} with notes: "${finalNotes}" by ${finalReturnedBy}`
+          );
         }
       } catch (historyError) {
         console.warn("Could not update vehicle history:", historyError);

@@ -1,13 +1,14 @@
 import express, { Request, Response, Router } from "express";
 import axios from "axios";
+import FormData from "form-data";
 
 const router: Router = express.Router();
 
 const RIDER_SERVICE_URL =
   process.env.RIDER_SERVICE_URL || "http://localhost:4005";
 
-// Special route for stats (fixing the URL path issue)
-router.get("/riders/stats", async (req: Request, res: Response) => {
+// Special route for stats (must be defined before the catch-all route)
+router.get("/stats", async (req: Request, res: Response) => {
   try {
     console.log(
       `Proxying rider stats request -> ${RIDER_SERVICE_URL}/api/v1/stats`
@@ -70,7 +71,47 @@ router.get("/riders/stats", async (req: Request, res: Response) => {
 router.all("/*", async (req: Request, res: Response) => {
   try {
     // Route admin endpoints directly to the admin routes
-    const targetUrl = `${RIDER_SERVICE_URL}/api/v1${req.path}`;
+    // req.path contains the path AFTER /api/riders (e.g., "/" for /api/riders, "/:id" for /api/riders/123)
+    // Special handling for different path patterns:
+    // - "/" (listing riders) -> "/riders"
+    // - "/admin/*" (admin endpoints) -> "/admin/*" (pass through as-is)
+    // - "/registration/*" (registration endpoints) -> "/registration/*" (pass through as-is)
+    // - "/vehicle-history/*" (vehicle history endpoints) -> "/vehicle-history/*" (pass through as-is)
+    // - "/check-unique" (uniqueness check) -> "/riders/check-unique"
+    // - "/:id" or other paths -> "/riders/:id"
+
+    let ridersPath;
+    if (req.path === "/") {
+      ridersPath = "/riders";
+    } else if (
+      req.path === "/check-unique" ||
+      req.path.startsWith("/check-unique?")
+    ) {
+      // Check-unique endpoint for document validation
+      ridersPath = "/riders/check-unique";
+    } else if (req.path.startsWith("/admin/")) {
+      // For admin paths, don't prepend /riders
+      ridersPath = req.path;
+    } else if (req.path.startsWith("/registration/")) {
+      // For registration paths, don't prepend /riders
+      ridersPath = req.path;
+    } else if (req.path.startsWith("/vehicle-history/")) {
+      // For vehicle-history paths, don't prepend /riders
+      ridersPath = req.path;
+    } else if (req.path.startsWith("/bank-details")) {
+      // For bank-details paths, prepend /riders to match rider service routing
+      ridersPath = `/riders${req.path}`;
+    } else if (req.path === "/hubs" || req.path.startsWith("/hubs?")) {
+      // Hub endpoints are at root level in adminRiders, don't prepend /riders
+      ridersPath = req.path;
+    } else if (req.path.startsWith("/vehicles/available")) {
+      // Available vehicles endpoint is at root level in adminRiders, don't prepend /riders
+      ridersPath = req.path;
+    } else {
+      ridersPath = `/riders${req.path}`;
+    }
+
+    const targetUrl = `${RIDER_SERVICE_URL}/api/v1${ridersPath}`;
 
     // Properly forward query parameters
     const queryParams = new URLSearchParams(req.query as any).toString();
@@ -134,7 +175,7 @@ router.all("/*", async (req: Request, res: Response) => {
 
     // Set a longer timeout for KYC document uploads
     const isKycUpload = req.path.includes("/kyc") && req.method === "POST";
-    const timeout = isKycUpload ? 60000 : 10000; // 60 seconds for KYC uploads, 10 seconds for other requests
+    const timeout = isKycUpload ? 180000 : 10000; // 180 seconds (3 mins) for KYC uploads, 10 seconds for other requests
 
     console.log(
       `Request timeout set to ${timeout}ms for ${
@@ -142,13 +183,76 @@ router.all("/*", async (req: Request, res: Response) => {
       }`
     );
 
-    const response = await axios({
-      method: req.method as any,
-      url: fullUrl,
-      data: req.body,
-      headers,
-      timeout: timeout,
-    });
+    // If this is a KYC upload, add detailed logging
+    if (isKycUpload) {
+      console.log(`🔵 [API Gateway] Processing KYC document upload request:`, {
+        riderId: req.path.split("/")[1], // Extract rider ID from path
+        method: req.method,
+        contentType: req.headers["content-type"],
+        hasMultipartData:
+          req.headers["content-type"]?.includes("multipart/form-data") || false,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // For multipart/form-data (file uploads), we need to proxy differently
+    // because express body parsers don't handle file data properly
+    const isMultipartUpload = req.headers["content-type"]?.includes(
+      "multipart/form-data"
+    );
+
+    let response;
+    if (isMultipartUpload) {
+      console.log(
+        `🟢 [API Gateway] Detected multipart upload, using http-proxy-middleware approach`
+      );
+
+      // For file uploads, we need to use a streaming approach
+      // Create a new request to forward to the backend service
+      try {
+        response = await axios({
+          method: req.method as any,
+          url: fullUrl,
+          headers: {
+            ...headers,
+            "content-type": req.headers["content-type"], // Preserve the exact content-type with boundary
+            "content-length": req.headers["content-length"], // Preserve content length
+          },
+          data: req, // Pass the raw request stream
+          timeout: timeout,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          // This tells axios to pipe the request stream
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / (progressEvent.total || 1)
+            );
+            if (percentCompleted % 10 === 0) {
+              // Log every 10%
+              console.log(
+                `📤 [API Gateway] Upload progress: ${percentCompleted}%`
+              );
+            }
+          },
+        });
+        console.log(`✅ [API Gateway] File upload proxied successfully`);
+      } catch (uploadError: any) {
+        console.error(
+          `❌ [API Gateway] File upload proxy failed:`,
+          uploadError.message
+        );
+        throw uploadError;
+      }
+    } else {
+      // For non-file requests, use the parsed body
+      response = await axios({
+        method: req.method as any,
+        url: fullUrl,
+        data: req.body,
+        headers,
+        timeout: timeout,
+      });
+    }
 
     // Log response details for status updates
     if (req.path.includes("/status")) {

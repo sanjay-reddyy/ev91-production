@@ -113,24 +113,40 @@ const riderVehicleHistoryController = {
         vehicleModel,
         notes,
         hubId,
+        hubCode,
+        hubName,
         startMileage,
         batteryPercentageStart,
         conditionOnAssign,
+        assignedBy: assignedByFromBody,
+        updatedBy,
       } = req.body;
 
-      // Sanitize vehicle make and model data
+      // Use assignedBy from request body first, then updatedBy, then JWT token, then fallback to "System"
+      const assignedBy =
+        assignedByFromBody || updatedBy || req.user?.id || "System";
+
+      console.log(
+        `[VehicleHistory] Assigning vehicle with assignedBy: ${assignedBy}, notes: ${notes}, hubCode: ${hubCode}, hubName: ${hubName}`
+      );
+
+      // Sanitize vehicle make and model data while preserving all other fields
       const sanitizedData = sanitizeVehicleData({
         vehicleMake,
         vehicleModel,
         notes,
         hubId,
+        hubCode,
+        hubName,
         startMileage,
         batteryPercentageStart,
         conditionOnAssign,
       });
 
-      // Get the user from the JWT token (assuming middleware sets this)
-      const assignedBy = req.user?.id || "system";
+      console.log(
+        `[VehicleHistory] Sanitized data:`,
+        JSON.stringify(sanitizedData, null, 2)
+      );
 
       const newAssignment =
         await riderVehicleHistoryService.assignVehicleToRider(
@@ -154,6 +170,9 @@ const riderVehicleHistoryController = {
       const { assignmentId } = req.params;
       const {
         notes,
+        returnedBy: returnedByFromBody,
+        unassignedBy,
+        updatedBy,
         endMileage,
         batteryPercentageEnd,
         conditionOnReturn,
@@ -162,8 +181,35 @@ const riderVehicleHistoryController = {
         issuesReported,
       } = req.body;
 
-      // Get the user from the JWT token (assuming middleware sets this)
-      const returnedBy = req.user?.id || "system";
+      // Use returnedBy from request body first, then try alternative names, then JWT token, then fallback to "System"
+      const returnedBy =
+        returnedByFromBody ||
+        unassignedBy ||
+        updatedBy ||
+        req.user?.id ||
+        "System";
+
+      console.log(
+        `[VehicleHistory] ========== RETURN VEHICLE REQUEST ==========`
+      );
+      console.log(`[VehicleHistory] Assignment ID: ${assignmentId}`);
+      console.log(
+        `[VehicleHistory] Request Body:`,
+        JSON.stringify(req.body, null, 2)
+      );
+      console.log(`[VehicleHistory] Extracted Values:`, {
+        notes,
+        returnedByFromBody,
+        unassignedBy,
+        updatedBy,
+        finalReturnedBy: returnedBy,
+        endMileage,
+        batteryPercentageEnd,
+        conditionOnReturn,
+      });
+      console.log(
+        `[VehicleHistory] Returning vehicle with returnedBy: ${returnedBy}, notes: ${notes}`
+      );
 
       const updatedAssignment =
         await riderVehicleHistoryService.returnVehicleFromRider(
@@ -179,6 +225,16 @@ const riderVehicleHistoryController = {
             issuesReported,
           }
         );
+
+      console.log(
+        `[VehicleHistory] ✅ Vehicle returned successfully. Updated record:`,
+        {
+          id: updatedAssignment?.id,
+          returnedBy: updatedAssignment?.returnedBy,
+          notes: updatedAssignment?.notes,
+          returnedAt: updatedAssignment?.returnedAt,
+        }
+      );
 
       res.status(200).json({
         success: true,

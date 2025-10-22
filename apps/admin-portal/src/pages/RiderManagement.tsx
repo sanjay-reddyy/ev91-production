@@ -1,6 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
-// Import environment check utility
-import { checkApiConfiguration } from '../utils/envCheck'
+import React, { useState, useEffect, useCallback } from 'react'
 
 /**
  * PAGINATION FIX IMPLEMENTATION
@@ -9,16 +7,7 @@ import { checkApiConfiguration } from '../utils/envCheck'
  * 1. Using TablePagination component for consistent UI
  * 2. Moved loadRiders into a useCallback to ensure consistent dependencies
  * 3. Improved error handling and state management for pagination
- * 4. Added useMemo for derived value  const handleSearch = useCallback((e) => {
-                  setSearchTerm(e.target.value);
-                  // Reset page to 0 when searching
-                  setPage(0);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    loadRiders();
-                  }
-                }}ed logging for better debugging
+ * 4. Added enhanced logging for better debugging
  *
  * To debug pagination issues:
  * - Check browser console for detailed request/response logs
@@ -53,8 +42,8 @@ import {
   Select,
   InputAdornment,
   Avatar,
-  Badge,
   Stack,
+  Autocomplete,
 } from '@mui/material'
 import {
   Add as AddIcon,
@@ -66,7 +55,6 @@ import {
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
   Assignment as AssignmentIcon,
-  Block as BlockIcon,
   Check as CheckIcon,
   Close as CloseIcon,
   Download as DownloadIcon,
@@ -84,9 +72,12 @@ const REGISTRATION_STATUSES = [
 
 const KYC_STATUSES = [
   { value: 'pending', label: 'Pending', color: 'warning' },
+  { value: 'incomplete', label: 'Incomplete', color: 'default' },
+  { value: 'submitted', label: 'Submitted', color: 'info' },
+  { value: 'review', label: 'Under Review', color: 'warning' },
+  { value: 'approved', label: 'Approved', color: 'success' },
   { value: 'verified', label: 'Verified', color: 'success' },
   { value: 'rejected', label: 'Rejected', color: 'error' },
-  { value: 'incomplete', label: 'Incomplete', color: 'default' },
 ]
 
 interface RiderFormData {
@@ -121,15 +112,16 @@ const RiderManagement: React.FC = () => {
 
   // Filters and pagination
   const [searchTerm, setSearchTerm] = useState('')
-  const [registrationStatusFilter, setRegistrationStatusFilter] = useState('')
   const [kycStatusFilter, setKycStatusFilter] = useState('')
-  const [isActiveFilter, setIsActiveFilter] = useState('')
   const [cityFilter, setCityFilter] = useState('')
+  const [storeFilter, setStoreFilter] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
-  // Track the riders that are currently toggling status to show loading state
-  const [togglingRiders, setTogglingRiders] = useState<Record<string, boolean>>({})
+  const [cities, setCities] = useState<Array<{id: string; name: string}>>([])
+  const [stores, setStores] = useState<Array<{id: string; storeName: string; storeCode: string}>>([])
+  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingStores, setLoadingStores] = useState(false)
   const [stats, setStats] = useState({
     totalRiders: 0,
     activeRiders: 0,
@@ -152,10 +144,9 @@ const RiderManagement: React.FC = () => {
       // Check if we have any active filters to show in the UI
       const hasActiveFilters = !!(
         searchTerm ||
-        registrationStatusFilter ||
         kycStatusFilter ||
-        isActiveFilter ||
-        cityFilter
+        cityFilter ||
+        storeFilter
       );
       setFiltersApplied(hasActiveFilters);
 
@@ -167,57 +158,25 @@ const RiderManagement: React.FC = () => {
         limit: rowsPerPage,
         filters: {
           search: searchTerm,
-          registrationStatus: registrationStatusFilter,
           kycStatus: kycStatusFilter,
-          isActive: isActiveFilter,
-          city: cityFilter
+          city: cityFilter,
+          storeId: storeFilter
         }
       });
 
-      // Convert isActiveFilter string to proper boolean or undefined
-      let isActiveBoolean: boolean | undefined = undefined;
-      if (isActiveFilter === 'true') {
-        isActiveBoolean = true;
-      } else if (isActiveFilter === 'false') {
-        isActiveBoolean = false;
-      }
-
-      // Ensure registrationStatus and kycStatus values match what the backend expects
-      // By using the actual values from our status arrays rather than directly passing the string
-      let mappedRegistrationStatus: string | undefined = undefined;
-      let mappedKycStatus: string | undefined = undefined;
-
-      if (registrationStatusFilter) {
-        const statusConfig = REGISTRATION_STATUSES.find(s => s.value === registrationStatusFilter);
-        mappedRegistrationStatus = statusConfig ? statusConfig.value : undefined;
-        console.log(`Mapped registrationStatus from "${registrationStatusFilter}" to "${mappedRegistrationStatus}"`);
-      }
-
-      if (kycStatusFilter) {
-        const statusConfig = KYC_STATUSES.find(s => s.value === kycStatusFilter);
-        mappedKycStatus = statusConfig ? statusConfig.value : undefined;
-        console.log(`Mapped kycStatus from "${kycStatusFilter}" to "${mappedKycStatus}"`);
-      }
-
-      console.log('Sending filter params:', {
-        isActiveFilter,
-        parsedValue: isActiveBoolean,
-        registrationStatusFilter,
-        mappedRegistrationStatus,
+      // Use riderService instead of direct fetch for consistent API handling
+      console.log('🔍 REQUEST - KYC Status Filter:', {
         kycStatusFilter,
-        mappedKycStatus,
-        cityFilter,
+        willSendToAPI: kycStatusFilter || undefined
       });
 
-      // Use riderService instead of direct fetch for consistent API handling
       const response = await riderService.getRiders({
         page: page + 1, // Backend uses 1-based pagination
         limit: rowsPerPage,
         search: searchTerm || undefined,
-        registrationStatus: mappedRegistrationStatus || undefined,
-        kycStatus: mappedKycStatus || undefined,
-        isActive: isActiveBoolean, // Using the properly converted boolean value
+        kycStatus: kycStatusFilter || undefined,
         city: cityFilter || undefined,
+        storeId: storeFilter || undefined,
         sortBy: 'createdAt',
         sortOrder: 'desc'
       });
@@ -228,6 +187,20 @@ const RiderManagement: React.FC = () => {
         dataCount: response.data?.length,
         pagination: response.pagination
       });
+
+      // Debug: Check what KYC statuses we actually received
+      if (response.data) {
+        const receivedStatuses = response.data.map(r => r.kycStatus);
+        console.log('📊 RESPONSE - KYC Statuses received:', {
+          filter: kycStatusFilter,
+          uniqueStatuses: [...new Set(receivedStatuses)],
+          sample: response.data.slice(0, 3).map(r => ({
+            id: r.id,
+            name: r.name,
+            kycStatus: r.kycStatus
+          }))
+        });
+      }
 
       if (response.success) {
         // Enhanced logging to debug filter issues
@@ -274,9 +247,9 @@ const RiderManagement: React.FC = () => {
           vehicleObjectCount: response.data?.filter(r => r.assignedVehicle).length,
           // Applied filters
           appliedFilters: {
-            isActive: isActiveBoolean,
-            registrationStatus: mappedRegistrationStatus,
-            kycStatus: mappedKycStatus,
+            kycStatus: kycStatusFilter,
+            city: cityFilter,
+            storeId: storeFilter,
           }
         });
 
@@ -316,7 +289,7 @@ const RiderManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, searchTerm, registrationStatusFilter, kycStatusFilter, isActiveFilter, cityFilter]);
+  }, [page, rowsPerPage, searchTerm, kycStatusFilter, cityFilter, storeFilter]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -329,16 +302,57 @@ const RiderManagement: React.FC = () => {
     }
   }, [])
 
+  // Fetch cities for dropdown
+  const loadCities = useCallback(async () => {
+    try {
+      setLoadingCities(true);
+      const response = await fetch('http://localhost:3006/internal/cities');
+      const data = await response.json();
+      if (data.success && data.data) {
+        setCities(data.data.map((city: any) => ({
+          id: city.id,
+          name: city.name
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading cities:', error);
+    } finally {
+      setLoadingCities(false);
+    }
+  }, []);
+
+  // Fetch stores for dropdown
+  const loadStores = useCallback(async () => {
+    try {
+      setLoadingStores(true);
+      const response = await fetch('http://localhost:3006/internal/stores');
+      const data = await response.json();
+      if (data.success && data.data) {
+        setStores(data.data.map((store: any) => ({
+          id: store.id,
+          storeName: store.storeName,
+          storeCode: store.storeCode
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading stores:', error);
+    } finally {
+      setLoadingStores(false);
+    }
+  }, []);
+
   // Effects for data loading
   useEffect(() => {
-    // Check API configuration on component mount
-    const config = checkApiConfiguration();
-    console.log('🔧 API Configuration:', config);
-
     // Initial data loading on component mount
-    loadRiders();
     loadStats();
-  }, [loadRiders, loadStats]);
+    loadCities();
+    loadStores();
+  }, [loadStats, loadCities, loadStores]);
+
+  // Separate effect for riders that responds to filter changes
+  useEffect(() => {
+    loadRiders();
+  }, [loadRiders, page, rowsPerPage, searchTerm, kycStatusFilter, cityFilter, storeFilter]);
 
   // Debug effect to track pagination changes
   useEffect(() => {
@@ -421,106 +435,6 @@ const RiderManagement: React.FC = () => {
     }
   }, [editingRider, loadRiders, loadStats])
 
-  const handleToggleRiderStatus = useCallback(async (riderId: string, currentStatus: boolean) => {
-    try {
-      // Set toggling state for this specific rider
-      setTogglingRiders(prev => ({ ...prev, [riderId]: true }));
-
-      // Optimistic UI update - update the local state immediately
-      setRiders(prevRiders =>
-        prevRiders.map(rider =>
-          rider.id === riderId
-            ? { ...rider, isActive: !currentStatus }
-            : rider
-        )
-      );
-
-      // Make the API call to update the database
-      const response = await riderService.toggleRiderStatus(riderId, !currentStatus);
-
-      if (response.success) {
-        // If the API call succeeded, use the returned data to ensure we have the correct status
-        const updatedRider = response.data;
-
-        // Update the rider in the local state with the data from the API
-        setRiders(prevRiders =>
-          prevRiders.map(rider =>
-            rider.id === riderId
-              ? { ...rider, isActive: updatedRider.isActive }
-              : rider
-          )
-        );
-
-        setSnackbar({
-          open: true,
-          message: `Rider ${updatedRider.isActive ? 'activated' : 'deactivated'} successfully`,
-          severity: 'success'
-        });
-
-        // Update stats, but don't reload riders to keep our optimistic update
-        loadStats();
-      } else {
-        // If the API call failed, revert the optimistic update
-        setRiders(prevRiders =>
-          prevRiders.map(rider =>
-            rider.id === riderId
-              ? { ...rider, isActive: currentStatus }
-              : rider
-          )
-        );
-
-        // Display business validation error from the API
-        setSnackbar({
-          open: true,
-          message: response.message || 'Failed to update rider status',
-          severity: 'error'
-        });
-
-        // No need to refresh data, we already reverted the optimistic update
-      }
-    } catch (error: any) {
-      // Revert optimistic update
-      setRiders(prevRiders =>
-        prevRiders.map(rider =>
-          rider.id === riderId
-            ? { ...rider, isActive: currentStatus }
-            : rider
-        )
-      );
-
-      // Improved error handling with more detailed messages
-      let errorMessage;
-
-      if (error.response?.data?.message) {
-        // Server returned a specific error message
-        errorMessage = error.response.data.message;
-      } else if (error.response?.status === 400) {
-        // Common error case for rider activation
-        errorMessage = 'Cannot update status: Registration may not be complete';
-      } else {
-        // Generic error fallback
-        errorMessage = error.message || 'Failed to update rider status';
-      }
-
-      console.error('Toggle status error:', error);
-
-      setSnackbar({
-        open: true,
-        message: errorMessage,
-        severity: 'error'
-      });
-
-      // No need to refresh data, we already reverted the optimistic update
-    } finally {
-      // Clear toggling state for this rider
-      setTogglingRiders(prev => {
-        const updated = { ...prev };
-        delete updated[riderId];
-        return updated;
-      });
-    }
-  }, [loadRiders, loadStats])
-
   const handleApproveRider = useCallback(async (riderId: string) => {
     if (!window.confirm('Are you sure you want to approve this rider registration?')) return
 
@@ -568,18 +482,19 @@ const RiderManagement: React.FC = () => {
     }).format(amount)
   }, [])
 
-  const formatDate = useCallback((dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN')
+  const maskPhoneNumber = useCallback((phone: string) => {
+    // Mask first 6 digits: 9876543210 -> ******3210
+    if (!phone || phone.length < 6) return phone
+    return '******' + phone.slice(6)
   }, [])
 
   const handleExportRiders = useCallback(async () => {
     try {
       const filters = {
         search: searchTerm,
-        registrationStatus: registrationStatusFilter,
         kycStatus: kycStatusFilter,
-        isActive: isActiveFilter,
         city: cityFilter,
+        storeId: storeFilter,
       }
 
       const blob = await riderService.exportRiders(filters)
@@ -597,7 +512,7 @@ const RiderManagement: React.FC = () => {
       console.error('Error exporting riders:', error)
       setSnackbar({ open: true, message: 'Failed to export riders', severity: 'error' })
     }
-  }, [searchTerm, registrationStatusFilter, kycStatusFilter, isActiveFilter, cityFilter])
+  }, [searchTerm, kycStatusFilter, cityFilter, storeFilter])
 
   return (
     <Box sx={{ p: 3 }}>
@@ -729,7 +644,7 @@ const RiderManagement: React.FC = () => {
                     setTimeout(loadRiders, 0);
                   }
                 }}
-                placeholder="Name, Phone, ID..."
+                placeholder="Name, Phone, Rider ID..."
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -748,42 +663,16 @@ const RiderManagement: React.FC = () => {
             </Grid>
             <Grid item xs={12} md={2}>
               <FormControl fullWidth>
-                <InputLabel>Registration Status</InputLabel>
-                <Select
-                  value={registrationStatusFilter}
-                  label="Registration Status"
-                  onChange={(e) => {
-                    setRegistrationStatusFilter(e.target.value);
-                    // Reset page to 0 when filtering
-                    setPage(0);
-                    // Apply filter immediately
-                    setTimeout(() => loadRiders(), 0);
-                  }}
-                >
-                  <MenuItem value="">All Statuses</MenuItem>
-                  {REGISTRATION_STATUSES.map((status) => (
-                    <MenuItem key={status.value} value={status.value}>
-                      {status.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth>
                 <InputLabel>KYC Status</InputLabel>
                 <Select
                   value={kycStatusFilter}
                   label="KYC Status"
                   onChange={(e) => {
                     setKycStatusFilter(e.target.value);
-                    // Reset page to 0 when filtering
                     setPage(0);
-                    // Apply filter immediately
-                    setTimeout(() => loadRiders(), 0);
                   }}
                 >
-                  <MenuItem value="">All Statuses</MenuItem>
+                  <MenuItem value="">All</MenuItem>
                   {KYC_STATUSES.map((status) => (
                     <MenuItem key={status.value} value={status.value}>
                       {status.label}
@@ -792,49 +681,58 @@ const RiderManagement: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={isActiveFilter}
-                  label="Status"
-                  onChange={(e) => {
-                    setIsActiveFilter(e.target.value);
-                    // Reset page to 0 when filtering
-                    setPage(0);
-                    // Apply filter immediately
-                    setTimeout(() => loadRiders(), 0);
-                  }}
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="true">Active</MenuItem>
-                  <MenuItem value="false">Inactive</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                fullWidth
-                label="City"
-                value={cityFilter}
-                onChange={(e) => {
-                  setCityFilter(e.target.value);
-                  // Reset page to 0 when filtering
+            <Grid item xs={12} md={2.5}>
+              <Autocomplete
+                options={cities}
+                getOptionLabel={(option) => option.name}
+                value={cities.find(c => c.name === cityFilter) || null}
+                onChange={(_, newValue) => {
+                  setCityFilter(newValue ? newValue.name : '');
                   setPage(0);
-                  // Only load if clearing the field - otherwise wait for blur or Enter
-                  if (e.target.value === '') {
-                    setTimeout(loadRiders, 0);
-                  }
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setTimeout(loadRiders, 0);
-                  }
+                loading={loadingCities}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="City"
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {loadingCities ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+              />
+            </Grid>
+            <Grid item xs={12} md={2.5}>
+              <Autocomplete
+                options={stores}
+                getOptionLabel={(option) => `${option.storeCode} - ${option.storeName}`}
+                value={stores.find(s => s.id === storeFilter) || null}
+                onChange={(_, newValue) => {
+                  setStoreFilter(newValue ? newValue.id : '');
+                  setPage(0);
                 }}
-                onBlur={() => {
-                  // Load on blur to capture user typing a value and clicking away
-                  loadRiders();
-                }}
+                loading={loadingStores}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Store"
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {loadingStores ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
               />
             </Grid>
             <Grid item xs={12} md={2}>
@@ -843,12 +741,10 @@ const RiderManagement: React.FC = () => {
                 variant="outlined"
                 onClick={() => {
                   setSearchTerm('')
-                  setRegistrationStatusFilter('')
                   setKycStatusFilter('')
-                  setIsActiveFilter('')
                   setCityFilter('')
+                  setStoreFilter('')
                   setPage(0)
-                  // Reload data after clearing filters
                   loadRiders();
                 }}
               >
@@ -870,12 +766,10 @@ const RiderManagement: React.FC = () => {
               size="small"
               onClick={() => {
                 setSearchTerm('');
-                setRegistrationStatusFilter('');
                 setKycStatusFilter('');
-                setIsActiveFilter('');
                 setCityFilter('');
+                setStoreFilter('');
                 setPage(0);
-                loadRiders();
               }}
             >
               Clear All
@@ -890,30 +784,29 @@ const RiderManagement: React.FC = () => {
       <Card>
         <CardContent>
           <TableContainer component={Paper}>
-            <Table>
+            <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Rider</TableCell>
-                  <TableCell>Phone</TableCell>
-                  <TableCell>Registration Status</TableCell>
+                  <TableCell>Mobile</TableCell>
+                  <TableCell>Store</TableCell>
+                  <TableCell>Work Type</TableCell>
                   <TableCell>KYC Status</TableCell>
                   <TableCell>Vehicle</TableCell>
                   <TableCell>Performance</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Registration Date</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
+                    <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4 }}>
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
                 ) : riders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
+                    <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4 }}>
                       No riders found
                     </TableCell>
                   </TableRow>
@@ -922,23 +815,35 @@ const RiderManagement: React.FC = () => {
                     <TableRow key={rider.id}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            {rider.name ? rider.name.charAt(0).toUpperCase() : rider.phone.charAt(0)}
+                          <Avatar
+                            src={(rider.kycStatus === 'verified' && rider.selfie) ? rider.selfie : undefined}
+                            sx={{ bgcolor: 'primary.main' }}
+                          >
+                            {(rider.kycStatus !== 'verified' || !rider.selfie) && (rider.name ? rider.name.charAt(0).toUpperCase() : rider.phone.charAt(0))}
                           </Avatar>
                           <Box>
                             <Typography variant="body2" fontWeight="medium">
                               {rider.name || 'No Name'}
                             </Typography>
-                            <Typography variant="caption" color="textSecondary">
-                              ID: {rider.id}
-                            </Typography>
+                            <Chip
+                              label={rider.publicRiderId || rider.id}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              sx={{
+                                mt: 0.5,
+                                fontWeight: 600,
+                                fontSize: '0.75rem',
+                                height: '20px'
+                              }}
+                            />
                           </Box>
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Box>
                           <Typography variant="body2">
-                            {rider.phone}
+                            {maskPhoneNumber(rider.phone)}
                           </Typography>
                           {rider.phoneVerified && (
                             <Chip label="Verified" size="small" color="success" variant="outlined" />
@@ -946,11 +851,34 @@ const RiderManagement: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={getStatusLabel(rider.registrationStatus, REGISTRATION_STATUSES)}
-                          color={getStatusColor(rider.registrationStatus, REGISTRATION_STATUSES) as any}
-                          size="small"
-                        />
+                        {rider.assignedStore ? (
+                          <Box>
+                            <Typography variant="body2" fontWeight="medium">
+                              {rider.assignedStore.storeCode}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              {rider.assignedStore.city}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="textSecondary">
+                            No Store
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {rider.workType ? (
+                          <Chip
+                            label={rider.workType === 'FULL_TIME' ? 'Full-Time' : 'Part-Time'}
+                            color={rider.workType === 'FULL_TIME' ? 'primary' : 'info'}
+                            size="small"
+                            variant="outlined"
+                          />
+                        ) : (
+                          <Typography variant="body2" color="textSecondary">
+                            -
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -960,7 +888,13 @@ const RiderManagement: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        {rider.assignedVehicle || rider.assignedVehicleId ? (
+                        {rider.assignedVehicle?.registrationNumber ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+                            <Typography variant="body2" fontWeight={500}>
+                              {rider.assignedVehicle.registrationNumber}
+                            </Typography>
+                          </Box>
+                        ) : rider.assignedVehicleId ? (
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
                             <Chip
                               label="Assigned"
@@ -976,34 +910,14 @@ const RiderManagement: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Stack spacing={0.5}>
-                          <Typography variant="body2">
+                        <Stack spacing={0.25}>
+                          <Typography variant="body2" fontSize="0.8rem">
                             Orders: {rider.totalOrders || 0}
                           </Typography>
-                          <Typography variant="body2">
-                            Rating: {rider.averageRating ? rider.averageRating.toFixed(1) : 'N/A'}
-                          </Typography>
-                          <Typography variant="body2">
+                          <Typography variant="body2" fontSize="0.8rem">
                             Earnings: {formatCurrency(rider.totalEarnings || 0)}
                           </Typography>
                         </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip title="Rider's current status">
-                          <Badge
-                            badgeContent={rider.isActive ? '●' : '○'}
-                            color={rider.isActive ? 'success' : 'error'}
-                          >
-                            <Typography variant="body2">
-                              {rider.isActive ? 'Active' : 'Inactive'}
-                            </Typography>
-                          </Badge>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {formatDate(rider.createdAt)}
-                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1044,27 +958,6 @@ const RiderManagement: React.FC = () => {
                                 </IconButton>
                               </Tooltip>
                             </>
-                          )}
-                          {togglingRiders[rider.id] ? (
-                            <IconButton
-                              size="small"
-                              disabled={true}
-                              color="inherit"
-                            >
-                              <CircularProgress size={20} color="inherit" />
-                            </IconButton>
-                          ) : (
-                            <Tooltip title={rider.isActive ? 'Set rider as inactive' : 'Set rider as active'}>
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleToggleRiderStatus(rider.id, rider.isActive)}
-                                  color={rider.isActive ? 'error' : 'success'}
-                                >
-                                  {rider.isActive ? <BlockIcon /> : <CheckCircleIcon />}
-                                </IconButton>
-                              </span>
-                            </Tooltip>
                           )}
                         </Box>
                       </TableCell>

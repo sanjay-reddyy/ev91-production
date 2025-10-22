@@ -58,6 +58,9 @@ export interface RiderVehicleHistory {
   damagesReported?: string;
   riderFeedback?: string;
   issuesReported?: string;
+  hubId?: string; // Hub ID
+  hubCode?: string; // Hub code (e.g., "HUB001")
+  hubName?: string; // Hub name
   vehicle?: any; // This can be a string (JSON) or an object from backend
 }
 
@@ -76,7 +79,7 @@ const vehicleHistoryService = {
     try {
       // Use the new endpoint in the rider service
       const response = await riderApi.get(
-        `/vehicle-history/riders/${riderId}/vehicle-history`
+        `/riders/vehicle-history/riders/${riderId}/vehicle-history`
       );
 
       // Process the response data to calculate duration days if not provided by API
@@ -243,7 +246,7 @@ const vehicleHistoryService = {
   ): Promise<APIResponse<RiderVehicleHistory>> {
     try {
       const response = await riderApi.post(
-        `/vehicle-history/riders/${riderId}/vehicle-assignments`,
+        `/riders/vehicle-history/riders/${riderId}/vehicle-assignments`,
         {
           vehicleId,
           registrationNumber,
@@ -271,7 +274,7 @@ const vehicleHistoryService = {
   ): Promise<APIResponse<RiderVehicleHistory>> {
     try {
       const response = await riderApi.patch(
-        `/vehicle-history/vehicle-assignments/${assignmentId}/return`,
+        `/riders/vehicle-history/vehicle-assignments/${assignmentId}/return`,
         {
           notes,
         }
@@ -296,7 +299,7 @@ const vehicleHistoryService = {
   ): Promise<APIResponse<RiderVehicleHistory | null>> {
     try {
       const response = await riderApi.get(
-        `/vehicle-history/riders/${riderId}/vehicle-history/active`
+        `/riders/vehicle-history/riders/${riderId}/vehicle-history/active`
       );
       return {
         success: true,

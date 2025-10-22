@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Grid,
   TextField,
   Typography,
   Divider,
+  CircularProgress,
+  InputAdornment,
 } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import axios from 'axios';
 
 interface RiderFormData {
   name: string;
@@ -42,12 +47,19 @@ interface FormErrors {
   emergencyRelation?: string;
 }
 
+interface ValidationState {
+  aadhaar: 'idle' | 'checking' | 'valid' | 'invalid';
+  pan: 'idle' | 'checking' | 'valid' | 'invalid';
+  dl: 'idle' | 'checking' | 'valid' | 'invalid';
+}
+
 interface RiderFormProps {
   formData: RiderFormData;
   formErrors: FormErrors;
   validationEnabled: boolean;
   onFormDataChange: (data: RiderFormData) => void;
   onErrorsChange: (errors: FormErrors) => void;
+  riderId?: string; // Optional: For edit mode to exclude current rider from uniqueness check
 }
 
 const RiderForm: React.FC<RiderFormProps> = ({
@@ -56,7 +68,48 @@ const RiderForm: React.FC<RiderFormProps> = ({
   validationEnabled,
   onFormDataChange,
   onErrorsChange,
+  riderId,
 }) => {
+  const [validationState, setValidationState] = useState<ValidationState>({
+    aadhaar: 'idle',
+    pan: 'idle',
+    dl: 'idle',
+  });
+
+  // Debounced uniqueness check
+  const checkUniqueness = useCallback(
+    async (field: 'aadhaar' | 'pan' | 'dl', value: string) => {
+      if (!value || value.length < 8) return; // Skip if too short
+
+      setValidationState(prev => ({ ...prev, [field]: 'checking' }));
+
+      try {
+        const params: any = { [field]: value };
+        if (riderId) {
+          params.riderId = riderId;
+        }
+
+        const response = await axios.get('/api/rider-service/riders/check-unique', { params });
+
+        if (response.data.isUnique) {
+          setValidationState(prev => ({ ...prev, [field]: 'valid' }));
+        } else {
+          setValidationState(prev => ({ ...prev, [field]: 'invalid' }));
+          const errors = { ...formErrors };
+          const duplicateField = response.data.duplicates.find((d: any) => d.field === field);
+          if (duplicateField) {
+            const fieldName = field === 'aadhaar' ? 'aadharNumber' : field === 'pan' ? 'panNumber' : 'drivingLicenseNumber';
+            errors[fieldName as keyof FormErrors] = `This ${field.toUpperCase()} is already registered to another rider`;
+          }
+          onErrorsChange(errors);
+        }
+      } catch (error) {
+        console.error(`Error checking ${field} uniqueness:`, error);
+        setValidationState(prev => ({ ...prev, [field]: 'idle' }));
+      }
+    },
+    [riderId, formErrors, onErrorsChange]
+  );
   const handleFieldChange = (field: keyof RiderFormData, value: string, validator?: (value: string) => string | undefined) => {
     const newFormData = { ...formData, [field]: value };
     onFormDataChange(newFormData);
@@ -362,15 +415,37 @@ const RiderForm: React.FC<RiderFormProps> = ({
           onChange={(e) => {
             const aadharValue = e.target.value.replace(/\D/g, '').slice(0, 12);
             handleFieldChange('aadharNumber', aadharValue, validateAadharNumber);
+
+            // Check uniqueness after validation passes
+            if (aadharValue.length === 12 && validationEnabled) {
+              checkUniqueness('aadhaar', aadharValue);
+            } else {
+              setValidationState(prev => ({ ...prev, aadhaar: 'idle' }));
+            }
           }}
           required
-          error={validationEnabled && !!formErrors.aadharNumber}
-          helperText={validationEnabled && formErrors.aadharNumber ? formErrors.aadharNumber : '12-digit Aadhar number'}
+          error={validationEnabled && (!!formErrors.aadharNumber || validationState.aadhaar === 'invalid')}
+          helperText={
+            validationEnabled && formErrors.aadharNumber
+              ? formErrors.aadharNumber
+              : validationState.aadhaar === 'invalid'
+              ? 'This Aadhaar number is already registered'
+              : '12-digit Aadhar number'
+          }
           placeholder="123456789012"
           inputProps={{
             maxLength: 12,
             inputMode: 'numeric',
             pattern: '[0-9]*'
+          }}
+          InputProps={{
+            endAdornment: validationState.aadhaar !== 'idle' && formData.aadharNumber.length === 12 && (
+              <InputAdornment position="end">
+                {validationState.aadhaar === 'checking' && <CircularProgress size={20} />}
+                {validationState.aadhaar === 'valid' && <CheckCircleIcon color="success" />}
+                {validationState.aadhaar === 'invalid' && <ErrorIcon color="error" />}
+              </InputAdornment>
+            ),
           }}
         />
       </Grid>
@@ -384,13 +459,35 @@ const RiderForm: React.FC<RiderFormProps> = ({
             const panValue = e.target.value.toUpperCase();
             if (panValue.length <= 10) {
               handleFieldChange('panNumber', panValue, validatePanNumber);
+
+              // Check uniqueness after validation passes
+              if (panValue.length === 10 && /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panValue) && validationEnabled) {
+                checkUniqueness('pan', panValue);
+              } else {
+                setValidationState(prev => ({ ...prev, pan: 'idle' }));
+              }
             }
           }}
           required
-          error={validationEnabled && !!formErrors.panNumber}
-          helperText={validationEnabled && formErrors.panNumber ? formErrors.panNumber : 'Format: ABCDE1234F'}
+          error={validationEnabled && (!!formErrors.panNumber || validationState.pan === 'invalid')}
+          helperText={
+            validationEnabled && formErrors.panNumber
+              ? formErrors.panNumber
+              : validationState.pan === 'invalid'
+              ? 'This PAN number is already registered'
+              : 'Format: ABCDE1234F'
+          }
           placeholder="ABCDE1234F"
           inputProps={{ style: { textTransform: 'uppercase' } }}
+          InputProps={{
+            endAdornment: validationState.pan !== 'idle' && formData.panNumber.length === 10 && (
+              <InputAdornment position="end">
+                {validationState.pan === 'checking' && <CircularProgress size={20} />}
+                {validationState.pan === 'valid' && <CheckCircleIcon color="success" />}
+                {validationState.pan === 'invalid' && <ErrorIcon color="error" />}
+              </InputAdornment>
+            ),
+          }}
         />
       </Grid>
 
@@ -399,11 +496,35 @@ const RiderForm: React.FC<RiderFormProps> = ({
           fullWidth
           label="Driving License Number"
           value={formData.drivingLicenseNumber}
-          onChange={(e) => handleFieldChange('drivingLicenseNumber', e.target.value, validateDrivingLicenseNumber)}
+          onChange={(e) => {
+            handleFieldChange('drivingLicenseNumber', e.target.value, validateDrivingLicenseNumber);
+
+            // Check uniqueness after validation passes
+            if (e.target.value.trim().length >= 8 && validationEnabled) {
+              checkUniqueness('dl', e.target.value.trim());
+            } else {
+              setValidationState(prev => ({ ...prev, dl: 'idle' }));
+            }
+          }}
           required
-          error={validationEnabled && !!formErrors.drivingLicenseNumber}
-          helperText={validationEnabled && formErrors.drivingLicenseNumber ? formErrors.drivingLicenseNumber : 'Minimum 8 characters'}
+          error={validationEnabled && (!!formErrors.drivingLicenseNumber || validationState.dl === 'invalid')}
+          helperText={
+            validationEnabled && formErrors.drivingLicenseNumber
+              ? formErrors.drivingLicenseNumber
+              : validationState.dl === 'invalid'
+              ? 'This Driving License number is already registered'
+              : 'Minimum 8 characters'
+          }
           placeholder="Enter driving license number"
+          InputProps={{
+            endAdornment: validationState.dl !== 'idle' && formData.drivingLicenseNumber.length >= 8 && (
+              <InputAdornment position="end">
+                {validationState.dl === 'checking' && <CircularProgress size={20} />}
+                {validationState.dl === 'valid' && <CheckCircleIcon color="success" />}
+                {validationState.dl === 'invalid' && <ErrorIcon color="error" />}
+              </InputAdornment>
+            ),
+          }}
         />
       </Grid>
 

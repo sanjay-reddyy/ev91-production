@@ -12,6 +12,35 @@ datasource db {
   schemas  = ["rider"]
 }
 
+// Enums for EV Rental Feature
+enum RiderVehiclePreference {
+  NEED_EV_RENTAL @map("Need EV Rental")
+  OWN_VEHICLE    @map("Own Vehicle")
+  RENTED_VEHICLE @map("Rented Vehicle")
+  CYCLE          @map("Cycle")
+  WALK           @map("Walk")
+
+  @@schema("rider")
+}
+
+enum VehicleRentalStatus {
+  NOT_APPLICABLE @map("Not Applicable")
+  PENDING        @map("Pending")
+  APPROVED       @map("Approved")
+  ACTIVE         @map("Active")
+  TERMINATED     @map("Terminated")
+  SUSPENDED      @map("Suspended")
+
+  @@schema("rider")
+}
+
+enum RiderWorkType {
+  FULL_TIME @map("Full Time")
+  PART_TIME @map("Part Time")
+
+  @@schema("rider")
+}
+
 // City model - Synchronized from vehicle-service
 model City {
   id String @id @default(cuid())
@@ -44,10 +73,10 @@ model City {
   marketPotential     String? // High, Medium, Low
 
   // Event Sourcing Fields (for cross-service synchronization)
-  version           Int     @default(1) // For optimistic locking
-  lastModifiedBy    String? // User ID who last modified
-  eventSequence     Int     @default(0) // Auto-increment for event ordering
-  lastSyncAt        DateTime @default(now()) // Last sync timestamp
+  version        Int      @default(1) // For optimistic locking
+  lastModifiedBy String? // User ID who last modified
+  eventSequence  Int      @default(0) // Auto-increment for event ordering
+  lastSyncAt     DateTime @default(now()) // Last sync timestamp
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -58,70 +87,90 @@ model City {
 }
 
 model Rider {
-  id            String   @id @default(uuid())
-  phone         String   @unique
-  phoneVerified Boolean  @default(false)
-  registrationStatus String @default("PENDING") // PENDING, PHONE_VERIFIED, KYC_COMPLETED, COMPLETED
-  isActive      Boolean  @default(false) // Decoupled activation status from registration status
+  id                 String  @id @default(uuid())
+  publicRiderId      String? @unique // Human-readable permanent ID (e.g., MAA-25-R000001)
+  phone              String  @unique
+  phoneVerified      Boolean @default(false)
+  registrationStatus String  @default("PENDING") // PENDING, PHONE_VERIFIED, KYC_COMPLETED, COMPLETED
+  isActive           Boolean @default(false) // Decoupled activation status from registration status
 
   // User data
-  name          String?
-  dob           String?
-  address1      String?
-  address2      String?
-  city          String?
-  state         String?
-  pincode       String?
-  emergencyName String?
-  emergencyPhone String?
+  name              String?
+  email             String? // Rider's email address
+  dob               String?
+  address1          String?
+  address2          String?
+  city              String?
+  state             String?
+  pincode           String?
+  emergencyName     String?
+  emergencyPhone    String?
   emergencyRelation String?
 
   // KYC fields
-  kycStatus     String   @default("pending")
-  aadhaar       String?
-  pan           String?
-  dl            String?
-  selfie        String?
+  kycStatus String  @default("pending")
+  aadhaar   String? @unique // Aadhaar must be unique across all riders
+  pan       String? @unique // PAN must be unique across all riders
+  dl        String? @unique // Driving License must be unique across all riders
+  selfie    String?
 
-  // Vehicle Assignment
+  // Vehicle Assignment (Legacy - still used for non-rental vehicles)
   assignedVehicleId String?
   assignmentDate    DateTime?
   hubId             String? // Hub where rider is based
 
+  // EV Rental Vehicle Preference
+  needsEvRental           Boolean                 @default(false) // True if rider needs EV rental from platform
+  vehiclePreference       RiderVehiclePreference? // Selected transport mode (only if needsEvRental = false)
+  preferredVehicleModelId String? // Preferred vehicle model ID from vehicle-service (only if needsEvRental = true)
+  workType                RiderWorkType? // Full-time or Part-time work schedule
+
+  // EV Rental Details (only applicable when needsEvRental = true)
+  rentalStatus            VehicleRentalStatus @default(NOT_APPLICABLE)
+  monthlyRentalAmount     Float? // Current monthly rental amount being paid
+  rentalStartDate         DateTime? // Date when rental started
+  rentalEndDate           DateTime? // Date when rental ended (null = ongoing)
+  rentalAgreementAccepted Boolean             @default(false)
+  rentalAgreementDate     DateTime?
+  currentVehicleId        String? // Currently assigned rental vehicle ID from vehicle-service
+
   // Store Assignment
-  assignedStoreId   String?
-  assignedClientId  String?
-  storeAssignmentDate DateTime?
+  assignedStoreId      String?
+  assignedClientId     String?
+  storeAssignmentDate  DateTime?
   storeAssignmentNotes String?
 
   // Compliance
-  consent       Boolean  @default(false)
-  consentLogs   String?
-  ip            String?
+  consent         Boolean @default(false)
+  consentLogs     String?
+  ip              String?
   agreementSigned Boolean @default(false)
 
   // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
   vehicleHistory RiderVehicleHistory[] // Relationship to vehicle assignment history
-  kycDocuments   KycDocument[]         // Relationship to KYC documents
+  kycDocuments   KycDocument[] // Relationship to KYC documents
+  rentalHistory  RiderVehicleRental[] // EV Rental history
+  rentalPayments RiderRentalPayment[] // EV Rental payment records
+  bankDetails    RiderBankDetails[] // Relationship to bank account details
 
   @@schema("rider")
 }
 
 // Vehicle Assignment History - Tracks all vehicle assignments for riders
 model RiderVehicleHistory {
-  id            String   @id @default(uuid())
-  riderId       String
-  vehicleId     String   // ID from vehicle-service
+  id        String @id @default(uuid())
+  riderId   String
+  vehicleId String // ID from vehicle-service
 
   // Assignment Details
-  assignedAt    DateTime @default(now())
-  returnedAt    DateTime?
-  assignedBy    String   // User ID who assigned the vehicle
-  returnedBy    String?  // User ID who processed the return
+  assignedAt DateTime  @default(now())
+  returnedAt DateTime?
+  assignedBy String // User ID who assigned the vehicle
+  returnedBy String? // User ID who processed the return
 
   // Vehicle Information (denormalized from vehicle-service for faster retrieval)
   registrationNumber String
@@ -129,13 +178,15 @@ model RiderVehicleHistory {
   vehicleModel       String? // Model name (Activa, S1 Pro, etc.)
 
   // Status and Metadata
-  status            String @default("ACTIVE") // ACTIVE, RETURNED
-  notes             String? // Assignment/return notes
-  hubId             String? // Hub where vehicle was assigned from
+  status String  @default("ACTIVE") // ACTIVE, RETURNED
+  notes  String? // Assignment/return notes
+  hubId  String? // Hub where vehicle was assigned from
+  hubCode String? // Hub code at time of assignment (denormalized for historical accuracy)
+  hubName String? // Hub name at time of assignment (denormalized for historical accuracy)
 
   // Performance and Usage Data
-  startMileage      Int?   // Mileage reading at assignment
-  endMileage        Int?   // Mileage reading at return
+  startMileage           Int? // Mileage reading at assignment
+  endMileage             Int? // Mileage reading at return
   batteryPercentageStart Int?
   batteryPercentageEnd   Int?
 
@@ -145,15 +196,15 @@ model RiderVehicleHistory {
   damagesReported   String? // JSON array of reported damages
 
   // Issues and Feedback
-  riderFeedback     String? // Rider's feedback on the vehicle
-  issuesReported    String? // JSON array of reported issues
+  riderFeedback  String? // Rider's feedback on the vehicle
+  issuesReported String? // JSON array of reported issues
 
   // Audit and Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  rider     Rider   @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   @@index([riderId])
   @@index([vehicleId])
@@ -165,23 +216,23 @@ model RiderVehicleHistory {
 
 // KYC Documents - Stores document uploads and verification status
 model KycDocument {
-  id                 String    @id @default(uuid())
-  riderId            String
-  documentType       String    // aadhaar, pan, dl, selfie
-  documentTypeDisplay String?  // Display name for the document type
-  documentNumber     String?   // Document identification number
-  documentImageUrl   String?   // URL to the document image in S3
-  verificationStatus String    @default("pending") // pending, verified, rejected
-  verificationDate   DateTime?
-  verificationNotes  String?
-  verifiedBy         String?   // Admin user who verified the document
+  id                  String    @id @default(uuid())
+  riderId             String
+  documentType        String // aadhaar, pan, dl, selfie
+  documentTypeDisplay String? // Display name for the document type
+  documentNumber      String? // Document identification number
+  documentImageUrl    String? // URL to the document image in S3
+  verificationStatus  String    @default("pending") // pending, verified, rejected
+  verificationDate    DateTime?
+  verificationNotes   String?
+  verifiedBy          String? // Admin user who verified the document
 
   // Audit and Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  rider     Rider   @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   @@index([riderId])
   @@index([documentType])
@@ -202,5 +253,173 @@ model OtpVerification {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
+  @@schema("rider")
+}
+
+// Rider Vehicle Rental - Tracks rental agreements and assignments
+model RiderVehicleRental {
+  id             String @id @default(uuid())
+  riderId        String
+  vehicleId      String // ID of actual vehicle from vehicle-service
+  vehicleModelId String // Reference to vehicle model ID from vehicle-service (not FK, just string reference)
+
+  // Rental Terms
+  monthlyRentalCost Float // Actual monthly cost (after depreciation calculation)
+  startDate         DateTime
+  endDate           DateTime? // null = ongoing rental
+  status            VehicleRentalStatus @default(ACTIVE)
+
+  // Termination Details
+  terminationReason String? // Rider request, Vehicle damage, Payment default, etc.
+  terminationDate   DateTime?
+  terminatedBy      String? // User ID who terminated
+
+  // Financial
+  securityDeposit         Float? // One-time security deposit
+  securityDepositPaid     Boolean @default(false)
+  securityDepositRefunded Boolean @default(false)
+
+  // Agreement
+  agreementSignedAt    DateTime?
+  agreementDocumentUrl String? // S3 URL to signed agreement
+
+  // Notes and Metadata
+  notes      String?
+  adminNotes String? // Internal notes for admins
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  rider    Rider                @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  payments RiderRentalPayment[]
+
+  @@index([riderId])
+  @@index([vehicleId])
+  @@index([vehicleModelId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("rider_vehicle_rentals")
+  @@schema("rider")
+}
+
+// Rider Rental Payments - Tracks monthly rental payments
+model RiderRentalPayment {
+  id       String @id @default(uuid())
+  riderId  String
+  rentalId String
+
+  // Payment Details
+  amount   Float // Monthly rental amount
+  dueDate  DateTime // When payment is due
+  paidDate DateTime? // When payment was actually made
+  status   String    @default("PENDING") // PENDING, PAID, OVERDUE, WAIVED, FAILED
+
+  // Payment Processing
+  paymentMethod    String? // EARNINGS_DEDUCTION, MANUAL_PAYMENT, BANK_TRANSFER
+  transactionId    String? // Reference to payment transaction
+  paymentReference String? // External payment reference
+
+  // Deduction from Earnings
+  deductedFromEarnings Boolean   @default(false)
+  deductionDate        DateTime?
+  earningsBalance      Float? // Rider's earnings balance at time of deduction
+
+  // Late Payment
+  isLate      Boolean @default(false)
+  lateFee     Float? // Late payment penalty
+  daysPastDue Int?
+
+  // Waiver/Adjustment
+  isWaived     Boolean   @default(false)
+  waiverReason String?
+  waivedBy     String? // Admin user who approved waiver
+  waivedAt     DateTime?
+
+  // Notes
+  notes      String?
+  adminNotes String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  rider  Rider              @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  rental RiderVehicleRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  @@index([riderId])
+  @@index([rentalId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([paidDate])
+  @@map("rider_rental_payments")
+  @@schema("rider")
+}
+
+// Rider ID Counter - Tracks sequential numbers for public rider IDs
+model RiderCounter {
+  id         String @id @default(cuid())
+  cityCode   String // City code (MAA, BLR, MUM, etc.)
+  year       Int // Registration year (2025, 2026, etc.)
+  lastNumber Int    @default(0) // Last assigned sequential number
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cityCode, year]) // One counter per city-year combination
+  @@index([cityCode, year])
+  @@map("rider_counters")
+  @@schema("rider")
+}
+
+// Rider Bank Details - Stores rider's bank account information for payments
+model RiderBankDetails {
+  id       String @id @default(uuid())
+  riderId  String
+
+  // Bank Account Information
+  accountHolderName String // Name as per bank account
+  accountNumber     String // Bank account number
+  accountType       String @default("SAVINGS") // SAVINGS, CURRENT
+  ifscCode          String // IFSC code
+  bankName          String // Name of the bank
+  branchName        String? // Branch name (optional)
+  branchAddress     String? // Branch address (optional)
+
+  // Verification Status
+  verificationStatus String   @default("pending") // pending, verified, rejected
+  verificationDate   DateTime?
+  verificationNotes  String? // Notes from admin during verification
+  verifiedBy         String? // Admin user ID who verified
+
+  // Bank Proof Documents (Passbook, Cheque, Statement)
+  proofDocumentType String? // PASSBOOK, CANCELLED_CHEQUE, BANK_STATEMENT
+  proofDocumentUrl  String? // S3 URL to uploaded proof document
+
+  // Primary Account Flag
+  isPrimary Boolean @default(false) // One primary account per rider
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Audit Trail
+  notes      String? // Additional notes or remarks
+  addedBy    String? // Admin user ID who added this
+  lastEditedBy String? // Admin user ID who last edited this
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@index([riderId])
+  @@index([verificationStatus])
+  @@index([isPrimary])
+  @@map("rider_bank_details")
   @@schema("rider")
 }

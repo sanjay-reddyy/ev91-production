@@ -39,6 +39,34 @@ const riderVehicleHistoryService = {
 
       logDebug(`Found ${history.length} history records for rider ${riderId}`);
 
+      // Fetch hub information for records that have hubId
+      const hubIds = history
+        .filter((record) => record.hubId)
+        .map((record) => record.hubId);
+
+      let hubsMap = new Map();
+
+      if (hubIds.length > 0) {
+        try {
+          // Try to fetch hub information from client_store schema
+          const hubs: any[] = await prisma.$queryRaw`
+            SELECT id, code, name FROM client_store.hubs
+            WHERE id = ANY(${hubIds}::uuid[])
+          `;
+
+          // Create a map for quick lookup
+          hubs.forEach((hub) => {
+            hubsMap.set(hub.id, { code: hub.code, name: hub.name });
+          });
+
+          logDebug(`Fetched ${hubs.length} hub records`);
+        } catch (hubError) {
+          // If cross-schema query fails, log warning but continue
+          logDebug(`Could not fetch hub information: ${hubError}`);
+          // Hub data will be null, frontend will show "N/A"
+        }
+      }
+
       // Process the history records to ensure clean data structure
       const processedHistory = history.map((record) => {
         // First check if vehicleModel contains JSON data
@@ -74,6 +102,9 @@ const riderVehicleHistoryService = {
           }
         }
 
+        // Get hub information from the map
+        const hubInfo = record.hubId ? hubsMap.get(record.hubId) : null;
+
         // Handle any other fields
         return {
           ...record,
@@ -82,6 +113,9 @@ const riderVehicleHistoryService = {
           }`,
           // Ensure registration number is displayed correctly
           registrationNumber: record.registrationNumber || "Unknown",
+          // Add hub information if available
+          hubCode: hubInfo?.code || null,
+          hubName: hubInfo?.name || null,
         };
       });
 
@@ -234,6 +268,8 @@ const riderVehicleHistoryService = {
       vehicleModel?: string;
       notes?: string;
       hubId?: string;
+      hubCode?: string;
+      hubName?: string;
       startMileage?: number;
       batteryPercentageStart?: number;
       conditionOnAssign?: string;
@@ -270,14 +306,16 @@ const riderVehicleHistoryService = {
       const assignmentId = await prisma.$executeRaw`
         INSERT INTO rider.rider_vehicle_history (
           id, "riderId", "vehicleId", "registrationNumber", "assignedBy",
-          "vehicleMake", "vehicleModel", notes, "hubId",
+          "vehicleMake", "vehicleModel", notes, "hubId", "hubCode", "hubName",
           "startMileage", "batteryPercentageStart", "conditionOnAssign",
           "createdAt", "updatedAt"
         ) VALUES (
           gen_random_uuid(), ${riderId}, ${vehicleId}, ${registrationNumber}, ${assignedBy},
           ${data.vehicleMake || null}, ${data.vehicleModel || null}, ${
         data.notes || null
-      }, ${data.hubId || null},
+      }, ${data.hubId || null}, ${data.hubCode || null}, ${
+        data.hubName || null
+      },
           ${data.startMileage || null}, ${
         data.batteryPercentageStart || null
       }, ${data.conditionOnAssign || null},
@@ -337,7 +375,10 @@ const riderVehicleHistoryService = {
     }
   ) {
     try {
-      logDebug(`Returning vehicle for assignment ${assignmentId}`, data);
+      logDebug(`========== RETURNING VEHICLE - SERVICE LAYER ==========`);
+      logDebug(`Assignment ID: ${assignmentId}`);
+      logDebug(`Returned By: ${returnedBy}`);
+      logDebug(`Data:`, data);
 
       // Find the assignment using direct query
       const assignments: any[] = await prisma.$queryRaw`
@@ -350,6 +391,17 @@ const riderVehicleHistoryService = {
       }
 
       const assignment = assignments[0];
+      logDebug(`Found assignment:`, {
+        id: assignment.id,
+        riderId: assignment.riderId,
+        vehicleId: assignment.vehicleId,
+        status: assignment.status,
+        hubId: assignment.hubId,
+        hubCode: assignment.hubCode,
+        hubName: assignment.hubName,
+        currentNotes: assignment.notes,
+        assignedBy: assignment.assignedBy,
+      });
 
       if (assignment.status !== "ACTIVE" || assignment.returnedAt) {
         throw new BadRequestError("Vehicle is not currently assigned to rider");
@@ -359,6 +411,14 @@ const riderVehicleHistoryService = {
       const updatedNotes = data.notes
         ? `${assignment.notes || ""} | Return: ${data.notes}`
         : assignment.notes;
+
+      logDebug(`Updating assignment with:`, {
+        returnedBy,
+        updatedNotes,
+        endMileage: data.endMileage,
+        batteryPercentageEnd: data.batteryPercentageEnd,
+        conditionOnReturn: data.conditionOnReturn,
+      });
 
       // Update the assignment with return details using direct query
       const now = new Date();
@@ -397,7 +457,19 @@ const riderVehicleHistoryService = {
 
       const updatedAssignment =
         updatedAssignments.length > 0 ? updatedAssignments[0] : null;
-      logDebug(`Vehicle returned successfully for assignment ${assignmentId}`);
+
+      logDebug(
+        `✅ SERVICE LAYER: Vehicle returned successfully. Final record:`,
+        {
+          id: updatedAssignment?.id,
+          returnedBy: updatedAssignment?.returnedBy,
+          notes: updatedAssignment?.notes,
+          hubCode: updatedAssignment?.hubCode,
+          hubName: updatedAssignment?.hubName,
+          returnedAt: updatedAssignment?.returnedAt,
+          status: updatedAssignment?.status,
+        }
+      );
 
       return updatedAssignment;
     } catch (error) {

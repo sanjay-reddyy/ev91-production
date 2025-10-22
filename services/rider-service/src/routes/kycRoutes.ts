@@ -1,5 +1,9 @@
 import { Router } from "express";
 import { KycController } from "../controllers/kycController";
+import {
+  validateKycVerificationRequest,
+  validateDocumentUploadRequest,
+} from "../middleware/kycValidation";
 
 const kycRouter = Router();
 const kycController = new KycController();
@@ -21,7 +25,12 @@ const kycController = new KycController();
  *       200:
  *         description: KYC documents retrieved successfully
  */
-kycRouter.get("/:riderId/kyc", kycController.getKycDocuments);
+kycRouter.get("/:riderId/kyc", async (req, res) => {
+  console.log("🔵 ROUTE HANDLER EXECUTING for riderId:", req.params.riderId);
+  const result = await kycController.getKycDocuments(req, res);
+  console.log("🟢 ROUTE HANDLER COMPLETE");
+  return result;
+});
 
 /**
  * @swagger
@@ -55,8 +64,123 @@ kycRouter.get("/:riderId/kyc", kycController.getKycDocuments);
  */
 kycRouter.post(
   "/:riderId/kyc",
+  (req, res, next) => {
+    console.log(`🔵 KYC upload route hit: ${req.params.riderId}`);
+    console.log(`Content-Type: ${req.headers["content-type"]}`);
+    next();
+  },
   kycController.uploadMiddleware,
+  (req, res, next) => {
+    console.log(
+      `🟢 Multer middleware passed, file: ${req.file ? "YES" : "NO"}`
+    );
+    next();
+  },
   kycController.uploadDocument
+);
+
+/**
+ * @swagger
+ * /api/riders/{riderId}/kyc/init-chunked-upload:
+ *   post:
+ *     summary: Initialize a chunked upload session
+ *     description: Start a chunked upload session for a large KYC document
+ *     parameters:
+ *       - in: path
+ *         name: riderId
+ *         required: true
+ *         description: ID of the rider
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fileName:
+ *                 type: string
+ *               fileSize:
+ *                 type: number
+ *               fileType:
+ *                 type: string
+ *               totalChunks:
+ *                 type: number
+ *               sessionId:
+ *                 type: string
+ *               documentType:
+ *                 type: string
+ *               documentNumber:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Upload session initialized
+ */
+kycRouter.post(
+  "/:riderId/kyc/init-chunked-upload",
+  kycController.initChunkedUpload
+);
+
+/**
+ * @swagger
+ * /api/riders/{riderId}/kyc/upload-chunk:
+ *   post:
+ *     summary: Upload a chunk of a file
+ *     description: Upload an individual chunk as part of a chunked upload
+ *     parameters:
+ *       - in: path
+ *         name: riderId
+ *         required: true
+ *         description: ID of the rider
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               chunk:
+ *                 type: string
+ *                 format: binary
+ *               sessionId:
+ *                 type: string
+ *               chunkIndex:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Chunk received
+ */
+kycRouter.post("/:riderId/kyc/upload-chunk", kycController.uploadChunk);
+
+/**
+ * @swagger
+ * /api/riders/{riderId}/kyc/complete-chunked-upload:
+ *   post:
+ *     summary: Complete a chunked upload
+ *     description: Finalize a chunked upload and process the assembled file
+ *     parameters:
+ *       - in: path
+ *         name: riderId
+ *         required: true
+ *         description: ID of the rider
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               sessionId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: File upload completed
+ */
+kycRouter.post(
+  "/:riderId/kyc/complete-chunked-upload",
+  kycController.completeChunkedUpload
 );
 
 /**
@@ -96,6 +220,7 @@ kycRouter.post(
 kycRouter.post(
   "/:riderId/kyc/:documentType",
   kycController.uploadMiddleware,
+  validateDocumentUploadRequest,
   kycController.uploadDocument
 );
 
@@ -132,6 +257,45 @@ kycRouter.get("/kyc/pending", kycController.getPendingKycSubmissions);
 
 /**
  * @swagger
+ * /api/riders/{riderId}/kyc/{documentId}/verify:
+ *   patch:
+ *     summary: Verify or reject a specific KYC document
+ *     description: Admin verification or rejection of a single KYC document
+ *     parameters:
+ *       - in: path
+ *         name: riderId
+ *         required: true
+ *         description: ID of the rider
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: documentId
+ *         required: true
+ *         description: ID of the KYC document
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [verified, rejected]
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: KYC document verified/rejected
+ */
+kycRouter.patch(
+  "/:riderId/kyc/:documentId/verify",
+  kycController.verifySingleKycDocument
+);
+
+/**
+ * @swagger
  * /api/riders/{riderId}/kyc/verify-admin:
  *   post:
  *     summary: Admin verification of KYC documents
@@ -160,7 +324,11 @@ kycRouter.get("/kyc/pending", kycController.getPendingKycSubmissions);
  *       200:
  *         description: KYC documents verified/rejected
  */
-kycRouter.post("/:riderId/kyc/verify-admin", kycController.verifyKycDocuments);
+kycRouter.post(
+  "/:riderId/kyc/verify-admin",
+  validateKycVerificationRequest,
+  kycController.verifyKycDocuments
+);
 
 /**
  * @swagger

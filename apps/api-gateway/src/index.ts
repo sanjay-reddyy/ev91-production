@@ -14,6 +14,7 @@ import clientStoreRoutes from "./routes/client-store";
 import riderRoutes from "./routes/riders";
 import sparePartsRoutes from "./routes/spare-parts";
 import orderRoutes from "./routes/orders";
+import dashboardRoutes from "./routes/dashboard";
 
 // Import middleware
 import { authMiddleware } from "./middleware/auth";
@@ -70,14 +71,25 @@ app.use((req: Request, res: Response, next) => {
   next();
 });
 
-// Body parsing middleware
+// Body parsing middleware - skip for multipart/form-data to preserve file uploads
+app.use((req: Request, res: Response, next) => {
+  // Skip body parsing for multipart uploads (file uploads)
+  if (req.headers["content-type"]?.includes("multipart/form-data")) {
+    console.log(
+      `⏭️ [API Gateway] Skipping body parser for multipart upload: ${req.method} ${req.path}`
+    );
+    return next();
+  }
+  next();
+});
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Rate limiting - disabled for development
+// Rate limiting - much higher limits for development
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000"), // 1 minute
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "10000"), // Much higher limit for dev
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100000"), // 100k requests per minute for dev
   message: {
     success: false,
     error: "Too many requests from this IP, please try again later.",
@@ -85,8 +97,8 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => {
-    console.log(`Rate limiter check - NODE_ENV: ${process.env.NODE_ENV}`);
-    return process.env.NODE_ENV === "development"; // Skip rate limiting in development
+    // Skip rate limiting in development
+    return process.env.NODE_ENV === "development";
   },
 });
 
@@ -215,6 +227,7 @@ app.get("/", (req: Request, res: Response) => {
       riders: "/api/riders/*",
       riderEarnings: "/api/rider-earnings/*",
       spareParts: "/api/spare-parts/*",
+      dashboard: "/api/dashboard/*",
       "v1-auth": "/api/v1/auth/*",
       "v1-users": "/api/v1/users/*",
       "v1-employees": "/api/v1/employees/*",
@@ -267,6 +280,7 @@ app.use("/api/riders", authMiddleware);
 app.use("/api/rider-earnings", authMiddleware);
 app.use("/api/spare-parts", authMiddleware);
 app.use("/api/orders", authMiddleware);
+app.use("/api/dashboard", authMiddleware);
 
 // Route configuration
 app.use("/api/auth", authRoutes);
@@ -296,6 +310,7 @@ app.use("/api", clientStoreRoutes); // Handles /clients, /stores, /rider-earning
 app.use("/api/riders", riderRoutes);
 app.use("/api/spare-parts", sparePartsRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // 404 handler
 app.use("*", (req: Request, res: Response) => {

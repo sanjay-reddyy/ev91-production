@@ -20,13 +20,18 @@ import EmailVerificationPage from './components/auth/EmailVerificationPage'
 import ResendVerificationForm from './components/auth/ResendVerificationForm'
 
 import Dashboard from './pages/Dashboard'
+import OperationsDashboard from './pages/OperationsDashboard'
+import SalesDashboard from './pages/SalesDashboard'
+import FinanceDashboard from './pages/FinanceDashboard'
+import ManagementDashboard from './pages/ManagementDashboard'
+import SupplyDashboard from './pages/SupplyDashboard'
+import InventoryDashboard from './pages/InventoryDashboard'
 import Teams from './pages/Teams'
 import CreateTeam from './pages/CreateTeam'
 import EditTeam from './pages/EditTeam'
 import ClientStoreManagement from './pages/ClientStoreManagement'
 import RiderEarnings from './pages/RiderEarnings'
 import RiderManagement from './pages/RiderManagement'
-import RiderProfile from './pages/RiderProfile'
 import RiderDetail from './pages/RiderDetail'
 
 // Vehicle Management Pages
@@ -174,6 +179,15 @@ const App: React.FC = () => {
             <Layout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+
+                {/* Department Dashboard Routes */}
+                <Route path="/dashboard/operations" element={<OperationsDashboard />} />
+                <Route path="/dashboard/sales" element={<SalesDashboard />} />
+                <Route path="/dashboard/finance" element={<FinanceDashboard />} />
+                <Route path="/dashboard/management" element={<ManagementDashboard />} />
+                <Route path="/dashboard/supply" element={<SupplyDashboard />} />
+                <Route path="/dashboard/inventory" element={<InventoryDashboard />} />
+
                 <Route path="/employees" element={<Users />} />
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/teams/create" element={<CreateTeam />} />

@@ -11,6 +11,8 @@ import citySyncRoutes from "./routes/citySyncRoutes";
 import completeRegistrationRoutes from "./routes/completeRegistration";
 import vehicleHistoryRoutes from "./routes/vehicleHistoryRoutes";
 import kycRoutes from "./routes/kycRoutes";
+import rentalRoutes from "./routes/rental";
+import bankDetailsRoutes from "./routes/bankDetailsRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import {
   requestId,
@@ -39,8 +41,10 @@ v1Router.use("/rider-register", riderRegistrationRouter); // Comprehensive rider
 v1Router.use("/booking", bookingRoutes);
 v1Router.use("/registration", completeRegistrationRoutes); // New KYC verification and registration completion
 v1Router.use("/vehicle-history", vehicleHistoryRoutes); // Vehicle assignment history
+v1Router.use("/", adminRidersRoutes); // Admin rider management routes (must be before KYC routes)
 v1Router.use("/riders", kycRoutes); // KYC document upload and verification
-v1Router.use("/", adminRidersRoutes); // Admin rider management routes
+v1Router.use("/riders", rentalRoutes); // EV Rental management routes
+v1Router.use("/riders/bank-details", bankDetailsRoutes); // Bank account details management
 
 app.use("/api/v1", v1Router);
 
@@ -61,6 +65,7 @@ app.get("/", (req, res) => {
       health: "/api/v1/health",
       "rider-register": "/api/v1/rider-register",
       booking: "/api/v1/booking",
+      "ev-rental": "/api/v1/riders/:id/rental",
     },
     features: [
       "Registration Flow",
@@ -68,6 +73,7 @@ app.get("/", (req, res) => {
       "Document Upload",
       "E-signature",
       "Booking Management",
+      "EV Rental Management",
     ],
   });
 });

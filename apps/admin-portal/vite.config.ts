@@ -21,7 +21,7 @@ export default defineConfig({
         target: "http://localhost:4005",
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api\/riders/, "/api/v1"),
+        rewrite: (path) => path.replace(/^\/api/, "/api/v1"),
       },
       "/api/clients": {
         target: "http://localhost:3004",

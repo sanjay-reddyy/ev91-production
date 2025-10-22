@@ -28,10 +28,9 @@ import {
   Cancel as CancelIcon,
   Pending as PendingIcon,
   AssignmentTurnedIn as AssignmentIcon,
-  AddTask as AddTaskIcon,
   Block as BlockIcon,
 } from '@mui/icons-material';
-import { riderService } from '../services';
+import { riderService } from '../../services';
 
 // Define the registration steps
 const REGISTRATION_STEPS = [
@@ -40,6 +39,18 @@ const REGISTRATION_STEPS = [
   { label: 'KYC Completed', status: 'KYC_COMPLETED' },
   { label: 'Registration Completed', status: 'COMPLETED' }
 ];
+
+// Calculate progress percentage based on registration stages
+const calculateStageProgress = (registrationStatus: string): number => {
+  const stepIndex = REGISTRATION_STEPS.findIndex(s => s.status === registrationStatus);
+
+  if (stepIndex === -1) return 0; // Status not found
+
+  // Calculate percentage based on completed steps
+  // Each step represents 25% (100% / 4 steps)
+  const completedSteps = stepIndex + 1;
+  return (completedSteps / REGISTRATION_STEPS.length) * 100;
+};
 
 interface RegistrationCompleterProps {
   riderId: string;
@@ -67,55 +78,56 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
       // Add cache buster to prevent caching issues
       const cacheBuster = `_cb=${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
-      // IMPORTANT FIX: Fetch both endpoints to ensure consistency
-      // 1. First get the registration status
+      // Fetch registration status
       const registrationResponse = await riderService.getRiderRegistrationStatus(riderId, cacheBuster);
 
-      // 2. Also get main rider data to double check isActive status
-      const riderResponse = await riderService.getRiderById(riderId);
+      // ✅ OPTIMIZATION: Only fetch main rider data if we need vehicle assignment info
+      // This reduces API calls from 2 to 1 per refresh
+      let riderResponse = null;
+      if (registrationResponse.success && registrationResponse.data.registrationStatus === 'COMPLETED') {
+        // Only fetch rider details when registration is complete (to check vehicle assignment)
+        riderResponse = await riderService.getRiderById(riderId);
+      }
 
-      console.log('[RiderRegistrationCompleter] Fetched data from both endpoints:', {
-        registrationEndpoint: {
-          isActive: registrationResponse.data?.isActive,
-          type: typeof registrationResponse.data?.isActive
-        },
-        mainRiderEndpoint: {
-          isActive: riderResponse.data?.isActive,
-          type: typeof riderResponse.data?.isActive
-        },
-        match: registrationResponse.data?.isActive === riderResponse.data?.isActive
+      console.log('[RiderRegistrationCompleter] Fetched registration status:', {
+        registrationStatus: registrationResponse.data?.registrationStatus,
+        isActive: registrationResponse.data?.isActive,
+        fetchedRiderData: !!riderResponse
       });
 
       if (registrationResponse.success) {
-        // Explicitly convert isActive to boolean to ensure consistent type
-        // JSON stringify and parse to see exactly what's coming from the backend
-        const rawIsActive = registrationResponse.data.isActive;
-        console.log('[RiderRegistrationCompleter] Raw isActive from API:', {
-          value: rawIsActive,
-          type: typeof rawIsActive,
-          stringValue: String(rawIsActive),
-          jsonStringify: JSON.stringify(rawIsActive),
-          looseEval: rawIsActive ? 'truthy' : 'falsy',
-          strictEval: rawIsActive === true ? 'true' : 'false',
-        });
-
-        // CRITICAL: Use the main rider endpoint's isActive value as source of truth
+        // Use the main rider endpoint's isActive value as source of truth if available
         // This ensures we display the correct button state that matches the database
-        const isActiveFromMainEndpoint = riderResponse.success
+        const isActiveFromMainEndpoint = riderResponse?.success
           ? riderResponse.data.isActive === true
           : registrationResponse.data.isActive === true;
 
-        // Create processed data with the correct isActive value
+        // Include vehicle assignment data from main rider endpoint if available
+        // This is needed to check if rider has an assigned vehicle before deactivation
+        const assignedVehicleId = riderResponse?.success
+          ? riderResponse.data.assignedVehicleId
+          : null;
+        const assignedVehicle = riderResponse?.success
+          ? riderResponse.data.assignedVehicle
+          : null;
+
+        // Create processed data with the correct isActive value and vehicle assignment data
         const processedData = {
           ...registrationResponse.data,
-          isActive: isActiveFromMainEndpoint
+          isActive: isActiveFromMainEndpoint,
+          assignedVehicleId,
+          assignedVehicle
         };
 
-        console.log('[RiderRegistrationCompleter] Using main rider endpoint as source of truth:', {
-          registrationIsActive: registrationResponse.data.isActive,
-          mainRiderIsActive: riderResponse.data?.isActive,
+        console.log('[RiderRegistrationCompleter] Processed data:', {
           finalIsActive: isActiveFromMainEndpoint,
-          finalIsActiveType: typeof isActiveFromMainEndpoint
+          assignedVehicleId,
+          hasAssignedVehicle: !!(assignedVehicleId || assignedVehicle),
+          registrationStatus: registrationResponse.data.registrationStatus,
+          calculatedProgress: calculateStageProgress(registrationResponse.data.registrationStatus),
+          backendProgress: registrationResponse.data.completionPercentage,
+          missingFields: registrationResponse.data.missingFields,
+          missingFieldsCount: registrationResponse.data.missingFields?.length || 0
         });
 
         setStatusData(processedData);
@@ -139,6 +151,11 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
     fetchStatus();
   }, [fetchStatus]);
 
+  // ✅ Manual refresh only - removed auto-refresh to prevent rate limiting
+  // Status will refresh when user takes actions (complete registration, verify KYC, etc.)
+  // or when parent component triggers onRegistrationUpdated
+  // This is better for production as it reduces unnecessary API calls
+
   // Log the current status data whenever it changes
   useEffect(() => {
     if (statusData) {
@@ -148,7 +165,10 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
         isActiveStrict: statusData.isActive === true,
         isActiveType: typeof statusData.isActive,
         isActiveToString: String(statusData.isActive),
-        registrationStatus: statusData.registrationStatus
+        registrationStatus: statusData.registrationStatus,
+        stageProgress: calculateStageProgress(statusData.registrationStatus),
+        backendCompletion: statusData.completionPercentage,
+        missingFields: statusData.missingFields
       });
     }
   }, [riderId, statusData]);
@@ -310,9 +330,19 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
       )}
 
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Registration Status
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">
+            Registration Status
+          </Typography>
+          <Button
+            size="small"
+            onClick={fetchStatus}
+            disabled={loading}
+            variant="outlined"
+          >
+            {loading ? 'Refreshing...' : 'Refresh Status'}
+          </Button>
+        </Box>
 
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
           {REGISTRATION_STEPS.map((step, index) => (
@@ -324,12 +354,12 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
 
         <LinearProgress
           variant="determinate"
-          value={statusData.completionPercentage}
+          value={calculateStageProgress(statusData.registrationStatus)}
           sx={{ mb: 1, height: 10, borderRadius: 1 }}
         />
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          {statusData.completionPercentage}% Complete
+          {calculateStageProgress(statusData.registrationStatus)}% Complete
         </Typography>
 
         <Grid container spacing={3}>
@@ -405,7 +435,7 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           {/* Activation Button */}
-          <Box>
+          <Box sx={{ flex: 1 }}>
             {statusData.registrationStatus === 'COMPLETED' && (
               <>
                 {/* Debug info for button state */}
@@ -414,11 +444,20 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
                     isActive: statusData.isActive,
                     isActiveType: typeof statusData.isActive,
                     isActiveStrict: statusData.isActive === true,
+                    hasAssignedVehicle: !!(statusData.assignedVehicleId || statusData.assignedVehicle),
                     buttonText: statusData.isActive === true ? 'Deactivate' : 'Activate',
                     buttonColor: statusData.isActive === true ? 'error' : 'success'
                   });
                   return null;
                 })()}
+
+                {/* Warning message when trying to deactivate with assigned vehicle */}
+                {statusData.isActive === true && (statusData.assignedVehicleId || statusData.assignedVehicle) && (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    Cannot deactivate rider while a vehicle is assigned. Please unassign the vehicle first.
+                  </Alert>
+                )}
+
                 <Button
                   variant="contained"
                   color={statusData.isActive === true ? 'error' : 'success'}
@@ -428,7 +467,10 @@ const RiderRegistrationCompleter: React.FC<RegistrationCompleterProps> = ({
                     console.log(`[RiderRegistrationCompleter] Toggle status: Current=${statusData.isActive} (${typeof statusData.isActive}), New=${newStatus} (${typeof newStatus})`);
                     handleToggleActivation(newStatus);
                   }}
-                  disabled={loading}
+                  disabled={
+                    loading ||
+                    (statusData.isActive === true && (statusData.assignedVehicleId || statusData.assignedVehicle))
+                  }
                 >
                   {statusData.isActive === true ? 'Deactivate' : 'Activate'} Rider
                 </Button>

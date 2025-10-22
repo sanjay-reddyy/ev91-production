@@ -97,6 +97,104 @@ app.use("/api/v1/cities", cityRoutes);
 // Internal sync routes (no auth required for service-to-service communication)
 app.use("/internal", citySyncRoutes);
 
+// Internal stores endpoint for service-to-service calls
+app.get("/internal/stores/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = await prisma.store.findUnique({
+      where: { id },
+      include: {
+        client: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!store) {
+      return res.status(404).json({
+        success: false,
+        message: "Store not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: store.id,
+        storeName: store.storeName,
+        storeCode: store.storeCode,
+        city: store.city,
+        clientName: store.client?.name,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching store:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch store",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+// Internal stores list endpoint for dropdowns (no auth)
+app.get("/internal/stores", async (req, res) => {
+  try {
+    const stores = await prisma.store.findMany({
+      select: {
+        id: true,
+        storeName: true,
+        storeCode: true,
+        city: true,
+      },
+      orderBy: {
+        storeCode: "asc",
+      },
+    });
+
+    res.json({
+      success: true,
+      data: stores,
+    });
+  } catch (error) {
+    console.error("Error fetching stores list:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch stores list",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+// Internal cities list endpoint for dropdowns (no auth)
+app.get("/internal/cities", async (req, res) => {
+  try {
+    const cities = await prisma.city.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    res.json({
+      success: true,
+      data: cities,
+    });
+  } catch (error) {
+    console.error("Error fetching cities list:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch cities list",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
 // 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({
