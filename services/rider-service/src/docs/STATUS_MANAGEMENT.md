@@ -1,0 +1,54 @@
+/\*\*
+
+- STATUS MANAGEMENT DOCUMENTATION
+-
+- This file documents the status management strategy for riders in the EV91 Platform.
+-
+- CURRENT STATUS FIELDS:
+-
+- 1.  registrationStatus:
+- - Primary field for tracking registration progress
+- - Values: PENDING, PHONE_VERIFIED, KYC_COMPLETED, COMPLETED
+- - Used for workflow tracking and UI state management
+-
+- 2.  kycStatus:
+- - Tracks KYC document verification status
+- - Values: pending, verified, rejected, under_review
+- - Used for KYC approval workflows
+-
+- 3.  isActive:
+- - Legacy boolean field for simple active/inactive status
+- - Being phased out in favor of registrationStatus
+- - Currently maintained for backward compatibility
+-
+- MIGRATION PLAN:
+-
+- Phase 1: (Current)
+- - Maintain both isActive and registrationStatus
+- - Update both fields together for consistency
+- - Frontend gradually switches to using registrationStatus
+-
+- Phase 2: (Next Release)
+- - Add deprecation notice to isActive field
+- - Update all API responses to primarily use registrationStatus
+- - Include isActive for backward compatibility only
+-
+- Phase 3: (Future Release)
+- - Remove isActive field from responses (keep in database)
+- - Update all frontend components to use registrationStatus
+-
+- Phase 4: (Final)
+- - Migrate database to remove isActive field
+- - Complete transition to registrationStatus
+-
+- MAPPING BETWEEN FIELDS:
+-
+- registrationStatus: COMPLETED → isActive: true (eligible for activation)
+- All other registrationStatus values → isActive: false (not eligible for activation)
+-
+- USAGE GUIDE:
+-
+- - For new code, always use registrationStatus and kycStatus
+- - When updating status, make sure to update both fields if appropriate
+- - For activation checks, use: registrationStatus === REGISTRATION_STATUS.COMPLETED && kycStatus === KYC_STATUS.VERIFIED
+    \*/

@@ -13,6 +13,7 @@ import vehicleHistoryRoutes from "./routes/vehicleHistoryRoutes";
 import kycRoutes from "./routes/kycRoutes";
 import rentalRoutes from "./routes/rental";
 import bankDetailsRoutes from "./routes/bankDetailsRoutes";
+import bulkUploadRoutes from "./routes/bulkUploadRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import {
   requestId,
@@ -42,6 +43,7 @@ v1Router.use("/booking", bookingRoutes);
 v1Router.use("/registration", completeRegistrationRoutes); // New KYC verification and registration completion
 v1Router.use("/vehicle-history", vehicleHistoryRoutes); // Vehicle assignment history
 v1Router.use("/", adminRidersRoutes); // Admin rider management routes (must be before KYC routes)
+v1Router.use("/riders", bulkUploadRoutes); // Bulk rider upload with Google Drive integration
 v1Router.use("/riders", kycRoutes); // KYC document upload and verification
 v1Router.use("/riders", rentalRoutes); // EV Rental management routes
 v1Router.use("/riders/bank-details", bankDetailsRoutes); // Bank account details management

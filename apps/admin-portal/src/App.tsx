@@ -33,6 +33,7 @@ import ClientStoreManagement from './pages/ClientStoreManagement'
 import RiderEarnings from './pages/RiderEarnings'
 import RiderManagement from './pages/RiderManagement'
 import RiderDetail from './pages/RiderDetail'
+import BulkRiderImport from './pages/BulkRiderImport'
 
 // Vehicle Management Pages
 import VehicleDashboard from './pages/VehicleDashboard'
@@ -197,6 +198,7 @@ const App: React.FC = () => {
                 <Route path="/rider-earnings" element={<RiderEarnings />} />
                 <Route path="/rider-management" element={<RiderManagement />} />
                 <Route path="/rider-management/:riderId" element={<RiderDetail />} />
+                <Route path="/riders/bulk-import" element={<BulkRiderImport />} />
 
                 {/* Vehicle Management Routes */}
                 <Route path="/vehicle-dashboard" element={<VehicleDashboard />} />
