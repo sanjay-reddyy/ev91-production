@@ -821,6 +821,57 @@ router.put("/riders/:riderId", async (req: Request, res: Response) => {
 });
 
 /**
+ * Get rider by public rider ID
+ * GET /riders/public/:publicRiderId
+ */
+router.get(
+  "/riders/public/:publicRiderId",
+  async (req: Request, res: Response) => {
+    try {
+      const { publicRiderId } = req.params;
+
+      console.log(`Looking up rider by publicRiderId: ${publicRiderId}`);
+
+      const rider = await prisma.rider.findFirst({
+        where: { publicRiderId: publicRiderId },
+      });
+
+      if (!rider) {
+        console.log(`Rider not found for publicRiderId: ${publicRiderId}`);
+        return res.status(404).json({
+          success: false,
+          message: `Rider with public ID "${publicRiderId}" not found`,
+        });
+      }
+
+      console.log(
+        `Found rider: ${rider.id} for publicRiderId: ${publicRiderId}`
+      );
+
+      res.json({
+        success: true,
+        data: {
+          id: rider.id,
+          publicRiderId: rider.publicRiderId,
+          name: rider.name,
+          phone: rider.phone,
+          email: rider.email,
+          city: rider.city,
+          registrationStatus: rider.registrationStatus,
+          kycStatus: rider.kycStatus,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching rider by publicRiderId:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch rider",
+      });
+    }
+  }
+);
+
+/**
  * Get rider by ID with full details
  */
 router.get("/riders/:riderId", async (req: Request, res: Response) => {

@@ -479,10 +479,29 @@ const menuItems: MenuItem[] = [
   {
     text: 'Clients & Stores',
     icon: <StoreIcon />,
-    path: '/clients',
     anyOfPermissions: [
       { service: 'client', resource: 'clients', action: 'read' },
       { service: 'client', resource: 'stores', action: 'read' }
+    ],
+    children: [
+      {
+        text: 'Clients & Stores',
+        icon: <StoreIcon />,
+        path: '/clients',
+        anyOfPermissions: [
+          { service: 'client', resource: 'clients', action: 'read' },
+          { service: 'client', resource: 'stores', action: 'read' }
+        ]
+      },
+      {
+        text: 'Client Rider Mapping',
+        icon: <AccountCircleIcon />,
+        path: '/client-rider-mappings',
+        anyOfPermissions: [
+          { service: 'client', resource: 'clients', action: 'read' },
+          { service: 'rider', resource: 'riders', action: 'read' }
+        ]
+      }
     ]
   },
   // 7. Employee Management

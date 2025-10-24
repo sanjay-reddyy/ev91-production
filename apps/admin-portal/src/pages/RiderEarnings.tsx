@@ -56,65 +56,55 @@ const PAYMENT_STATUSES = [
 
 interface RiderEarningFormData {
   riderId: string
+  clientRiderId?: string
+  clientId: string
   storeId: string
   orderId: string
-  orderValue: number
   baseRate: number
-  baseEarning: number
-  distanceBonus: number
-  timeBonus: number
-  storeOfferBonus: number
-  evBonus: number
-  peakTimeBonus: number
-  qualityBonus: number
-  penaltyAmount: number
-  bonusEarning: number
-  totalEarning: number
+  storeOfferRate: number
+  bulkOrderBonus: number
+  performanceBonus: number
+  weeklyTargetBonus: number
+  specialEventBonus: number
+  finalEarning: number
   paymentStatus: string
   orderDate: string
-  deliveryStartTime: string
-  deliveryEndTime: string
-  distanceTraveled: number
-  fuelUsed: number
-  energyUsed: number
-  notes: string
+  deliveryTime?: number
+  distance?: number
+  riderRating?: number
 }
 
 const RiderEarningsPage: React.FC = () => {
   const [earnings, setEarnings] = useState<RiderEarning[]>([])
   const [stores, setStores] = useState<Store[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
   const [editingEarning, setEditingEarning] = useState<RiderEarning | null>(null)
-  const [formData, setFormData] = useState<RiderEarningFormData>({
+  const [formData, setFormData] = React.useState<RiderEarningFormData>({
     riderId: '',
+    clientRiderId: '',
+    clientId: '',
     storeId: '',
     orderId: '',
-    orderValue: 0,
-    baseRate: 0,
-    baseEarning: 0,
-    distanceBonus: 0,
-    timeBonus: 0,
-    storeOfferBonus: 0,
-    evBonus: 0,
-    peakTimeBonus: 0,
-    qualityBonus: 0,
-    penaltyAmount: 0,
-    bonusEarning: 0,
-    totalEarning: 0,
+    baseRate: 35,
+    storeOfferRate: 0,
+    bulkOrderBonus: 0,
+    performanceBonus: 0,
+    weeklyTargetBonus: 0,
+    specialEventBonus: 0,
+    finalEarning: 0,
     paymentStatus: 'pending',
     orderDate: new Date().toISOString().split('T')[0],
-    deliveryStartTime: '',
-    deliveryEndTime: '',
-    distanceTraveled: 0,
-    fuelUsed: 0,
-    energyUsed: 0,
-    notes: '',
+    deliveryTime: 0,
+    distance: 0,
+    riderRating: 0,
   })
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' })
-  
+
   // Filters and pagination
   const [searchTerm, setSearchTerm] = useState('')
+  const [clientRiderIdFilter, setClientRiderIdFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [storeFilter, setStoreFilter] = useState('')
   const [dateFromFilter, setDateFromFilter] = useState('')
@@ -130,6 +120,7 @@ const RiderEarningsPage: React.FC = () => {
         page: page + 1,
         limit: rowsPerPage,
         riderId: searchTerm || undefined,
+        clientRiderId: clientRiderIdFilter || undefined,
         paymentStatus: statusFilter || undefined,
         storeId: storeFilter || undefined,
         dateFrom: dateFromFilter || undefined,
@@ -137,7 +128,7 @@ const RiderEarningsPage: React.FC = () => {
         sortBy: 'orderDate',
         sortOrder: 'desc' as const,
       }
-      
+
       const response = await clientStoreService.getRiderEarnings(params)
       if (response.success) {
         setEarnings(response.data)
@@ -149,7 +140,7 @@ const RiderEarningsPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [page, rowsPerPage, searchTerm, statusFilter, storeFilter, dateFromFilter, dateToFilter])
+  }, [page, rowsPerPage, searchTerm, clientRiderIdFilter, statusFilter, storeFilter, dateFromFilter, dateToFilter])
 
   const loadStores = useCallback(async () => {
     try {
@@ -170,27 +161,26 @@ const RiderEarningsPage: React.FC = () => {
   // Calculate total earning when other fields change
   useEffect(() => {
     const total = (
-      formData.baseEarning +
-      formData.distanceBonus +
-      formData.timeBonus +
-      formData.storeOfferBonus +
-      formData.evBonus +
-      formData.peakTimeBonus +
-      formData.qualityBonus +
-      formData.bonusEarning -
-      formData.penaltyAmount
+      formData.baseRate +
+      formData.storeOfferRate +
+      formData.bulkOrderBonus +
+      formData.performanceBonus +
+      formData.weeklyTargetBonus +
+      formData.specialEventBonus
     )
-    setFormData(prev => ({ ...prev, totalEarning: Math.max(0, total) }))
+
+    // Only update if the calculated value is different to avoid infinite loop
+    if (formData.finalEarning !== total) {
+      setFormData(prev => ({ ...prev, finalEarning: Math.max(0, total) }))
+    }
   }, [
-    formData.baseEarning,
-    formData.distanceBonus,
-    formData.timeBonus,
-    formData.storeOfferBonus,
-    formData.evBonus,
-    formData.peakTimeBonus,
-    formData.qualityBonus,
-    formData.bonusEarning,
-    formData.penaltyAmount
+    formData.baseRate,
+    formData.storeOfferRate,
+    formData.bulkOrderBonus,
+    formData.performanceBonus,
+    formData.weeklyTargetBonus,
+    formData.specialEventBonus,
+    formData.finalEarning // Add this to check current value
   ])
 
   const handleOpenDialog = (earning?: RiderEarning) => {
@@ -198,55 +188,43 @@ const RiderEarningsPage: React.FC = () => {
       setEditingEarning(earning)
       setFormData({
         riderId: earning.riderId,
+        clientRiderId: earning.clientRiderId || '',
+        clientId: earning.clientId,
         storeId: earning.storeId,
-        orderId: earning.orderId,
-        orderValue: earning.orderValue || 0,
-        baseRate: earning.baseRate || 0,
-        baseEarning: earning.baseEarning,
-        distanceBonus: earning.distanceBonus,
-        timeBonus: earning.timeBonus,
-        storeOfferBonus: earning.storeOfferBonus,
-        evBonus: earning.evBonus,
-        peakTimeBonus: earning.peakTimeBonus,
-        qualityBonus: earning.qualityBonus,
-        penaltyAmount: earning.penaltyAmount,
-        bonusEarning: earning.bonusEarning,
-        totalEarning: earning.totalEarning,
+        orderId: earning.orderId || '',
+        baseRate: earning.baseRate || 35,
+        storeOfferRate: earning.storeOfferRate || 0,
+        bulkOrderBonus: earning.bulkOrderBonus || 0,
+        performanceBonus: earning.performanceBonus || 0,
+        weeklyTargetBonus: earning.weeklyTargetBonus || 0,
+        specialEventBonus: earning.specialEventBonus || 0,
+        finalEarning: earning.finalEarning || 0,
         paymentStatus: earning.paymentStatus,
         orderDate: earning.orderDate.split('T')[0],
-        deliveryStartTime: earning.deliveryStartTime || '',
-        deliveryEndTime: earning.deliveryEndTime || '',
-        distanceTraveled: earning.distanceTraveled || 0,
-        fuelUsed: earning.fuelUsed || 0,
-        energyUsed: earning.energyUsed || 0,
-        notes: earning.notes || '',
+        deliveryTime: earning.deliveryTime || 0,
+        distance: earning.distance || 0,
+        riderRating: earning.riderRating || 0,
       })
     } else {
       setEditingEarning(null)
       setFormData({
         riderId: '',
+        clientRiderId: '',
+        clientId: '',
         storeId: '',
         orderId: '',
-        orderValue: 0,
-        baseRate: 0,
-        baseEarning: 0,
-        distanceBonus: 0,
-        timeBonus: 0,
-        storeOfferBonus: 0,
-        evBonus: 0,
-        peakTimeBonus: 0,
-        qualityBonus: 0,
-        penaltyAmount: 0,
-        bonusEarning: 0,
-        totalEarning: 0,
+        baseRate: 35,
+        storeOfferRate: 0,
+        bulkOrderBonus: 0,
+        performanceBonus: 0,
+        weeklyTargetBonus: 0,
+        specialEventBonus: 0,
+        finalEarning: 0,
         paymentStatus: 'pending',
         orderDate: new Date().toISOString().split('T')[0],
-        deliveryStartTime: '',
-        deliveryEndTime: '',
-        distanceTraveled: 0,
-        fuelUsed: 0,
-        energyUsed: 0,
-        notes: '',
+        deliveryTime: 0,
+        distance: 0,
+        riderRating: 0,
       })
     }
     setOpenDialog(true)
@@ -258,32 +236,58 @@ const RiderEarningsPage: React.FC = () => {
   }
 
   const handleSaveEarning = async () => {
+    // Prevent double submission
+    if (saving) return
+
     try {
-      const earningData = {
-        ...formData,
-        orderDate: new Date(formData.orderDate).toISOString(),
-        deliveryStartTime: formData.deliveryStartTime ? new Date(formData.deliveryStartTime).toISOString() : undefined,
-        deliveryEndTime: formData.deliveryEndTime ? new Date(formData.deliveryEndTime).toISOString() : undefined,
+      setSaving(true)
+
+      // Validate required fields
+      if (!formData.riderId || !formData.storeId || !formData.orderId) {
+        setSnackbar({ open: true, message: 'Rider ID, Store, and Order ID are required', severity: 'error' })
+        return
       }
 
+      if (!formData.clientId) {
+        setSnackbar({ open: true, message: 'Please select a store first to set the client', severity: 'error' })
+        return
+      }
+
+      // Calculate totalRate (base + offer)
+      const totalRate = formData.baseRate + formData.storeOfferRate
+
+      const earningData = {
+        ...formData,
+        totalRate, // Add the calculated totalRate
+        orderDate: new Date(formData.orderDate).toISOString(),
+      }
+
+      console.log('Submitting earning data:', earningData)
+      console.log('Is editing?', !!editingEarning, 'ID:', editingEarning?.id)
+
       if (editingEarning) {
+        console.log('Updating existing earning:', editingEarning.id)
         await clientStoreService.updateRiderEarning(editingEarning.id, earningData)
         setSnackbar({ open: true, message: 'Rider earning updated successfully', severity: 'success' })
       } else {
+        console.log('Creating new earning')
         await clientStoreService.createRiderEarning(earningData)
         setSnackbar({ open: true, message: 'Rider earning created successfully', severity: 'success' })
       }
       handleCloseDialog()
       loadEarnings()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving rider earning:', error)
-      setSnackbar({ open: true, message: 'Failed to save rider earning', severity: 'error' })
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save rider earning'
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' })
+    } finally {
+      setSaving(false)
     }
   }
 
   const handleDeleteEarning = async (earningId: string) => {
     if (!window.confirm('Are you sure you want to delete this rider earning record?')) return
-    
+
     try {
       await clientStoreService.deleteRiderEarning(earningId)
       setSnackbar({ open: true, message: 'Rider earning deleted successfully', severity: 'success' })
@@ -321,9 +325,9 @@ const RiderEarningsPage: React.FC = () => {
     return new Date(dateString).toLocaleDateString('en-IN')
   }
 
-  const totalEarnings = earnings.reduce((sum, earning) => sum + earning.totalEarning, 0)
-  const pendingEarnings = earnings.filter(e => e.paymentStatus === 'pending').reduce((sum, earning) => sum + earning.totalEarning, 0)
-  const paidEarnings = earnings.filter(e => e.paymentStatus === 'paid').reduce((sum, earning) => sum + earning.totalEarning, 0)
+  const totalEarnings = earnings.reduce((sum, earning) => sum + (earning.finalEarning || 0), 0)
+  const pendingEarnings = earnings.filter(e => e.paymentStatus === 'pending').reduce((sum, earning) => sum + (earning.finalEarning || 0), 0)
+  const paidEarnings = earnings.filter(e => e.paymentStatus === 'paid').reduce((sum, earning) => sum + (earning.finalEarning || 0), 0)
 
   return (
     <Box sx={{ p: 3 }}>
@@ -448,6 +452,22 @@ const RiderEarningsPage: React.FC = () => {
               />
             </Grid>
             <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                label="Client Rider ID"
+                value={clientRiderIdFilter}
+                onChange={(e) => setClientRiderIdFilter(e.target.value)}
+                placeholder="e.g., SWIG-DEL-001"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
               <FormControl fullWidth>
                 <InputLabel>Payment Status</InputLabel>
                 <Select
@@ -481,7 +501,7 @@ const RiderEarningsPage: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={1.5}>
               <TextField
                 fullWidth
                 label="Date From"
@@ -491,7 +511,7 @@ const RiderEarningsPage: React.FC = () => {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={1.5}>
               <TextField
                 fullWidth
                 label="Date To"
@@ -501,12 +521,13 @@ const RiderEarningsPage: React.FC = () => {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={1}>
               <Button
                 fullWidth
                 variant="outlined"
                 onClick={() => {
                   setSearchTerm('')
+                  setClientRiderIdFilter('')
                   setStatusFilter('')
                   setStoreFilter('')
                   setDateFromFilter('')
@@ -514,7 +535,7 @@ const RiderEarningsPage: React.FC = () => {
                   setPage(0)
                 }}
               >
-                Clear Filters
+                Clear
               </Button>
             </Grid>
           </Grid>
@@ -529,6 +550,8 @@ const RiderEarningsPage: React.FC = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Rider ID</TableCell>
+                  <TableCell>Client Rider ID</TableCell>
+                  <TableCell>Client</TableCell>
                   <TableCell>Order ID</TableCell>
                   <TableCell>Store</TableCell>
                   <TableCell>Order Date</TableCell>
@@ -543,13 +566,13 @@ const RiderEarningsPage: React.FC = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} sx={{ textAlign: 'center', py: 4 }}>
+                    <TableCell colSpan={12} sx={{ textAlign: 'center', py: 4 }}>
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
                 ) : earnings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} sx={{ textAlign: 'center', py: 4 }}>
+                    <TableCell colSpan={12} sx={{ textAlign: 'center', py: 4 }}>
                       No rider earnings found
                     </TableCell>
                   </TableRow>
@@ -560,6 +583,36 @@ const RiderEarningsPage: React.FC = () => {
                         <Typography variant="body2" fontWeight="medium">
                           {earning.riderId}
                         </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {earning.clientRiderId ? (
+                          <Chip
+                            label={earning.clientRiderId}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {earning.client ? (
+                          <Box>
+                            <Typography variant="body2" fontWeight="medium">
+                              {earning.client.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {earning.client.clientCode}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
@@ -578,32 +631,32 @@ const RiderEarningsPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {formatCurrency(earning.baseEarning)}
+                          {formatCurrency(earning.baseRate || 0)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          +{formatCurrency(earning.storeOfferRate || 0)} offer
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Box>
                           <Typography variant="body2" color="success.main">
                             +{formatCurrency(
-                              earning.distanceBonus +
-                              earning.timeBonus +
-                              earning.storeOfferBonus +
-                              earning.evBonus +
-                              earning.peakTimeBonus +
-                              earning.qualityBonus +
-                              earning.bonusEarning
+                              (earning.bulkOrderBonus || 0) +
+                              (earning.performanceBonus || 0) +
+                              (earning.weeklyTargetBonus || 0) +
+                              (earning.specialEventBonus || 0)
                             )}
                           </Typography>
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="error.main">
-                          -{formatCurrency(earning.penaltyAmount)}
+                        <Typography variant="body2" color="text.secondary">
+                          -
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          {formatCurrency(earning.totalEarning)}
+                          {formatCurrency(earning.finalEarning || 0)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -640,7 +693,7 @@ const RiderEarningsPage: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
-          
+
           <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50]}
             component="div"
@@ -673,12 +726,30 @@ const RiderEarningsPage: React.FC = () => {
               />
             </Grid>
             <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Client Rider ID"
+                value={formData.clientRiderId || ''}
+                onChange={(e) => setFormData({ ...formData, clientRiderId: e.target.value })}
+                placeholder="e.g., SWIG-DEL-001"
+                helperText="Optional: Client's unique rider ID"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
               <FormControl fullWidth required>
                 <InputLabel>Store</InputLabel>
                 <Select
                   value={formData.storeId}
                   label="Store"
-                  onChange={(e) => setFormData({ ...formData, storeId: e.target.value })}
+                  onChange={(e) => {
+                    const selectedStoreId = e.target.value
+                    const selectedStore = stores.find(s => s.id === selectedStoreId)
+                    setFormData({
+                      ...formData,
+                      storeId: selectedStoreId,
+                      clientId: selectedStore?.clientId || ''
+                    })
+                  }}
                 >
                   {stores.map((store) => (
                     <MenuItem key={store.id} value={store.id}>
@@ -697,22 +768,13 @@ const RiderEarningsPage: React.FC = () => {
                 required
               />
             </Grid>
-            
+
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }}>
                 <Typography variant="body2" color="textSecondary">Order Details</Typography>
               </Divider>
             </Grid>
-            
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Order Value"
-                type="number"
-                value={formData.orderValue}
-                onChange={(e) => setFormData({ ...formData, orderValue: parseFloat(e.target.value) || 0 })}
-              />
-            </Grid>
+
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -740,13 +802,13 @@ const RiderEarningsPage: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            
+
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }}>
                 <Typography variant="body2" color="textSecondary">Earnings Breakdown</Typography>
               </Divider>
             </Grid>
-            
+
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -759,165 +821,115 @@ const RiderEarningsPage: React.FC = () => {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Base Earning"
+                label="Base Rate"
                 type="number"
-                value={formData.baseEarning}
-                onChange={(e) => setFormData({ ...formData, baseEarning: parseFloat(e.target.value) || 0 })}
+                value={formData.baseRate}
+                onChange={(e) => setFormData({ ...formData, baseRate: parseFloat(e.target.value) || 0 })}
                 required
+                helperText="Base rate from client"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Distance Bonus"
+                label="Store Offer Rate"
                 type="number"
-                value={formData.distanceBonus}
-                onChange={(e) => setFormData({ ...formData, distanceBonus: parseFloat(e.target.value) || 0 })}
+                value={formData.storeOfferRate}
+                onChange={(e) => setFormData({ ...formData, storeOfferRate: parseFloat(e.target.value) || 0 })}
+                helperText="Additional rate from store offer"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Time Bonus"
+                label="Bulk Order Bonus"
                 type="number"
-                value={formData.timeBonus}
-                onChange={(e) => setFormData({ ...formData, timeBonus: parseFloat(e.target.value) || 0 })}
+                value={formData.bulkOrderBonus}
+                onChange={(e) => setFormData({ ...formData, bulkOrderBonus: parseFloat(e.target.value) || 0 })}
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Store Offer Bonus"
+                label="Performance Bonus"
                 type="number"
-                value={formData.storeOfferBonus}
-                onChange={(e) => setFormData({ ...formData, storeOfferBonus: parseFloat(e.target.value) || 0 })}
+                value={formData.performanceBonus}
+                onChange={(e) => setFormData({ ...formData, performanceBonus: parseFloat(e.target.value) || 0 })}
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="EV Bonus"
+                label="Weekly Target Bonus"
                 type="number"
-                value={formData.evBonus}
-                onChange={(e) => setFormData({ ...formData, evBonus: parseFloat(e.target.value) || 0 })}
+                value={formData.weeklyTargetBonus}
+                onChange={(e) => setFormData({ ...formData, weeklyTargetBonus: parseFloat(e.target.value) || 0 })}
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Peak Time Bonus"
+                label="Special Event Bonus"
                 type="number"
-                value={formData.peakTimeBonus}
-                onChange={(e) => setFormData({ ...formData, peakTimeBonus: parseFloat(e.target.value) || 0 })}
+                value={formData.specialEventBonus}
+                onChange={(e) => setFormData({ ...formData, specialEventBonus: parseFloat(e.target.value) || 0 })}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Quality Bonus"
+                label="Final Earning"
                 type="number"
-                value={formData.qualityBonus}
-                onChange={(e) => setFormData({ ...formData, qualityBonus: parseFloat(e.target.value) || 0 })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Additional Bonus"
-                type="number"
-                value={formData.bonusEarning}
-                onChange={(e) => setFormData({ ...formData, bonusEarning: parseFloat(e.target.value) || 0 })}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Penalty Amount"
-                type="number"
-                value={formData.penaltyAmount}
-                onChange={(e) => setFormData({ ...formData, penaltyAmount: parseFloat(e.target.value) || 0 })}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Total Earning"
-                type="number"
-                value={formData.totalEarning}
+                value={formData.finalEarning}
                 InputProps={{ readOnly: true }}
-                sx={{ '& .MuiInputBase-input': { fontWeight: 'bold' } }}
+                sx={{ '& .MuiInputBase-input': { fontWeight: 'bold', fontSize: '1.1rem' } }}
+                helperText="Auto-calculated: Base + Offer + All Bonuses"
               />
             </Grid>
-            
+
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }}>
                 <Typography variant="body2" color="textSecondary">Delivery Details</Typography>
               </Divider>
             </Grid>
-            
-            <Grid item xs={12} md={6}>
+
+            <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Delivery Start Time"
-                type="datetime-local"
-                value={formData.deliveryStartTime}
-                onChange={(e) => setFormData({ ...formData, deliveryStartTime: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Delivery End Time"
-                type="datetime-local"
-                value={formData.deliveryEndTime}
-                onChange={(e) => setFormData({ ...formData, deliveryEndTime: e.target.value })}
-                InputLabelProps={{ shrink: true }}
+                label="Delivery Time (minutes)"
+                type="number"
+                value={formData.deliveryTime}
+                onChange={(e) => setFormData({ ...formData, deliveryTime: parseInt(e.target.value) || 0 })}
+                helperText="Time taken for delivery"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Distance Traveled (km)"
+                label="Distance (km)"
                 type="number"
-                value={formData.distanceTraveled}
-                onChange={(e) => setFormData({ ...formData, distanceTraveled: parseFloat(e.target.value) || 0 })}
+                value={formData.distance}
+                onChange={(e) => setFormData({ ...formData, distance: parseFloat(e.target.value) || 0 })}
+                helperText="Delivery distance"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Fuel Used (L)"
+                label="Rider Rating"
                 type="number"
-                value={formData.fuelUsed}
-                onChange={(e) => setFormData({ ...formData, fuelUsed: parseFloat(e.target.value) || 0 })}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Energy Used (kWh)"
-                type="number"
-                value={formData.energyUsed}
-                onChange={(e) => setFormData({ ...formData, energyUsed: parseFloat(e.target.value) || 0 })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                multiline
-                rows={3}
+                inputProps={{ min: 0, max: 5, step: 0.1 }}
+                value={formData.riderRating || ''}
+                onChange={(e) => setFormData({ ...formData, riderRating: parseFloat(e.target.value) || undefined })}
+                helperText="Customer rating (1-5)"
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveEarning} variant="contained">
-            {editingEarning ? 'Update' : 'Create'}
+          <Button onClick={handleCloseDialog} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSaveEarning} variant="contained" disabled={saving}>
+            {saving ? 'Saving...' : (editingEarning ? 'Update' : 'Create')}
           </Button>
         </DialogActions>
       </Dialog>

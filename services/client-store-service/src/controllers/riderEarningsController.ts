@@ -11,8 +11,14 @@ export const listEarnings = asyncHandler(
       page = "1",
       limit = "50",
       riderId,
+      clientRiderId,
       storeId,
+      clientId,
       paymentStatus,
+      dateFrom,
+      dateTo,
+      sortBy = "orderDate",
+      sortOrder = "desc",
     } = req.query as any;
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -20,15 +26,46 @@ export const listEarnings = asyncHandler(
 
     const where: any = {};
     if (riderId) where.riderId = riderId;
+    if (clientRiderId) {
+      where.clientRiderId = {
+        contains: clientRiderId,
+        mode: "insensitive",
+      };
+    }
     if (storeId) where.storeId = storeId;
+    if (clientId) where.clientId = clientId;
     if (paymentStatus) where.paymentStatus = paymentStatus;
+
+    // Date range filtering
+    if (dateFrom || dateTo) {
+      where.orderDate = {};
+      if (dateFrom) where.orderDate.gte = new Date(dateFrom);
+      if (dateTo) where.orderDate.lte = new Date(dateTo);
+    }
 
     const [data, total] = await Promise.all([
       prisma.riderEarning.findMany({
         where,
         skip,
         take: limitNum,
-        orderBy: { createdAt: "desc" },
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          client: {
+            select: {
+              id: true,
+              name: true,
+              clientCode: true,
+            },
+          },
+          store: {
+            select: {
+              id: true,
+              storeName: true,
+              storeCode: true,
+              city: true,
+            },
+          },
+        },
       }),
       prisma.riderEarning.count({ where }),
     ]);
@@ -73,6 +110,7 @@ export const getEarningsByStore = asyncHandler(
 export const createEarning = asyncHandler(
   async (req: Request, res: Response) => {
     const payload = req.body;
+
     // Basic validation
     if (
       !payload.riderId ||
@@ -81,9 +119,42 @@ export const createEarning = asyncHandler(
       payload.finalEarning === undefined
     ) {
       throw createError(
-        "Missing required fields for creating earning",
+        "Missing required fields: riderId, clientId, storeId, and finalEarning are required",
         400,
         "MISSING_FIELDS"
+      );
+    }
+
+    // Verify client exists
+    const client = await prisma.client.findUnique({
+      where: { id: payload.clientId },
+    });
+    if (!client) {
+      throw createError(
+        `Client with ID ${payload.clientId} not found`,
+        404,
+        "CLIENT_NOT_FOUND"
+      );
+    }
+
+    // Verify store exists
+    const store = await prisma.store.findUnique({
+      where: { id: payload.storeId },
+    });
+    if (!store) {
+      throw createError(
+        `Store with ID ${payload.storeId} not found`,
+        404,
+        "STORE_NOT_FOUND"
+      );
+    }
+
+    // Verify store belongs to client
+    if (store.clientId !== payload.clientId) {
+      throw createError(
+        `Store ${payload.storeId} does not belong to client ${payload.clientId}`,
+        400,
+        "STORE_CLIENT_MISMATCH"
       );
     }
 

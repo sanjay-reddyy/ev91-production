@@ -815,14 +815,79 @@ const RiderManagement: React.FC = () => {
                     <TableRow key={rider.id}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar
-                            src={(rider.kycStatus === 'verified' && rider.selfie) ? rider.selfie : undefined}
-                            sx={{ bgcolor: 'primary.main' }}
+                          <Box
+                            onClick={() => handleViewRider(rider.id)}
+                            sx={{
+                              cursor: 'pointer',
+                              position: 'relative',
+                              '&:hover .avatar-overlay': {
+                                opacity: 1,
+                              }
+                            }}
                           >
-                            {(rider.kycStatus !== 'verified' || !rider.selfie) && (rider.name ? rider.name.charAt(0).toUpperCase() : rider.phone.charAt(0))}
-                          </Avatar>
+                            <Avatar
+                              src={(rider.kycStatus === 'verified' && rider.selfie) ? rider.selfie : undefined}
+                              sx={{
+                                bgcolor: 'primary.main',
+                                border: `2px solid ${rider.isActive ? '#4caf50' : '#f44336'}`,
+                                width: 48,
+                                height: 48,
+                                transition: 'transform 0.2s',
+                                '&:hover': {
+                                  transform: 'scale(1.1)',
+                                }
+                              }}
+                            >
+                              {(rider.kycStatus !== 'verified' || !rider.selfie) && (rider.name ? rider.name.charAt(0).toUpperCase() : rider.phone.charAt(0))}
+                            </Avatar>
+                            {/* Status Indicator Badge */}
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                right: 0,
+                                width: 14,
+                                height: 14,
+                                borderRadius: '50%',
+                                bgcolor: rider.isActive ? '#4caf50' : '#f44336',
+                                border: '2px solid white',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                              }}
+                            />
+                            {/* Hover Overlay */}
+                            <Box
+                              className="avatar-overlay"
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                borderRadius: '50%',
+                                bgcolor: 'rgba(0,0,0,0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: 0,
+                                transition: 'opacity 0.2s',
+                              }}
+                            >
+                              <ViewIcon sx={{ color: 'white', fontSize: 20 }} />
+                            </Box>
+                          </Box>
                           <Box>
-                            <Typography variant="body2" fontWeight="medium">
+                            <Typography
+                              variant="body2"
+                              fontWeight="medium"
+                              onClick={() => handleViewRider(rider.id)}
+                              sx={{
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  color: 'primary.main',
+                                  textDecoration: 'underline',
+                                }
+                              }}
+                            >
                               {rider.name || 'No Name'}
                             </Typography>
                             <Chip

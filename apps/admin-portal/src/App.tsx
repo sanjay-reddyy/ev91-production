@@ -31,6 +31,7 @@ import CreateTeam from './pages/CreateTeam'
 import EditTeam from './pages/EditTeam'
 import ClientStoreManagement from './pages/ClientStoreManagement'
 import RiderEarnings from './pages/RiderEarnings'
+import ClientRiderMappingManagement from './pages/ClientRiderMappingManagement'
 import RiderManagement from './pages/RiderManagement'
 import RiderDetail from './pages/RiderDetail'
 import BulkRiderImport from './pages/BulkRiderImport'
@@ -196,6 +197,7 @@ const App: React.FC = () => {
                 <Route path="/clients" element={<ClientStoreManagement />} />
                 <Route path="/stores" element={<ClientStoreManagement />} />
                 <Route path="/rider-earnings" element={<RiderEarnings />} />
+                <Route path="/client-rider-mappings" element={<ClientRiderMappingManagement />} />
                 <Route path="/rider-management" element={<RiderManagement />} />
                 <Route path="/rider-management/:riderId" element={<RiderDetail />} />
                 <Route path="/riders/bulk-import" element={<BulkRiderImport />} />

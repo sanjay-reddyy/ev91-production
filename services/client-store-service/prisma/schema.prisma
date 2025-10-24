@@ -159,6 +159,7 @@ model Client {
   stores              Store[]
   accountManager      User?    @relation("ClientAccountManager", fields: [accountManagerId], references: [id])
   riderEarnings       RiderEarning[]
+  riderMappings       ClientRiderMapping[] // Client-specific rider ID mappings
 
   @@map("clients")
   @@schema("client_store")
@@ -231,7 +232,8 @@ model Store {
 // Rider Earnings Calculation and Tracking
 model RiderEarning {
   id                   String   @id @default(cuid())
-  riderId              String   // Reference to rider in rider-service
+  riderId              String   // Reference to rider in rider-service (platform ID)
+  clientRiderId        String?  // Client's identifier for this rider (e.g., SWIG-DEL-0123)
   clientId             String
   storeId              String
   orderId              String?  // Reference to order in order-service
@@ -273,6 +275,11 @@ model RiderEarning {
   client               Client   @relation(fields: [clientId], references: [id])
   store                Store    @relation(fields: [storeId], references: [id])
 
+  @@index([riderId])
+  @@index([clientRiderId])
+  @@index([clientId])
+  @@index([paymentStatus])
+  @@index([orderDate])
   @@map("rider_earnings")
   @@schema("client_store")
 }
@@ -280,7 +287,8 @@ model RiderEarning {
 // Weekly Rider Summary for Performance Tracking
 model WeeklyRiderSummary {
   id                   String   @id @default(cuid())
-  riderId              String   // Reference to rider in rider-service
+  riderId              String   // Reference to rider in rider-service (platform ID)
+  clientRiderIds       String?  // JSON array of client rider IDs used this week
   weekStartDate        DateTime
   weekEndDate          DateTime
 
@@ -340,5 +348,58 @@ model RateHistory {
   createdAt            DateTime @default(now())
 
   @@map("rate_history")
+  @@schema("client_store")
+}
+
+// Client-Rider ID Mapping - Maps client-specific rider IDs to platform rider IDs
+model ClientRiderMapping {
+  id                String   @id @default(cuid())
+
+  // Identification
+  platformRiderId   String   // Our internal rider ID (UUID from rider-service)
+  publicRiderId     String?  // Human-readable rider ID (e.g., DEL-25-R000044)
+  clientId          String
+  clientRiderId     String   // Client's unique identifier for this rider (e.g., SWIG-DEL-0123, ZOM-MUM-5678)
+
+  // Status & Lifecycle
+  isActive          Boolean  @default(true)
+  assignmentDate    DateTime @default(now())
+  deactivationDate  DateTime?
+  deactivationReason String?
+
+  // Assignment Context
+  assignedBy        String?  // User ID who created this mapping
+  assignedByName    String?  // Name of user who created mapping
+  notes             String?  // Additional notes about this mapping
+
+  // Verification
+  verificationStatus String  @default("pending") // pending, verified, rejected
+  verifiedBy        String?  // User ID who verified
+  verifiedAt        DateTime?
+
+  // Metadata
+  source            String   @default("manual") // manual, bulk-upload, api, client-portal
+  priority          String   @default("standard") // high, standard, low
+  tags              String?  // JSON array of tags for categorization
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Constraints: Ensure uniqueness
+  @@unique([clientId, clientRiderId], name: "unique_client_rider_id") // Client cannot reuse same client rider ID
+  @@unique([clientId, platformRiderId], name: "unique_platform_rider_per_client") // One mapping per rider per client
+
+  // Indexes for fast lookups
+  @@index([platformRiderId])
+  @@index([clientRiderId])
+  @@index([clientId])
+  @@index([isActive])
+  @@index([verificationStatus])
+
+  @@map("client_rider_mappings")
   @@schema("client_store")
 }

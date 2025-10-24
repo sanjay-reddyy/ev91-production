@@ -9,6 +9,8 @@ import clientRoutes from "./routes/clientRoutes";
 import storeRoutes from "./routes/storeRoutes";
 import citySyncRoutes from "./routes/citySyncRoutes";
 import cityRoutes from "./routes/cityRoutes";
+import riderEarningsRoutes from "./routes/riderEarningsRoutes";
+import clientRiderMappingRoutes from "./routes/clientRiderMappingRoutes";
 
 // Import middleware
 import { authMiddleware } from "./middleware/auth";
@@ -90,6 +92,8 @@ app.use("/api", authMiddleware);
 // API Routes (protected)
 app.use("/api/clients", clientRoutes);
 app.use("/api/stores", storeRoutes);
+app.use("/api/rider-earnings", riderEarningsRoutes);
+app.use("/api/client-rider-mappings", clientRiderMappingRoutes);
 
 // Public API Routes (no authentication required for dropdown data)
 app.use("/api/v1/cities", cityRoutes);

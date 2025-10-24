@@ -226,6 +226,7 @@ app.get("/", (req: Request, res: Response) => {
       stores: "/api/stores/*",
       riders: "/api/riders/*",
       riderEarnings: "/api/rider-earnings/*",
+      clientRiderMappings: "/api/client-rider-mappings/*",
       spareParts: "/api/spare-parts/*",
       dashboard: "/api/dashboard/*",
       "v1-auth": "/api/v1/auth/*",
@@ -278,6 +279,7 @@ app.use("/api/clients", authMiddleware);
 app.use("/api/stores", authMiddleware);
 app.use("/api/riders", authMiddleware);
 app.use("/api/rider-earnings", authMiddleware);
+app.use("/api/client-rider-mappings", authMiddleware);
 app.use("/api/spare-parts", authMiddleware);
 app.use("/api/orders", authMiddleware);
 app.use("/api/dashboard", authMiddleware);
