@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
+import /*axios,*/ { AxiosInstance, AxiosRequestConfig } from "axios"; // axios commented out - imported but not currently used
 
 interface UploadProgressCallback {
   (progress: number, loaded: number, total: number): void;

@@ -19,8 +19,8 @@ import {
 } from '@mui/material'
 import {
   Hub as HubIcon,
-  People as PeopleIcon,
-  DirectionsCar as CarIcon,
+  // People as PeopleIcon, // Commented out - unused import
+  // DirectionsCar as CarIcon, // Commented out - unused import
   Store as StoreIcon,
   TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,

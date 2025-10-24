@@ -2,4 +2,4 @@
 
 // Rider components
 export { default as EnhancedRiderForm } from "./EnhancedRiderForm";
-export { default as RiderRegistrationCompleter } from "./RiderRegistrationCompleter";
+export { default as RiderRegistrationCompleter } from "./rider/RiderRegistrationCompleter";

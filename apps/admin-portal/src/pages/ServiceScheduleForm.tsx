@@ -111,7 +111,7 @@ const ServiceScheduleForm: React.FC = () => {
       });
       const data = await response.json();
       if (data.success) {
-        setVehicles(data.data.vehicles);
+        setVehicles(data.vehicles);
       }
     } catch (error) {
       console.error('Error fetching vehicles:', error);
@@ -154,9 +154,13 @@ const ServiceScheduleForm: React.FC = () => {
     setLoading(true);
 
     try {
+      const authToken = localStorage.getItem('authToken');
       const response = await fetch('/api/vehicles/service/schedule', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
         body: JSON.stringify({
           ...formData,
           estimatedCost: parseFloat(formData.estimatedCost) || 0

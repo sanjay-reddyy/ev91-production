@@ -93,7 +93,14 @@ const DamageForm: React.FC = () => {
       try {
         setLoadingVehicles(true);
         const response = await vehicleService.getVehicles({}, { page: 1, limit: 1000 });
-        setVehicles(response.data);
+        // Handle different response structure formats
+        if ('data' in response) {
+          setVehicles(response.data);
+        } else if ('vehicles' in response) {
+          setVehicles(response.vehicles);
+        } else {
+          setVehicles([]);
+        }
       } catch (error) {
         console.error('Error loading vehicles:', error);
         setError('Failed to load vehicles');

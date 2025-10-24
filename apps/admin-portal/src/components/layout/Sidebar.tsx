@@ -39,14 +39,14 @@ import {
   LocalShipping as SuppliersIcon,
   Receipt as PurchaseOrderIcon,
   TrendingUp as TrendsIcon,
-  CallMade as OutwardIcon,
-  Assignment as RequestIcon,
-  CheckCircle as ApprovalIcon,
-  Build as InstallationIcon,
-  AttachMoney as CostTrackingIcon,
+  // CallMade as OutwardIcon, // DISABLED - OutwardFlow functionality temporarily disabled
+  // Assignment as RequestIcon, // DISABLED - OutwardFlow functionality temporarily disabled
+  // CheckCircle as ApprovalIcon, // DISABLED - OutwardFlow functionality temporarily disabled
+  // Build as InstallationIcon, // DISABLED - OutwardFlow functionality temporarily disabled
+  // AttachMoney as CostTrackingIcon, // DISABLED - OutwardFlow functionality temporarily disabled
   // MergeType as UnifiedServiceIcon, // DISABLED - Unified Service Management
   LocationOn as CityIcon,
-  ShoppingCart as OrderIcon,
+  // ShoppingCart as OrderIcon, // DISABLED - Order Management
   CloudUpload as BulkUploadIcon,
 } from '@mui/icons-material'
 import { usePermissions } from '../../hooks/usePermissions'

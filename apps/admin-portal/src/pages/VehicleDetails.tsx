@@ -41,7 +41,7 @@ import {
   PhotoCamera as PhotoIcon,
   Download as DownloadIcon,
   Add as AddIcon,
-  History as HistoryIcon,
+  // History as HistoryIcon, // Commented out - unused import
   Assignment as AssignmentIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -77,12 +77,16 @@ function TabPanel(props: TabPanelProps) {
     'Under Maintenance': 'warning',
     'Retired': 'error',
     'Damaged': 'error',
-  } as const;const serviceStatusColors = {
+  } as const;
+
+/*
+const serviceStatusColors = {
   'Completed': 'success',
   'In Progress': 'warning',
   'Scheduled': 'info',
   'Cancelled': 'error',
 } as const;
+*/
 
 const damageStatusColors = {
   'Reported': 'warning',
@@ -101,7 +105,7 @@ const VehicleDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
+  const [_serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]); // Prefixed with _ - state managed but not directly displayed
   const [damageRecords, setDamageRecords] = useState<DamageRecord[]>([]);
   
   // Status change dialog

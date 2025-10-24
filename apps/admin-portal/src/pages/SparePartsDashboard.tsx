@@ -6,7 +6,7 @@ import {
   CardContent,
   CardHeader,
   Grid,
-  Paper,
+  // Paper, // Commented out - unused import
   Chip,
   Avatar,
   IconButton,
@@ -16,12 +16,12 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   LinearProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  // Table, // Commented out - unused import
+  // TableBody, // Commented out - unused import
+  // TableCell, // Commented out - unused import
+  // TableContainer, // Commented out - unused import
+  // TableHead, // Commented out - unused import
+  // TableRow, // Commented out - unused import
   Button,
   FormControl,
   InputLabel,
@@ -34,7 +34,7 @@ import {
   Badge,
 } from '@mui/material'
 import {
-  Dashboard as DashboardIcon,
+  // Dashboard as DashboardIcon, // Commented out - unused import
   Inventory2 as InventoryIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
@@ -47,9 +47,9 @@ import {
   MoreVert as MoreVertIcon,
   Error as ErrorIcon,
   CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Business as BusinessIcon,
-  Category as CategoryIcon,
+  // Schedule as ScheduleIcon, // Commented out - unused import
+  // Business as BusinessIcon, // Commented out - unused import
+  // Category as CategoryIcon, // Commented out - unused import
   LocalShipping as ShippingIcon,
   Timeline as TimelineIcon,
   PieChart as PieChartIcon,
@@ -122,8 +122,8 @@ const SparePartsDashboard: React.FC = () => {
 
   // Fetch analytics data
   const {
-    data: analyticsData,
-    isLoading: analyticsLoading,
+    // data: analyticsData, // Commented out - data fetched but not currently displayed
+    isLoading: _analyticsLoading, // Prefixed with _ - used for loading state but not displayed
   } = useQuery(
     ['analytics-usage', timeRange],
     () => analyticsService.getUsageAnalysis({
@@ -136,7 +136,7 @@ const SparePartsDashboard: React.FC = () => {
   )
 
   const stats = dashboardData?.data || {}
-  const analytics = analyticsData?.data || {}
+  // const analytics = analyticsData?.data || {} // Commented out - data available but not currently displayed
 
   // Loading state
   if (dashboardLoading) {

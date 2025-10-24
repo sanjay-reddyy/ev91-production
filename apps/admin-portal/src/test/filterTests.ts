@@ -107,8 +107,8 @@
 // Basic test runner function (for future automated testing)
 export async function runFilterTest(
   setRegistrationStatusFilter: (value: string) => void,
-  setKycStatusFilter: (value: string) => void,
-  setIsActiveFilter: (value: string) => void,
+  _setKycStatusFilter: (value: string) => void, // Prefixed with _ - parameter available but not used in current test
+  _setIsActiveFilter: (value: string) => void, // Prefixed with _ - parameter available but not used in current test
   loadRiders: () => Promise<void>
 ) {
   // Test Registration Status Filter

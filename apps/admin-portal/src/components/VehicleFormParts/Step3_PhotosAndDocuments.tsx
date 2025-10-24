@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Grid,
   Typography,
@@ -10,13 +10,13 @@ import {
   Chip,
   Card,
   CardContent,
-  Alert
+  // Alert  // UNUSED - commented out to fix build error
 } from '@mui/material';
 import {
   PhotoCamera as PhotoIcon,
   Description as DocumentIcon,
   Delete as DeleteIcon,
-  CloudUpload as UploadIcon,
+  // CloudUpload as UploadIcon,  // UNUSED - commented out to fix build error
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
   Preview as PreviewIcon
@@ -61,12 +61,12 @@ const Step3_PhotosAndDocuments: React.FC<Step3PhotosAndDocumentsProps> = ({
   handleFileUpload,
   removeFile,
   uploadStatus,
-  vehicleId,
+  // vehicleId,  // UNUSED - commented out to fix build error
   existingDocuments,
   onPreviewDocument,
   onDeleteExistingDocument,
 }) => {
-  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
+  // const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());  // UNUSED - commented out to fix build error
 
   const getStatusIcon = (status?: UploadStatus) => {
     if (!status) return null;

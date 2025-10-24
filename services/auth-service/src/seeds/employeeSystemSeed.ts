@@ -36,13 +36,13 @@ async function seedEmployeeSystem() {
       data: {
         userId: superAdminUser.id,
         employeeId: "EMP001",
-        firstName: "Super",
-        lastName: "Admin",
-        email: "admin@ev91.com",
+        // firstName: "Super",
+        // lastName: "Admin",
+        // email: "admin@ev91.com",
         departmentId: itDepartment.id,
         position: "System Administrator",
         hireDate: new Date(),
-        isActive: true,
+        // isActive: true,
       },
     });
 
@@ -130,14 +130,10 @@ async function seedEmployeeSystem() {
         data: {
           userId: user.id,
           employeeId: emp.employeeId,
-          firstName: emp.firstName,
-          lastName: emp.lastName,
-          email: emp.email,
           departmentId: department!.id,
           teamId: team?.id,
           position: emp.position,
           hireDate: new Date(),
-          isActive: true,
         },
       });
 
@@ -160,7 +156,11 @@ async function seedEmployeeSystem() {
 
     // Set John as manager of Backend Development team
     const johnEmployee = await prisma.employee.findFirst({
-      where: { email: "john.manager@ev91.com" },
+      where: { 
+        user: { 
+          email: "john.manager@ev91.com" 
+        } 
+      },
     });
 
     const backendTeam = await prisma.team.findFirst({
@@ -174,10 +174,20 @@ async function seedEmployeeSystem() {
       });
 
       // Set Jane as reporting to John
-      await prisma.employee.update({
-        where: { email: "jane.developer@ev91.com" },
-        data: { managerId: johnEmployee.id },
+      const janeEmployee = await prisma.employee.findFirst({
+        where: { 
+          user: { 
+            email: "jane.developer@ev91.com" 
+          } 
+        },
       });
+
+      if (janeEmployee) {
+        await prisma.employee.update({
+          where: { id: janeEmployee.id },
+          data: { managerId: johnEmployee.id },
+        });
+      }
 
       console.log("✅ Set up management hierarchy");
     }

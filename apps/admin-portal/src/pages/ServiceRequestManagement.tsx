@@ -27,7 +27,7 @@ import {
   CircularProgress,
   Tooltip,
   Grid,
-  Paper,
+  // Paper, // Commented out - unused import
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -35,8 +35,8 @@ import {
   Visibility as VisibilityIcon,
   Delete as DeleteIcon,
   Check as CheckIcon,
-  Close as CloseIcon,
-  Build as BuildIcon,
+  // Close as CloseIcon, // Commented out - unused import
+  // Build as BuildIcon, // Commented out - unused import
   Assignment as AssignmentIcon,
   Search as SearchIcon,
   Refresh as RefreshIcon,
@@ -134,7 +134,7 @@ const ServiceRequestManagement: React.FC = () => {
     }
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => { // Prefixed with _ - event parameter not used
     setPage(newPage);
   };
 

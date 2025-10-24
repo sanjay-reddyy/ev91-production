@@ -1,24 +1,17 @@
-FROM node:20-alpine
-
+FROM node:22.16.0-alpine
 WORKDIR /app
 
-# Install build dependencies for native modules
 RUN apk add --no-cache python3 make g++ openssl openssl-dev
 
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
 
-# Copy source code
 COPY . .
-
-# Build TypeScript
+RUN npx prisma generate
 RUN npm run build
 
-# Expose port
-EXPOSE 4001
+# Copy openapi.json into dist
+COPY src/openapi.json ./dist/
 
-# Run migrations and start the application
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run dev"]
+EXPOSE 4001
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/index.js"]

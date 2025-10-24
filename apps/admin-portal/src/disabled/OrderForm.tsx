@@ -48,6 +48,7 @@ import {
   UpdateOrderData,
   OrderItemFormData,
 } from '../types/order';
+import { ApiResponse } from '../types/auth';
 import * as orderService from '../services/orderService';
 
 // Initial values for a new order item
@@ -295,7 +296,7 @@ const OrderForm: React.FC = () => {
           specialInstructions: values.specialInstructions,
 
           // Items
-          items: values.items.map(item => ({
+        items: values.items.map((item) => ({
             id: item.isNew ? undefined : item.id,
             name: item.name,
             description: item.description,
@@ -303,10 +304,10 @@ const OrderForm: React.FC = () => {
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
             notes: item.notes
-          })),
+        })),      
         };
 
-        let response;
+      let response: ApiResponse<Order | Order[]>;
         if (isEditMode) {
           const updateData = {
             id: id as string,

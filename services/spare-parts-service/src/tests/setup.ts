@@ -73,12 +73,9 @@ export async function createTestData() {
         displayName: "Test Supplier",
         code: "TS001",
         supplierType: "OEM",
-        status: "ACTIVE",
-        contactInfo: {
-          email: "test@supplier.com",
-          phone: "+1234567890",
-          address: "123 Test Street",
-        },
+        email: "test@supplier.com",
+        phone: "+1234567890",
+        address: "123 Test Street",
         paymentTerms: "NET_30",
         isActive: true,
       },
@@ -90,19 +87,22 @@ export async function createTestData() {
         name: "Test Engine Oil Filter",
         displayName: "Engine Oil Filter",
         partNumber: "EOF001",
+        internalCode: "INTCODE001",            // Added required field
+        compatibility: "Universal",            // Added required field
+        mrp: 100.0,                            // Added required field
         description: "High-quality engine oil filter",
         categoryId: category.id,
         supplierId: supplier.id,
-        specifications: {
+        specifications: JSON.stringify({
           dimensions: "10x5x3 cm",
           weight: "200g",
-        },
+        }),
         costPrice: 50.0,
         sellingPrice: 75.0,
-        markupPercentage: 50.0,
-        minStockLevel: 10,
-        maxStockLevel: 100,
-        reorderPoint: 15,
+        markupPercent: 50.0,
+        minimumStock: 10,
+        maximumStock: 100,
+        reorderLevel: 15,
         warranty: 12, // 12 months
         isActive: true,
       },
@@ -117,9 +117,6 @@ export async function createTestData() {
         currentStock: 50,
         availableStock: 45,
         reservedStock: 5,
-        minStockLevel: 10,
-        maxStockLevel: 100,
-        reorderPoint: 15,
         isActive: true,
       },
     });

@@ -28,19 +28,19 @@ import {
   Tooltip,
   Grid,
   Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
+  // Accordion,  // UNUSED - commented out to fix build error
+  // AccordionSummary,  // UNUSED - commented out to fix build error
+  // AccordionDetails,  // UNUSED - commented out to fix build error
+  // List,  // UNUSED - commented out to fix build error
+  // ListItem,  // UNUSED - commented out to fix build error
+  // ListItemText,  // UNUSED - commented out to fix build error
+  // ListItemIcon,  // UNUSED - commented out to fix build error
+  // Divider,  // UNUSED - commented out to fix build error
 } from '@mui/material';
 import {
   Check as CheckIcon,
   Close as CloseIcon,
-  Visibility as VisibilityIcon,
+  // Visibility as VisibilityIcon,  // UNUSED - commented out to fix build error
   History as HistoryIcon,
   Search as SearchIcon,
   Refresh as RefreshIcon,
@@ -48,12 +48,12 @@ import {
   Person as PersonIcon,
   CalendarToday as CalendarIcon,
   Comment as CommentIcon,
-  Assignment as AssignmentIcon,
-  ExpandMore as ExpandMoreIcon,
+  // Assignment as AssignmentIcon,  // UNUSED - commented out to fix build error
+  // ExpandMore as ExpandMoreIcon,  // UNUSED - commented out to fix build error
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   HourglassEmpty as HourglassEmptyIcon,
-  Warning as WarningIcon,
+  // Warning as WarningIcon,  // UNUSED - commented out to fix build error
 } from '@mui/icons-material';
 import {
   Timeline,

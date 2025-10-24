@@ -7,7 +7,7 @@ export { default as clientStoreService } from "./clientStoreService";
 export { oemService } from "./oemService";
 export { vehicleModelService } from "./vehicleModelService";
 export { default as hubService } from "./hubService";
-export { default as outwardFlowService } from "./outwardFlowService";
+// export { default as outwardFlowService } from "./outwardFlowService"; // DISABLED: OutwardFlow functionality temporarily disabled
 export { teamsService } from "./teams";
 export { default as authService } from "./enhancedAuth";
 export { default as api } from "./api";

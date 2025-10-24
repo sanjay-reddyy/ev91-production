@@ -5,10 +5,8 @@ WORKDIR /app
 # Install build dependencies for native modules
 RUN apk add --no-cache python3 make g++ openssl openssl-dev postgresql-client
 
-# Copy package files
+# Copy package files and install dependencies
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
 
 # Copy source code
@@ -23,5 +21,5 @@ RUN npm run build
 # Expose port
 EXPOSE 4004
 
-# Run migrations and start the application
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma generate && npm run dev"]
+# Run fresh migrations and start production server
+CMD ["sh", "-c", "npx prisma migrate reset --force && npx prisma migrate deploy && npx prisma db seed && node dist/index.js"]

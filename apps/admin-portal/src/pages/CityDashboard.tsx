@@ -13,11 +13,11 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Divider,
+  // Divider, // Commented out - unused import
   Button,
-  IconButton,
-  Tooltip,
-  Badge,
+  // IconButton, // Commented out - unused import
+  // Tooltip, // Commented out - unused import
+  // Badge, // Commented out - unused import
 } from '@mui/material';
 import {
   LocationOn as LocationIcon,
@@ -28,12 +28,12 @@ import {
   Timeline as TimelineIcon,
   Assessment as AssessmentIcon,
   Add as AddIcon,
-  Edit as EditIcon,
+  // Edit as EditIcon, // Commented out - unused import
   Visibility as ViewIcon,
   Map as MapIcon,
   LocalShipping as DeliveryIcon,
-  ElectricCar as VehicleIcon,
-  Store as StoreIcon,
+  // ElectricCar as VehicleIcon, // Commented out - unused import
+  // Store as StoreIcon, // Commented out - unused import
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, isAfter } from 'date-fns';
@@ -379,7 +379,7 @@ const CityDashboard: React.FC = () => {
                       { name: 'Operational', value: dashboardData.operationalCities },
                       { name: 'Active (Non-operational)', value: dashboardData.activeCities - dashboardData.operationalCities },
                       { name: 'Inactive', value: dashboardData.totalCities - dashboardData.activeCities }
-                    ].map((entry, index) => (
+                    ].map((_entry, index) => ( // Prefixed with _ - entry object not used, only index needed
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

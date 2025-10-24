@@ -33,9 +33,7 @@ async function runDiagnostics() {
         `   ${hasServiceRequest ? "✅" : "❌"} ServiceRequest model available`
       );
       console.log(
-        `   ${
-          hasSparePartRequest ? "✅" : "❌"
-        } SparePartRequest model available`
+        `   ${hasSparePartRequest ? "✅" : "❌"} SparePartRequest model available`
       );
       console.log(
         `   ${hasApprovalHistory ? "✅" : "❌"} ApprovalHistory model available`
@@ -44,7 +42,7 @@ async function runDiagnostics() {
       console.log(`   ❌ Prisma client not found`);
     }
   } catch (error) {
-    console.log(`   ❌ Error checking Prisma client: ${error}`);
+    console.log(`   ❌ Error checking Prisma client: ${String(error)}`);
   }
 
   // 2. Check Database Connection
@@ -53,7 +51,6 @@ async function runDiagnostics() {
     await prisma.$connect();
     console.log("   ✅ Database connection successful");
 
-    // Check if we can query existing tables
     const categoryCount = await prisma.category.count();
     const sparePartCount = await prisma.sparePart.count();
     const inventoryCount = await prisma.inventoryLevel.count();
@@ -62,20 +59,23 @@ async function runDiagnostics() {
       `   📊 Existing data: ${categoryCount} categories, ${sparePartCount} parts, ${inventoryCount} inventory levels`
     );
   } catch (error) {
-    console.log(`   ❌ Database connection failed: ${error}`);
+    console.log(`   ❌ Database connection failed: ${String(error)}`);
   }
 
   // 3. Check New Tables (if migration was successful)
   console.log("\n3. 🆕 Checking New Tables...");
   try {
-    // This will fail if the new tables don't exist yet
     const serviceRequestCount = await prisma.serviceRequest.count();
     const requestCount = await prisma.sparePartRequest.count();
     console.log(
       `   ✅ New tables exist: ${serviceRequestCount} service requests, ${requestCount} part requests`
     );
   } catch (error) {
-    console.log(`   ⚠️ New tables not available yet: ${error.message}`);
+    // ✅ Fix: Safely handle unknown error type
+    const message =
+      error instanceof Error ? error.message : String(error);
+
+    console.log(`   ⚠️ New tables not available yet: ${message}`);
     console.log(`   💡 This is expected if migration hasn't run yet`);
   }
 
@@ -130,12 +130,10 @@ async function runDiagnostics() {
       `   ${hasExpress ? "✅" : "❌"} express: ${hasExpress || "missing"}`
     );
     console.log(
-      `   ${hasTypescript ? "✅" : "❌"} typescript: ${
-        hasTypescript || "missing"
-      }`
+      `   ${hasTypescript ? "✅" : "❌"} typescript: ${hasTypescript || "missing"}`
     );
   } catch (error) {
-    console.log(`   ❌ Error checking package.json: ${error}`);
+    console.log(`   ❌ Error checking package.json: ${String(error)}`);
   }
 
   await prisma.$disconnect();

@@ -31,15 +31,15 @@ import {
   LinearProgress,
   Rating,
   Tooltip,
-  Badge,
+  // Badge,  // UNUSED - commented out to fix build error
   Paper,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  // ListItemIcon,  // UNUSED - commented out to fix build error
+  // Accordion,  // UNUSED - commented out to fix build error
+  // AccordionSummary,  // UNUSED - commented out to fix build error
+  // AccordionDetails,  // UNUSED - commented out to fix build error
   Autocomplete,
   Checkbox,
   FormControlLabel,
@@ -51,23 +51,23 @@ import {
   Schedule as ScheduleIcon,
   Build as ServiceIcon,
   Payment as PaymentIcon,
-  PhotoCamera as PhotoIcon,
-  Download as DownloadIcon,
+  // PhotoCamera as PhotoIcon,  // UNUSED - commented out to fix build error
+  // Download as DownloadIcon,  // UNUSED - commented out to fix build error
   CheckCircle as CompleteIcon,
   Cancel as CancelIcon,
-  Warning as WarningIcon,
-  TrendingUp as TrendingIcon,
+  // Warning as WarningIcon,  // UNUSED - commented out to fix build error
+  // TrendingUp as TrendingIcon,  // UNUSED - commented out to fix build error
   CalendarMonth as CalendarIcon,
-  Engineering as MechanicIcon,
-  ExpandMore as ExpandMoreIcon,
-  Star as StarIcon,
+  // Engineering as MechanicIcon,  // UNUSED - commented out to fix build error
+  // ExpandMore as ExpandMoreIcon,  // UNUSED - commented out to fix build error
+  // Star as StarIcon,  // UNUSED - commented out to fix build error
   Timeline as TimelineIcon,
   Assessment as ReportIcon,
   DirectionsCar as CarIcon,
   Business as ServiceCenterIcon,
   Person as MechanicPersonIcon,
 } from '@mui/icons-material';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { format, /* addDays, */ differenceInDays } from 'date-fns';
 
 interface ServiceRecord {
   id: string;
@@ -149,8 +149,8 @@ const VehicleServiceManager: React.FC<VehicleServiceManagerProps> = ({
   const [statistics, setStatistics] = useState<ServiceStatistics | null>(null);
   const [loading, setLoading] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
-  const [editServiceDialogOpen, setEditServiceDialogOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<ServiceRecord | null>(null);
+  const [_editServiceDialogOpen, setEditServiceDialogOpen] = useState(false);  // Prefixed with _ - state managed but dialog not currently used
+  const [_selectedService, setSelectedService] = useState<ServiceRecord | null>(null);  // Prefixed with _ - state managed but selection not currently used
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as any });
 
   // New state for enhanced form
@@ -218,7 +218,7 @@ const VehicleServiceManager: React.FC<VehicleServiceManagerProps> = ({
 
   const fetchVehicles = async () => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const authToken = localStorage.getItem('authToken');
 
       console.log('🔍 Service Management - Vehicles API Base URL:', apiBaseUrl);
@@ -341,7 +341,7 @@ const VehicleServiceManager: React.FC<VehicleServiceManagerProps> = ({
     setLoading(true);
     try {
       // Fetch service records via API Gateway
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const authToken = localStorage.getItem('authToken');
 
       console.log('🔍 Service Management - API Base URL:', apiBaseUrl);
@@ -460,7 +460,7 @@ const VehicleServiceManager: React.FC<VehicleServiceManagerProps> = ({
 
   const handleScheduleService = async () => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const authToken = localStorage.getItem('authToken');
 
       console.log('🔍 Service Management - Schedule API Base URL:', apiBaseUrl);
@@ -543,7 +543,7 @@ const VehicleServiceManager: React.FC<VehicleServiceManagerProps> = ({
 
   const handleUpdateServiceStatus = async (serviceId: string, status: string) => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const authToken = localStorage.getItem('authToken');
 
       console.log('🔍 Service Management - Update Status API Base URL:', apiBaseUrl);
@@ -842,7 +842,7 @@ const VehicleServiceManager: React.FC<VehicleServiceManagerProps> = ({
               options={availableVehicles}
               getOptionLabel={(option) => `${option.registrationNumber} - ${option.make} ${option.model}`}
               value={selectedVehicle}
-              onChange={(event, newValue) => {
+              onChange={(_event, newValue) => {
                 setSelectedVehicle(newValue);
                 setScheduleForm(prev => ({ ...prev, vehicleId: newValue?.id || '' }));
               }}
@@ -1146,7 +1146,7 @@ const VehicleServiceManager: React.FC<VehicleServiceManagerProps> = ({
       {/* Service Management Tabs */}
       <Card variant="outlined">
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+          <Tabs value={tabValue} onChange={(_e, newValue) => setTabValue(newValue)}>
             <Tab label="Service History" icon={<TimelineIcon />} />
             <Tab label="Analytics" icon={<ReportIcon />} />
             <Tab label="Maintenance Schedule" icon={<CalendarIcon />} />

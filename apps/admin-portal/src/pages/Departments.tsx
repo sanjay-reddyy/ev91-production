@@ -35,7 +35,7 @@ import {
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
+  // Delete as DeleteIcon, // Commented out - unused import
   Archive as ArchiveIcon,
   Business as BusinessIcon,
   AccountTree as AccountTreeIcon,

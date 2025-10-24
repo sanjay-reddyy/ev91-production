@@ -220,7 +220,7 @@ export async function runAllTests() {
   try {
     // Test 1: Create request
     const createResult = await testCreatePartRequest();
-    const requestId = createResult.data?.data?.id;
+    const requestId = (createResult.data as any)?.data?.id;
 
     // Test 2: Get requests
     await testGetPartRequests();

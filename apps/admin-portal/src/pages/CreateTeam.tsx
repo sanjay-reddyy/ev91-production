@@ -91,7 +91,7 @@ export default function CreateTeam() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [departmentsLoading, setDepartmentsLoading] = useState(true)
   const [cities, setCities] = useState<Array<{id: string, name: string, state: string, isActive: boolean}>>([])
-  const [citiesLoading, setCitiesLoading] = useState(true)
+  const [_citiesLoading, setCitiesLoading] = useState(true) // Prefixed with _ - used in state management but not displayed
   const [employees, setEmployees] = useState<any[]>([])
   const [employeesLoading, setEmployeesLoading] = useState(true)
 

@@ -55,7 +55,7 @@ import {
   Phone as PhoneIcon,
   Save as SaveIcon,
   ElectricCar as ElectricCarIcon,
-  Visibility as ViewIcon,
+  // Visibility as ViewIcon, // Commented out - unused import
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -623,10 +623,12 @@ const ClientStoreManagement: React.FC = () => {
     setStoreDialogOpen(true);
   };
 
+  /*
   const handleViewStoreDetails = (store: Store) => {
     // TODO: Navigate to store details or show details modal
     console.log('Viewing store details:', store.id);
   };
+  */
 
   const handleArchiveStore = async (store: Store, archive: boolean) => {
     try {

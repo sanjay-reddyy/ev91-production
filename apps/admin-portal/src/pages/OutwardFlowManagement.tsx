@@ -9,7 +9,7 @@ import {
   Tab,
   Tabs,
   IconButton,
-  Chip,
+  // Chip, // Commented out - unused import
   Avatar,
   LinearProgress,
   Alert,
@@ -21,10 +21,10 @@ import {
   Assignment as AssignmentIcon,
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
-  Error as ErrorIcon,
+  // Error as ErrorIcon, // Commented out - unused import
   TrendingUp as TrendingUpIcon,
   Speed as SpeedIcon,
-  Warning as WarningIcon,
+  // Warning as WarningIcon, // Commented out - unused import
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -61,6 +61,7 @@ function a11yProps(index: number) {
 }
 
 // Status color mapping
+/*
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case 'pending':
@@ -94,6 +95,7 @@ const getPriorityColor = (priority: string) => {
       return 'default';
   }
 };
+*/
 
 const OutwardFlowManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -125,7 +127,7 @@ const OutwardFlowManagement: React.FC = () => {
     }
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => { // Prefixed with _ - event parameter not used
     setCurrentTab(newValue);
   };
 
