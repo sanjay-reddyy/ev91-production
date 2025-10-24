@@ -7,10 +7,10 @@ import { Box, CircularProgress } from '@mui/material'
 import Login from './pages/Login'
 import Layout from './components/layout/Layout'
 
-// Import Order Management pages
-import OrderList from './pages/OrderList'
-import OrderDetail from './pages/OrderDetail'
-import OrderForm from './pages/OrderForm'
+// Import Order Management pages - DISABLED
+// import OrderList from './pages/OrderList'
+// import OrderDetail from './pages/OrderDetail'
+// import OrderForm from './pages/OrderForm'
 
 // Import auth components
 import SignUpForm from './components/auth/SignUpForm'
@@ -63,7 +63,7 @@ import CityDashboard from './pages/CityDashboard'
 // Service Management Pages
 import ServiceManagement from './pages/ServiceManagement'
 import ServiceScheduleForm from './pages/ServiceScheduleForm'
-import UnifiedServiceDashboard from './pages/UnifiedServiceDashboard'
+// import UnifiedServiceDashboard from './pages/UnifiedServiceDashboard' // DISABLED - Unified Service Management
 
 // Spare Parts Management Pages
 import SpareParts from './pages/SpareParts'
@@ -239,7 +239,7 @@ const App: React.FC = () => {
                 {/* Service Management Routes */}
                 <Route path="/services" element={<ServiceManagement />} />
                 <Route path="/services/schedule" element={<ServiceScheduleForm />} />
-                <Route path="/unified-service" element={<UnifiedServiceDashboard />} />
+                {/* <Route path="/unified-service" element={<UnifiedServiceDashboard />} /> */} {/* DISABLED - Unified Service Management */}
 
                 {/* Spare Parts Management Routes */}
                 <Route path="/spare-parts" element={<SpareParts />} />
@@ -265,11 +265,11 @@ const App: React.FC = () => {
                 <Route path="/spare-parts/outward/installations" element={<InstallationManagement />} />
                 <Route path="/spare-parts/outward/cost-tracking" element={<CostTrackingManagement />} />
 
-                {/* Order Management Routes */}
-                <Route path="/orders" element={<OrderList />} />
-                <Route path="/orders/new" element={<OrderForm />} />
-                <Route path="/orders/:id/edit" element={<OrderForm />} />
-                <Route path="/orders/:id" element={<OrderDetail />} />
+                {/* Order Management Routes - DISABLED */}
+                {/* <Route path="/orders" element={<OrderList />} /> */}
+                {/* <Route path="/orders/new" element={<OrderForm />} /> */}
+                {/* <Route path="/orders/:id/edit" element={<OrderForm />} /> */}
+                {/* <Route path="/orders/:id" element={<OrderDetail />} /> */}
 
                 {/* Debug Routes */}
                 <Route path="/debug/vehicle-api" element={<DebugVehicleAPI />} />

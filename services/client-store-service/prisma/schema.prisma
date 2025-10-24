@@ -43,10 +43,10 @@ model City {
   marketPotential     String? // High, Medium, Low
 
   // Event Sourcing Fields (for cross-service synchronization)
-  version           Int     @default(1) // For optimistic locking
-  lastModifiedBy    String? // User ID who last modified
-  eventSequence     Int     @default(0) // Auto-increment for event ordering
-  lastSyncAt        DateTime @default(now()) // Last sync timestamp
+  version        Int      @default(1) // For optimistic locking
+  lastModifiedBy String? // User ID who last modified
+  eventSequence  Int      @default(0) // Auto-increment for event ordering
+  lastSyncAt     DateTime @default(now()) // Last sync timestamp
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -59,13 +59,13 @@ model City {
 // Minimal User reference for client relationships
 // This is a reference table only - full user data comes from auth-service
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  firstName    String
-  lastName     String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String
+  lastName  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Client relationships
   clientsManaged Client[] @relation("ClientAccountManager")
@@ -76,15 +76,18 @@ model User {
 
 // Client model - Business entities that have stores
 model Client {
-  id                    String   @id @default(cuid())
-  name                  String   @unique
-  clientCode            String   @unique
-  clientType            String   // B2B, B2C, Government, Enterprise
-  industrySector        String?  // Automotive OEM, Fleet Operator, Logistics
-  businessCategory      String?  // Manufacturer, Dealer, Service Provider, End Customer
+  id               String  @id @default(cuid())
+  name             String  @unique
+  clientCode       String  @unique
+  clientType       String // B2B, B2C, Government, Enterprise
+  industrySector   String? // Automotive OEM, Fleet Operator, Logistics
+  businessCategory String? // Manufacturer, Dealer, Service Provider, End Customer
+
+  // 👇 Add this new relation field
+  clientRiderMappings ClientRiderMapping[]
 
   // Contact Information
-  primaryContactPerson  String?
+  primaryContactPerson String?
   designation          String?
   email                String?
   secondaryEmail       String?
@@ -92,74 +95,73 @@ model Client {
   secondaryPhone       String?
 
   // Address & Location
-  city                 String?
-  state                String?
-  pinCode              String?
+  city    String?
+  state   String?
+  pinCode String?
 
   // Business Details
-  registrationNumber   String?
-  panNumber           String?
-  gstNumber           String?
+  registrationNumber String?
+  panNumber          String?
+  gstNumber          String?
 
   // EV-Specific Fields
-  evPortfolio         String?  // JSON array: 2-Wheeler, 3-Wheeler, 4-Wheeler, Commercial
-  fleetSize           Int?
-  hasChargingInfra    Boolean  @default(false)
-  chargingInfraDetails String? // JSON details
+  evPortfolio           String? // JSON array: 2-Wheeler, 3-Wheeler, 4-Wheeler, Commercial
+  fleetSize             Int?
+  hasChargingInfra      Boolean @default(false)
+  chargingInfraDetails  String? // JSON details
   batteryTechPreference String?
-  serviceRequirements String?  // JSON array: Maintenance, Charging, Financing
+  serviceRequirements   String? // JSON array: Maintenance, Charging, Financing
 
   // Commercial Details
-  paymentTerms        String?  // Net 30, Net 60, etc.
+  paymentTerms           String? // Net 30, Net 60, etc.
   preferredPaymentMethod String?
-  taxCategory         String?
-  discountCategory    String?
+  taxCategory            String?
+  discountCategory       String?
 
   // Rider Earning Configuration
-  baseOrderRate       Float    @default(25.0) // ₹25 per order
-  rateEffectiveDate   DateTime @default(now())
-  rateType            String   @default("fixed") // fixed, variable, distance-based
-  minimumRate         Float    @default(15.0)
-  maximumRate         Float    @default(50.0)
+  baseOrderRate     Float    @default(25.0) // ₹25 per order
+  rateEffectiveDate DateTime @default(now())
+  rateType          String   @default("fixed") // fixed, variable, distance-based
+  minimumRate       Float    @default(15.0)
+  maximumRate       Float    @default(50.0)
 
   // Bulk Order Bonus Configuration
-  bulkBonusEnabled    Boolean  @default(false)
-  bulkOrdersThreshold Int      @default(10)
-  bulkBonusAmount     Float    @default(0.0)
-  bulkResetPeriod     String   @default("daily") // daily, weekly
+  bulkBonusEnabled    Boolean @default(false)
+  bulkOrdersThreshold Int     @default(10)
+  bulkBonusAmount     Float   @default(0.0)
+  bulkResetPeriod     String  @default("daily") // daily, weekly
 
   // Weekly Target Bonus
-  weeklyBonusEnabled  Boolean  @default(false)
-  weeklyOrderTarget   Int      @default(0)
-  weeklyBonusAmount   Float    @default(0.0)
+  weeklyBonusEnabled Boolean @default(false)
+  weeklyOrderTarget  Int     @default(0)
+  weeklyBonusAmount  Float   @default(0.0)
 
   // Performance Multiplier
   performanceMultiplierEnabled Boolean @default(false)
-  topPerformerRate    Float    @default(1.2)
-  performanceCriteria String   @default("rating") // rating, speed, volume
+  topPerformerRate             Float   @default(1.2)
+  performanceCriteria          String  @default("rating") // rating, speed, volume
 
   // Payment Configuration
-  paymentCycle        String   @default("weekly") // daily, weekly, bi-weekly
-  paymentMethods      String?  // JSON array of payment methods
-  minimumPayout       Float    @default(100.0)
-  payoutDay          String   @default("Friday")
+  paymentCycle   String  @default("weekly") // daily, weekly, bi-weekly
+  paymentMethods String? // JSON array of payment methods
+  minimumPayout  Float   @default(100.0)
+  payoutDay      String  @default("Friday")
 
   // Relationship Management
-  clientStatus        String   @default("Active") // Active, Inactive, Prospect, Suspended
-  acquisitionDate     DateTime @default(now())
-  accountManagerId    String?
-  clientPriority      String   @default("Medium") // High, Medium, Low
-  relationshipType    String   @default("Direct") // Direct, Partner, Distributor
+  clientStatus     String   @default("Active") // Active, Inactive, Prospect, Suspended
+  acquisitionDate  DateTime @default(now())
+  accountManagerId String?
+  clientPriority   String   @default("Medium") // High, Medium, Low
+  relationshipType String   @default("Direct") // Direct, Partner, Distributor
 
   // Timestamps
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  stores              Store[]
-  accountManager      User?    @relation("ClientAccountManager", fields: [accountManagerId], references: [id])
-  riderEarnings       RiderEarning[]
-  riderMappings       ClientRiderMapping[] // Client-specific rider ID mappings
+  stores         Store[]
+  accountManager User?          @relation("ClientAccountManager", fields: [accountManagerId], references: [id])
+  riderEarnings  RiderEarning[]
 
   @@map("clients")
   @@schema("client_store")
@@ -167,62 +169,62 @@ model Client {
 
 // Store model - Individual store locations for clients
 model Store {
-  id                    String   @id @default(cuid())
-  clientId              String
-  storeName            String
-  storeCode            String   @unique
-  storeType            String   // Showroom, Service Center, Charging Hub, Experience Center
-  brandFranchise       String?
+  id             String  @id @default(cuid())
+  clientId       String
+  storeName      String
+  storeCode      String  @unique
+  storeType      String // Showroom, Service Center, Charging Hub, Experience Center
+  brandFranchise String?
 
   // Location Details
-  completeAddress      String
-  city                 String   // Key field for multi-city operations
-  state                String
-  country              String   @default("India")
-  pinCode              String
-  landmark             String?
-  gpsLatitude          Float?
-  gpsLongitude         Float?
-  zoneRegion           String?  // North, South, East, West
+  completeAddress String
+  city            String // Key field for multi-city operations
+  state           String
+  country         String  @default("India")
+  pinCode         String
+  landmark        String?
+  gpsLatitude     Float?
+  gpsLongitude    Float?
+  zoneRegion      String? // North, South, East, West
 
   // Contact Information
-  storeManagerName     String?
-  contactNumber        String?
-  emailAddress         String?
-  whatsappNumber       String?
+  storeManagerName String?
+  contactNumber    String?
+  emailAddress     String?
+  whatsappNumber   String?
 
   // Business Operations
-  storeStatus          String   @default("Active") // Active, Inactive, Under Construction, Planned
+  storeStatus String @default("Active") // Active, Inactive, Under Construction, Planned
 
   // Store-Specific Offers for Riders
-  currentOfferRate     Float    @default(0.0) // Extra ₹ per delivery
-  offerStartDate       DateTime?
-  offerEndDate         DateTime?
-  offerType            String   @default("none") // temporary, permanent, seasonal, none
-  offerReason          String?
-  isOfferActive        Boolean  @default(false)
+  currentOfferRate Float     @default(0.0) // Extra ₹ per delivery
+  offerStartDate   DateTime?
+  offerEndDate     DateTime?
+  offerType        String    @default("none") // temporary, permanent, seasonal, none
+  offerReason      String?
+  isOfferActive    Boolean   @default(false)
 
   // Traffic & Performance Metrics
-  busyLevel            String   @default("medium") // low, medium, high, peak
-  averageOrdersPerDay  Int      @default(0)
-  peakHours            String?  // JSON array: ['12:00-14:00', '19:00-21:00']
-  busyDays             String?  // JSON array: ['friday', 'saturday', 'sunday']
-  orderDifficultyLevel String   @default("medium") // easy, medium, hard
-  averageDeliveryDistance Float @default(0.0) // in km
+  busyLevel               String  @default("medium") // low, medium, high, peak
+  averageOrdersPerDay     Int     @default(0)
+  peakHours               String? // JSON array: ['12:00-14:00', '19:00-21:00']
+  busyDays                String? // JSON array: ['friday', 'saturday', 'sunday']
+  orderDifficultyLevel    String  @default("medium") // easy, medium, hard
+  averageDeliveryDistance Float   @default(0.0) // in km
 
   // Performance Tracking
-  monthlyOrderVolume   Int      @default(0)
-  riderRating          Float    @default(0.0) // 1-5 rating from riders
-  averagePickupTime    Int      @default(0) // in minutes
-  storePriority        String   @default("standard") // vip, standard, low
+  monthlyOrderVolume Int    @default(0)
+  riderRating        Float  @default(0.0) // 1-5 rating from riders
+  averagePickupTime  Int    @default(0) // in minutes
+  storePriority      String @default("standard") // vip, standard, low
 
   // Timestamps
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  client               Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  riderEarnings        RiderEarning[]
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  riderEarnings RiderEarning[]
 
   @@unique([clientId, storeCode])
   @@map("stores")
@@ -231,103 +233,96 @@ model Store {
 
 // Rider Earnings Calculation and Tracking
 model RiderEarning {
-  id                   String   @id @default(cuid())
-  riderId              String   // Reference to rider in rider-service (platform ID)
-  clientRiderId        String?  // Client's identifier for this rider (e.g., SWIG-DEL-0123)
-  clientId             String
-  storeId              String
-  orderId              String?  // Reference to order in order-service
+  id       String  @id @default(cuid())
+  riderId  String // Reference to rider in rider-service
+  clientId String
+  storeId  String
+  orderId  String? // Reference to order in order-service
 
   // Rate Breakdown
-  baseRate             Float    // ₹25 (from client)
-  storeOfferRate       Float    @default(0.0) // ₹10 (from store offer)
-  totalRate            Float    // ₹35 (base + offer)
+  baseRate       Float // ₹25 (from client)
+  storeOfferRate Float @default(0.0) // ₹10 (from store offer)
+  totalRate      Float // ₹35 (base + offer)
 
   // Bonuses Applied
-  bulkOrderBonus       Float    @default(0.0) // ₹0 or bonus amount
-  performanceBonus     Float    @default(0.0) // ₹0 or multiplier bonus
-  weeklyTargetBonus    Float    @default(0.0) // ₹0 or weekly bonus
-  specialEventBonus    Float    @default(0.0) // ₹0 or event bonus
+  bulkOrderBonus    Float @default(0.0) // ₹0 or bonus amount
+  performanceBonus  Float @default(0.0) // ₹0 or multiplier bonus
+  weeklyTargetBonus Float @default(0.0) // ₹0 or weekly bonus
+  specialEventBonus Float @default(0.0) // ₹0 or event bonus
 
-  finalEarning         Float    // Total amount rider earns
+  finalEarning Float // Total amount rider earns
 
   // Metadata
-  orderDate            DateTime @default(now())
-  deliveryTime         Int?     // minutes taken
-  riderRating          Float?   // customer rating (1-5)
-  distance             Float?   // delivery distance in km
+  orderDate    DateTime @default(now())
+  deliveryTime Int? // minutes taken
+  riderRating  Float? // customer rating (1-5)
+  distance     Float? // delivery distance in km
 
   // Calculation Details
-  bonusesApplied       String?  // JSON array of bonus types applied
-  rateCalculationLog   String?  // JSON log of how rate was calculated
+  bonusesApplied     String? // JSON array of bonus types applied
+  rateCalculationLog String? // JSON log of how rate was calculated
 
   // Payment Status
-  paymentStatus        String   @default("pending") // pending, paid, on-hold
-  paymentDate          DateTime?
-  paymentMethod        String?
-  paymentReference     String?
+  paymentStatus    String    @default("pending") // pending, paid, on-hold
+  paymentDate      DateTime?
+  paymentMethod    String?
+  paymentReference String?
 
   // Timestamps
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  client               Client   @relation(fields: [clientId], references: [id])
-  store                Store    @relation(fields: [storeId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+  store  Store  @relation(fields: [storeId], references: [id])
 
-  @@index([riderId])
-  @@index([clientRiderId])
-  @@index([clientId])
-  @@index([paymentStatus])
-  @@index([orderDate])
   @@map("rider_earnings")
   @@schema("client_store")
 }
 
 // Weekly Rider Summary for Performance Tracking
 model WeeklyRiderSummary {
-  id                   String   @id @default(cuid())
-  riderId              String   // Reference to rider in rider-service (platform ID)
-  clientRiderIds       String?  // JSON array of client rider IDs used this week
-  weekStartDate        DateTime
-  weekEndDate          DateTime
+  id            String   @id @default(cuid())
+  riderId       String // Reference to rider in rider-service
+  weekStartDate DateTime
+  weekEndDate   DateTime
 
   // Order Statistics
-  totalOrders          Int      @default(0)
-  averageOrdersPerDay  Float    @default(0.0)
-  bestDayOrders        Int      @default(0)
-  worstDayOrders       Int      @default(0)
+  totalOrders         Int   @default(0)
+  averageOrdersPerDay Float @default(0.0)
+  bestDayOrders       Int   @default(0)
+  worstDayOrders      Int   @default(0)
 
   // Earnings Breakdown
-  baseEarnings         Float    @default(0.0) // From base rates
-  offerEarnings        Float    @default(0.0) // From store offers
-  bonusEarnings        Float    @default(0.0) // From incentives
-  totalEarnings        Float    @default(0.0)
+  baseEarnings  Float @default(0.0) // From base rates
+  offerEarnings Float @default(0.0) // From store offers
+  bonusEarnings Float @default(0.0) // From incentives
+  totalEarnings Float @default(0.0)
 
   // Performance Metrics
-  averageRating        Float    @default(0.0)
-  averageDeliveryTime  Float    @default(0.0) // in minutes
+  averageRating            Float @default(0.0)
+  averageDeliveryTime      Float @default(0.0) // in minutes
   onTimeDeliveryPercentage Float @default(0.0)
-  totalDistance        Float    @default(0.0) // km
+  totalDistance            Float @default(0.0) // km
 
   // Targets Achievement
-  dailyTargetAchieved  String?  // JSON array [true, false, true, ...] for each day
-  weeklyTargetAchieved Boolean  @default(false)
-  bonusesEarned        String?  // JSON array of bonus types earned
+  dailyTargetAchieved  String? // JSON array [true, false, true, ...] for each day
+  weeklyTargetAchieved Boolean @default(false)
+  bonusesEarned        String? // JSON array of bonus types earned
 
   // Client Performance
-  topClientId          String?  // Client with most orders
-  topStoreId           String?  // Store with most orders
-  citiesWorked         String?  // JSON array of cities worked in
+  topClientId  String? // Client with most orders
+  topStoreId   String? // Store with most orders
+  citiesWorked String? // JSON array of cities worked in
 
   // Payment Summary
-  totalPaid            Float    @default(0.0)
-  pendingAmount        Float    @default(0.0)
-  paymentCount         Int      @default(0)
+  totalPaid     Float @default(0.0)
+  pendingAmount Float @default(0.0)
+  paymentCount  Int   @default(0)
 
   // Timestamps
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([riderId, weekStartDate])
   @@map("weekly_rider_summaries")
@@ -336,16 +331,16 @@ model WeeklyRiderSummary {
 
 // Rate History for tracking rate changes
 model RateHistory {
-  id                   String   @id @default(cuid())
-  clientId             String
-  oldBaseRate          Float
-  newBaseRate          Float
-  changeReason         String?
-  effectiveDate        DateTime
-  changedBy            String?  // User ID who made the change
+  id            String   @id @default(cuid())
+  clientId      String
+  oldBaseRate   Float
+  newBaseRate   Float
+  changeReason  String?
+  effectiveDate DateTime
+  changedBy     String? // User ID who made the change
 
   // Timestamps
-  createdAt            DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@map("rate_history")
   @@schema("client_store")
@@ -353,53 +348,51 @@ model RateHistory {
 
 // Client-Rider ID Mapping - Maps client-specific rider IDs to platform rider IDs
 model ClientRiderMapping {
-  id                String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Identification
-  platformRiderId   String   // Our internal rider ID (UUID from rider-service)
-  publicRiderId     String?  // Human-readable rider ID (e.g., DEL-25-R000044)
-  clientId          String
-  clientRiderId     String   // Client's unique identifier for this rider (e.g., SWIG-DEL-0123, ZOM-MUM-5678)
+  platformRiderId String // Our internal rider ID (UUID from rider-service)
+  publicRiderId   String? // Human-readable rider ID (e.g., DEL-25-R000044)
+  clientId        String
+  clientRiderId   String // Client's unique identifier for this rider (e.g., SWIG-DEL-0123, ZOM-MUM-5678)
 
   // Status & Lifecycle
-  isActive          Boolean  @default(true)
-  assignmentDate    DateTime @default(now())
-  deactivationDate  DateTime?
+  isActive           Boolean   @default(true)
+  assignmentDate     DateTime  @default(now())
+  deactivationDate   DateTime?
   deactivationReason String?
 
   // Assignment Context
-  assignedBy        String?  // User ID who created this mapping
-  assignedByName    String?  // Name of user who created mapping
-  notes             String?  // Additional notes about this mapping
+  assignedBy     String? // User ID who created this mapping
+  assignedByName String? // Name of user who created mapping
+  notes          String? // Additional notes about this mapping
 
   // Verification
-  verificationStatus String  @default("pending") // pending, verified, rejected
-  verifiedBy        String?  // User ID who verified
-  verifiedAt        DateTime?
+  verificationStatus String    @default("pending") // pending, verified, rejected
+  verifiedBy         String? // User ID who verified
+  verifiedAt         DateTime?
 
   // Metadata
-  source            String   @default("manual") // manual, bulk-upload, api, client-portal
-  priority          String   @default("standard") // high, standard, low
-  tags              String?  // JSON array of tags for categorization
+  source   String  @default("manual") // manual, bulk-upload, api, client-portal
+  priority String  @default("standard") // high, standard, low
+  tags     String? // JSON array of tags for categorization
 
   // Timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationships
-  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   // Constraints: Ensure uniqueness
   @@unique([clientId, clientRiderId], name: "unique_client_rider_id") // Client cannot reuse same client rider ID
   @@unique([clientId, platformRiderId], name: "unique_platform_rider_per_client") // One mapping per rider per client
-
   // Indexes for fast lookups
   @@index([platformRiderId])
   @@index([clientRiderId])
   @@index([clientId])
   @@index([isActive])
   @@index([verificationStatus])
-
   @@map("client_rider_mappings")
   @@schema("client_store")
 }

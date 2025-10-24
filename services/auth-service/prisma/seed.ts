@@ -37,8 +37,9 @@ async function main() {
         regionCode: "South",
         isActive: true,
         isOperational: true,
-        estimatedPopulation: 12000000,
-        marketPotential: "High",
+  estimatedPopulation: 12000000,
+  // Estimated market potential in INR (approx)
+  marketPotential: 5e10,
         launchDate: new Date("2023-01-01"),
         version: 1,
         lastModifiedBy: "system",
@@ -56,8 +57,9 @@ async function main() {
         regionCode: "West",
         isActive: true,
         isOperational: true,
-        estimatedPopulation: 20000000,
-        marketPotential: "High",
+  estimatedPopulation: 20000000,
+  // Estimated market potential in INR (approx)
+  marketPotential: 7e10,
         launchDate: new Date("2023-02-01"),
         version: 1,
         lastModifiedBy: "system",
@@ -75,8 +77,9 @@ async function main() {
         regionCode: "North",
         isActive: true,
         isOperational: true,
-        estimatedPopulation: 30000000,
-        marketPotential: "High",
+  estimatedPopulation: 30000000,
+  // Estimated market potential in INR (approx)
+  marketPotential: 8e10,
         launchDate: new Date("2023-03-01"),
         version: 1,
         lastModifiedBy: "system",
@@ -94,8 +97,9 @@ async function main() {
         regionCode: "South",
         isActive: true,
         isOperational: true,
-        estimatedPopulation: 10000000,
-        marketPotential: "High",
+  estimatedPopulation: 10000000,
+  // Estimated market potential in INR (approx)
+  marketPotential: 3e10,
         launchDate: new Date("2023-04-01"),
         version: 1,
         lastModifiedBy: "system",
@@ -113,8 +117,9 @@ async function main() {
         regionCode: "South",
         isActive: true,
         isOperational: true,
-        estimatedPopulation: 8000000,
-        marketPotential: "High",
+  estimatedPopulation: 8000000,
+  // Estimated market potential in INR (approx)
+  marketPotential: 2.5e10,
         launchDate: new Date("2023-05-01"),
         version: 1,
         lastModifiedBy: "system",
@@ -132,8 +137,9 @@ async function main() {
         regionCode: "West",
         isActive: true,
         isOperational: true,
-        estimatedPopulation: 6000000,
-        marketPotential: "High",
+  estimatedPopulation: 6000000,
+  // Estimated market potential in INR (approx)
+  marketPotential: 2e10,
         launchDate: new Date("2023-06-01"),
         version: 1,
         lastModifiedBy: "system",
@@ -254,90 +260,90 @@ async function main() {
   console.log("🔐 Creating permissions...");
   const permissions = [
     // Auth Service Permissions
-    { service: "auth", resource: "user", action: "create" },
-    { service: "auth", resource: "user", action: "read" },
-    { service: "auth", resource: "user", action: "update" },
-    { service: "auth", resource: "user", action: "delete" },
-    { service: "auth", resource: "role", action: "create" },
-    { service: "auth", resource: "role", action: "read" },
-    { service: "auth", resource: "role", action: "update" },
-    { service: "auth", resource: "role", action: "delete" },
-    { service: "auth", resource: "permission", action: "create" },
-    { service: "auth", resource: "permission", action: "read" },
-    { service: "auth", resource: "permission", action: "update" },
-    { service: "auth", resource: "permission", action: "delete" },
-    { service: "auth", resource: "department", action: "create" },
-    { service: "auth", resource: "department", action: "read" },
-    { service: "auth", resource: "department", action: "update" },
-    { service: "auth", resource: "department", action: "delete" },
-    { service: "auth", resource: "team", action: "create" },
-    { service: "auth", resource: "team", action: "read" },
-    { service: "auth", resource: "team", action: "update" },
-    { service: "auth", resource: "team", action: "delete" },
-    { service: "auth", resource: "employee", action: "create" },
-    { service: "auth", resource: "employee", action: "read" },
-    { service: "auth", resource: "employee", action: "update" },
-    { service: "auth", resource: "employee", action: "delete" },
+    { service: "auth", resource: "users", action: "create" },
+    { service: "auth", resource: "users", action: "read" },
+    { service: "auth", resource: "users", action: "update" },
+    { service: "auth", resource: "users", action: "delete" },
+    { service: "auth", resource: "roles", action: "create" },
+    { service: "auth", resource: "roles", action: "read" },
+    { service: "auth", resource: "roles", action: "update" },
+    { service: "auth", resource: "roles", action: "delete" },
+    { service: "auth", resource: "permissions", action: "create" },
+    { service: "auth", resource: "permissions", action: "read" },
+    { service: "auth", resource: "permissions", action: "update" },
+    { service: "auth", resource: "permissions", action: "delete" },
+    { service: "auth", resource: "departments", action: "create" },
+    { service: "auth", resource: "departments", action: "read" },
+    { service: "auth", resource: "departments", action: "update" },
+    { service: "auth", resource: "departments", action: "delete" },
+    { service: "auth", resource: "teams", action: "create" },
+    { service: "auth", resource: "teams", action: "read" },
+    { service: "auth", resource: "teams", action: "update" },
+    { service: "auth", resource: "teams", action: "delete" },
+    { service: "auth", resource: "employees", action: "create" },
+    { service: "auth", resource: "employees", action: "read" },
+    { service: "auth", resource: "employees", action: "update" },
+    { service: "auth", resource: "employees", action: "delete" },
 
     // Vehicle Service Permissions
-    { service: "vehicle", resource: "vehicle", action: "create" },
-    { service: "vehicle", resource: "vehicle", action: "read" },
-    { service: "vehicle", resource: "vehicle", action: "update" },
-    { service: "vehicle", resource: "vehicle", action: "delete" },
-    { service: "vehicle", resource: "hub", action: "create" },
-    { service: "vehicle", resource: "hub", action: "read" },
-    { service: "vehicle", resource: "hub", action: "update" },
-    { service: "vehicle", resource: "hub", action: "delete" },
-    { service: "vehicle", resource: "model", action: "create" },
-    { service: "vehicle", resource: "model", action: "read" },
-    { service: "vehicle", resource: "model", action: "update" },
-    { service: "vehicle", resource: "model", action: "delete" },
-    { service: "vehicle", resource: "oem", action: "create" },
-    { service: "vehicle", resource: "oem", action: "read" },
-    { service: "vehicle", resource: "oem", action: "update" },
-    { service: "vehicle", resource: "oem", action: "delete" },
+    { service: "vehicle", resource: "vehicles", action: "create" },
+    { service: "vehicle", resource: "vehicles", action: "read" },
+    { service: "vehicle", resource: "vehicles", action: "update" },
+    { service: "vehicle", resource: "vehicles", action: "delete" },
+    { service: "vehicle", resource: "hubs", action: "create" },
+    { service: "vehicle", resource: "hubs", action: "read" },
+    { service: "vehicle", resource: "hubs", action: "update" },
+    { service: "vehicle", resource: "hubs", action: "delete" },
+    { service: "vehicle", resource: "models", action: "create" },
+    { service: "vehicle", resource: "models", action: "read" },
+    { service: "vehicle", resource: "models", action: "update" },
+    { service: "vehicle", resource: "models", action: "delete" },
+    { service: "vehicle", resource: "oems", action: "create" },
+    { service: "vehicle", resource: "oems", action: "read" },
+    { service: "vehicle", resource: "oems", action: "update" },
+    { service: "vehicle", resource: "oems", action: "delete" },
 
     // Rider Service Permissions
-    { service: "rider", resource: "rider", action: "create" },
-    { service: "rider", resource: "rider", action: "read" },
-    { service: "rider", resource: "rider", action: "update" },
-    { service: "rider", resource: "rider", action: "delete" },
-    { service: "rider", resource: "assignment", action: "create" },
-    { service: "rider", resource: "assignment", action: "read" },
-    { service: "rider", resource: "assignment", action: "update" },
-    { service: "rider", resource: "assignment", action: "delete" },
+    { service: "rider", resource: "riders", action: "create" },
+    { service: "rider", resource: "riders", action: "read" },
+    { service: "rider", resource: "riders", action: "update" },
+    { service: "rider", resource: "riders", action: "delete" },
+    { service: "rider", resource: "assignments", action: "create" },
+    { service: "rider", resource: "assignments", action: "read" },
+    { service: "rider", resource: "assignments", action: "update" },
+    { service: "rider", resource: "assignments", action: "delete" },
 
     // Client Store Service Permissions
-    { service: "client-store", resource: "client", action: "create" },
-    { service: "client-store", resource: "client", action: "read" },
-    { service: "client-store", resource: "client", action: "update" },
-    { service: "client-store", resource: "client", action: "delete" },
-    { service: "client-store", resource: "store", action: "create" },
-    { service: "client-store", resource: "store", action: "read" },
-    { service: "client-store", resource: "store", action: "update" },
-    { service: "client-store", resource: "store", action: "delete" },
+    { service: "client-store", resource: "clients", action: "create" },
+    { service: "client-store", resource: "clients", action: "read" },
+    { service: "client-store", resource: "clients", action: "update" },
+    { service: "client-store", resource: "clients", action: "delete" },
+    { service: "client-store", resource: "stores", action: "create" },
+    { service: "client-store", resource: "stores", action: "read" },
+    { service: "client-store", resource: "stores", action: "update" },
+    { service: "client-store", resource: "stores", action: "delete" },
 
     // Spare Parts Service Permissions
-    { service: "spare-parts", resource: "part", action: "create" },
-    { service: "spare-parts", resource: "part", action: "read" },
-    { service: "spare-parts", resource: "part", action: "update" },
-    { service: "spare-parts", resource: "part", action: "delete" },
-    { service: "spare-parts", resource: "category", action: "create" },
-    { service: "spare-parts", resource: "category", action: "read" },
-    { service: "spare-parts", resource: "category", action: "update" },
-    { service: "spare-parts", resource: "category", action: "delete" },
-    { service: "spare-parts", resource: "supplier", action: "create" },
-    { service: "spare-parts", resource: "supplier", action: "read" },
-    { service: "spare-parts", resource: "supplier", action: "update" },
-    { service: "spare-parts", resource: "supplier", action: "delete" },
-    { service: "spare-parts", resource: "inventory", action: "create" },
-    { service: "spare-parts", resource: "inventory", action: "read" },
-    { service: "spare-parts", resource: "inventory", action: "update" },
-    { service: "spare-parts", resource: "inventory", action: "delete" },
-    { service: "spare-parts", resource: "request", action: "create" },
-    { service: "spare-parts", resource: "request", action: "read" },
-    { service: "spare-parts", resource: "request", action: "update" },
-    { service: "spare-parts", resource: "request", action: "delete" },
+    { service: "spare-parts", resource: "parts", action: "create" },
+    { service: "spare-parts", resource: "parts", action: "read" },
+    { service: "spare-parts", resource: "parts", action: "update" },
+    { service: "spare-parts", resource: "parts", action: "delete" },
+    { service: "spare-parts", resource: "categories", action: "create" },
+    { service: "spare-parts", resource: "categories", action: "read" },
+    { service: "spare-parts", resource: "categories", action: "update" },
+    { service: "spare-parts", resource: "categories", action: "delete" },
+    { service: "spare-parts", resource: "suppliers", action: "create" },
+    { service: "spare-parts", resource: "suppliers", action: "read" },
+    { service: "spare-parts", resource: "suppliers", action: "update" },
+    { service: "spare-parts", resource: "suppliers", action: "delete" },
+    { service: "spare-parts", resource: "inventories", action: "create" },
+    { service: "spare-parts", resource: "inventories", action: "read" },
+    { service: "spare-parts", resource: "inventories", action: "update" },
+    { service: "spare-parts", resource: "inventories", action: "delete" },
+    { service: "spare-parts", resource: "requests", action: "create" },
+    { service: "spare-parts", resource: "requests", action: "read" },
+    { service: "spare-parts", resource: "requests", action: "update" },
+    { service: "spare-parts", resource: "requests", action: "delete" },
 
     // System Permissions
     { service: "system", resource: "dashboard", action: "read" },
@@ -384,7 +390,7 @@ async function main() {
       (p) =>
         !(
           p.service === "auth" &&
-          ["role", "permission", "department"].includes(p.resource) &&
+          ["roles", "permissions", "departments"].includes(p.resource) &&
           ["create", "delete"].includes(p.action)
         )
     )
@@ -407,7 +413,7 @@ async function main() {
   const operatorPermissions = createdPermissions
     .filter(
       (p) =>
-        (p.service !== "auth" || p.resource === "user") &&
+        (p.service !== "auth" || p.resource === "users") &&
         ["read", "update", "create"].includes(p.action) &&
         !["delete"].includes(p.action)
     )
@@ -423,8 +429,8 @@ async function main() {
       (p) =>
         ["read"].includes(p.action) ||
         (p.service === "client-store" &&
-          ["read", "update"].includes(p.action)) ||
-        (p.service === "rider" && ["read"].includes(p.action))
+          ["read", "update"].includes(p.action)) || // Note: resource names are plural now
+        (p.service === "rider" && ["read"].includes(p.action)) // Note: resource names are plural now
     )
     .map((permission) => ({
       roleId: telecallerRole.id,

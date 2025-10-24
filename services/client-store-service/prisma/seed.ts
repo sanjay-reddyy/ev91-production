@@ -5,6 +5,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
+  // Clean existing data to ensure a fresh start
+  await prisma.store.deleteMany();
+  await prisma.client.deleteMany();
+  console.log('🧹 Cleaned existing clients and stores.');
+
   // Create sample clients
   const client1 = await prisma.client.create({
     data: {
@@ -14,13 +19,13 @@ async function main() {
       primaryContactPerson: 'Rajesh Sharma',
       email: 'admin@foodpalace.com',
       phone: '+91-9876543210',
-      headquartersCity: 'Mumbai',
-      headquartersState: 'Maharashtra',
+      city: 'Mumbai',
+      state: 'Maharashtra',
       registrationNumber: 'REG001',
       panNumber: 'ABCDE1234F',
       gstNumber: 'GSTIN001',
-      businessSize: 'SME',
-      creditLimit: 50000.00,
+      industrySector: 'Food & Beverage',
+      businessCategory: 'SME',
       preferredPaymentMethod: 'bank_transfer',
       baseOrderRate: 30.0,
       bulkBonusEnabled: true,
@@ -42,13 +47,13 @@ async function main() {
       primaryContactPerson: 'Priya Singh',
       email: 'operations@quickmart.com',
       phone: '+91-9876543211',
-      headquartersCity: 'Delhi',
-      headquartersState: 'Delhi',
+      city: 'Delhi',
+      state: 'Delhi',
       registrationNumber: 'REG002',
       panNumber: 'FGHIJ5678K',
       gstNumber: 'GSTIN002',
-      businessSize: 'Large Enterprise',
-      creditLimit: 75000.00,
+      industrySector: 'Retail',
+      businessCategory: 'Large Enterprise',
       preferredPaymentMethod: 'digital_wallet',
       baseOrderRate: 28.0,
       bulkBonusEnabled: true,

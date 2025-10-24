@@ -44,7 +44,7 @@ import {
   CheckCircle as ApprovalIcon,
   Build as InstallationIcon,
   AttachMoney as CostTrackingIcon,
-  MergeType as UnifiedServiceIcon,
+  // MergeType as UnifiedServiceIcon, // DISABLED - Unified Service Management
   LocationOn as CityIcon,
   ShoppingCart as OrderIcon,
   CloudUpload as BulkUploadIcon,
@@ -211,6 +211,7 @@ const menuItems: MenuItem[] = [
           action: 'read'
         }
       },
+      /*
       {
         text: 'Unified Service Management',
         icon: <UnifiedServiceIcon />,
@@ -221,6 +222,7 @@ const menuItems: MenuItem[] = [
           { service: 'vehicle', resource: 'service-requests', action: 'read' }
         ]
       },
+      */ // DISABLED - Unified Service Management
       {
         text: 'Damage Management',
         icon: <DamageIcon />,
@@ -367,6 +369,7 @@ const menuItems: MenuItem[] = [
           action: 'read'
         }
       },
+      /* DISABLED: Outward Flow functionality temporarily disabled
       {
         text: 'Outward Flow',
         icon: <OutwardIcon />,
@@ -441,9 +444,11 @@ const menuItems: MenuItem[] = [
           },
         ]
       },
+      */
     ],
   },
-  // 5. Order Management
+  // 5. Order Management - DISABLED
+  /*
   {
     text: 'Order Management',
     icon: <OrderIcon />,
@@ -475,6 +480,7 @@ const menuItems: MenuItem[] = [
       }
     ]
   },
+  */
   // 6. Clients & Stores
   {
     text: 'Clients & Stores',

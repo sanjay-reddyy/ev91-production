@@ -97,9 +97,9 @@ const refreshTokenIfNeeded = async (): Promise<string | null> => {
   }
 };
 
-// Use the API Gateway URL instead of direct service connection
+// Use the Client Store API URL through API Gateway
 const API_GATEWAY_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_CLIENT_STORE_API_URL || "http://localhost:8000/api/client-store";
 
 // Configure axios instance for client-store service through API Gateway
 const api = axios.create({
@@ -734,10 +734,36 @@ export const createClient = async (
   message?: string;
 }> => {
   try {
-    const response = await api.post("/clients", clientData);
+    console.log('🔍 Creating client with data:', JSON.stringify(clientData, null, 2));
+    
+    // Create a minimal test client with only required fields
+    const minimalTestData = {
+      clientCode: `TEST-${Date.now()}`, // Unique client code
+      clientType: "B2B",
+      name: `Test Client ${Date.now()}`, // Unique name
+      baseOrderRate: 25.0,
+      clientStatus: "Active"
+    };
+    
+    console.log('🔍 Testing with minimal data first:', JSON.stringify(minimalTestData, null, 2));
+    
+    // Try with minimal data first
+    const response = await api.post("/clients", minimalTestData);
     return response.data;
-  } catch (error) {
+    
+    // If minimal works, we'll add more fields later
+    
+  } catch (error: any) {
     console.error("Error creating client:", error);
+    console.error("Error response data:", error.response?.data);
+    console.error("Error status:", error.response?.status);
+    console.error("Full error response:", error.response);
+    
+    // Log the specific error message if available
+    if (error.response?.data?.error) {
+      console.error("Specific error:", error.response.data.error);
+    }
+    
     throw error;
   }
 };

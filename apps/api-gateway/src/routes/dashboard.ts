@@ -13,8 +13,7 @@ const CLIENT_STORE_SERVICE_URL =
   process.env.CLIENT_STORE_SERVICE_URL || "http://localhost:4004";
 const SPARE_PARTS_SERVICE_URL =
   process.env.SPARE_PARTS_SERVICE_URL || "http://localhost:4006";
-const ORDER_SERVICE_URL =
-  process.env.ORDER_SERVICE_URL || "http://localhost:4007";
+// const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || "http://localhost:4007"; // DISABLED - Order Management
 
 /**
  * Helper function to make authenticated requests to services
@@ -44,16 +43,16 @@ router.get(
       const token = req.headers.authorization?.replace("Bearer ", "");
 
       // Fetch data from multiple services in parallel
-      const [ridersData, vehiclesData, ordersData] = await Promise.all([
+      const [ridersData, vehiclesData] = await Promise.all([
         fetchFromService(`${RIDER_SERVICE_URL}/api/riders`, token),
         fetchFromService(`${VEHICLE_SERVICE_URL}/api/vehicles`, token),
-        fetchFromService(`${ORDER_SERVICE_URL}/api/orders/stats`, token),
+        // fetchFromService(`${ORDER_SERVICE_URL}/api/orders/stats`, token), // DISABLED - Order Management
       ]);
 
       // Calculate operations metrics
       const riders = ridersData?.data || [];
       const vehicles = vehiclesData?.data || [];
-      const orderStats = ordersData?.data || {};
+      const orderStats = {}; // ordersData?.data || {}; // DISABLED - Order Management
 
       const activeRiders = riders.filter(
         (r: any) => r.status === "ACTIVE" || r.isActive
@@ -67,24 +66,24 @@ router.get(
         // Real-time metrics
         activeRiders,
         totalRiders,
-        ongoingDeliveries: orderStats.ongoingOrders || 0,
-        pendingPickups: orderStats.pendingOrders || 0,
-        completedDeliveriesToday: orderStats.completedToday || 0,
+        ongoingDeliveries: 0, // orderStats.ongoingOrders || 0, // DISABLED - Order Management
+        pendingPickups: 0, // orderStats.pendingOrders || 0, // DISABLED - Order Management
+        completedDeliveriesToday: 0, // orderStats.completedToday || 0, // DISABLED - Order Management
 
         // Performance metrics
-        avgDeliveryTime: orderStats.avgDeliveryTime || 0,
-        onTimeDeliveryRate: orderStats.onTimeRate || 0,
-        customerSatisfaction: orderStats.satisfaction || 0,
+        avgDeliveryTime: 0, // orderStats.avgDeliveryTime || 0, // DISABLED - Order Management
+        onTimeDeliveryRate: 0, // orderStats.onTimeRate || 0, // DISABLED - Order Management
+        customerSatisfaction: 0, // orderStats.satisfaction || 0, // DISABLED - Order Management
 
         // Efficiency
         riderUtilization:
           totalRiders > 0 ? (activeRiders / totalRiders) * 100 : 0,
         avgDeliveriesPerRider:
-          totalRiders > 0 ? (orderStats.completedToday || 0) / totalRiders : 0,
+          totalRiders > 0 ? 0 : 0, // (orderStats.completedToday || 0) / totalRiders : 0, // DISABLED - Order Management
 
         // Issues
-        delayedDeliveries: orderStats.delayedOrders || 0,
-        failedDeliveries: orderStats.failedOrders || 0,
+        delayedDeliveries: 0, // orderStats.delayedOrders || 0, // DISABLED - Order Management
+        failedDeliveries: 0, // orderStats.failedOrders || 0, // DISABLED - Order Management
 
         // Resources
         activeVehicles: vehicles.filter((v: any) => v.status === "ACTIVE")
@@ -430,9 +429,9 @@ router.get("/finance", authMiddleware, async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization?.replace("Bearer ", "");
 
-    const [earningsData, ordersData, vehiclesData] = await Promise.all([
+    const [earningsData, vehiclesData] = await Promise.all([
       fetchFromService(`${CLIENT_STORE_SERVICE_URL}/api/rider-earnings`, token),
-      fetchFromService(`${ORDER_SERVICE_URL}/api/orders/stats`, token),
+      // fetchFromService(`${ORDER_SERVICE_URL}/api/orders/stats`, token), // DISABLED - Order Management
       fetchFromService(
         `${VEHICLE_SERVICE_URL}/api/v1/analytics/fleet-performance`,
         token
@@ -440,7 +439,7 @@ router.get("/finance", authMiddleware, async (req: Request, res: Response) => {
     ]);
 
     const earnings = earningsData?.data || [];
-    const orderStats = ordersData?.data || {};
+    const orderStats = {}; // ordersData?.data || {}; // DISABLED - Order Management
     const vehicleAnalytics = vehiclesData?.data || {};
 
     // Calculate financial metrics
@@ -456,10 +455,10 @@ router.get("/finance", authMiddleware, async (req: Request, res: Response) => {
       department: "FINANCE",
       lastUpdated: new Date(),
 
-      // Revenue (mock data - needs payment service)
-      totalRevenue: orderStats.totalRevenue || 0,
-      monthlyRevenue: orderStats.monthlyRevenue || 0,
-      revenueGrowth: orderStats.revenueGrowth || 0,
+      // Revenue (mock data - needs payment service) - DISABLED Order Management
+      totalRevenue: 0, // orderStats.totalRevenue || 0,
+      monthlyRevenue: 0, // orderStats.monthlyRevenue || 0,
+      revenueGrowth: 0, // orderStats.revenueGrowth || 0,
 
       // Expenses
       riderPayouts: totalPayouts,

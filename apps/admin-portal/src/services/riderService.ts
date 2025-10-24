@@ -1,13 +1,32 @@
 import axios from "axios";
 
-const RIDER_SERVICE_URL =
+// Vite env may provide a URL that already contains the /riders segment.
+// Normalize so we never produce double "/riders/riders" in requests.
+const RAW_RIDER_SERVICE_URL =
   import.meta.env.VITE_RIDER_API_URL || "http://localhost:8000/api";
 
+// Remove trailing slashes and ensure a single "/riders" segment exists
+const RIDER_SERVICE_BASE = RAW_RIDER_SERVICE_URL.replace(/\/+$/, "");
+const normalizedBaseURL =
+  RIDER_SERVICE_BASE.endsWith("/riders")
+    ? RIDER_SERVICE_BASE
+    : `${RIDER_SERVICE_BASE}/riders`;
+
+if (normalizedBaseURL.includes("/riders/riders")) {
+  // Extra defensive logging to help debug environment misconfiguration
+  // (should not happen with the normalization above)
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[riderService] normalizedBaseURL contains duplicate /riders segments:",
+    normalizedBaseURL
+  );
+}
+
 // Configure axios instance for rider service
-// Note: The baseURL already includes /api, so all endpoint paths should NOT include /riders at the beginning
-// This is because the API Gateway is already configured to route /api/riders/* to the rider service
+// Use the normalized baseURL so callers in this file can use relative paths
+// (e.g. `stats`, `?page=...`, `${riderId}/kyc`) without accidentally adding extra segments.
 const api = axios.create({
-  baseURL: `${RIDER_SERVICE_URL}/riders`,
+  baseURL: normalizedBaseURL,
   headers: {
     "Content-Type": "application/json",
   },

@@ -9,58 +9,50 @@ const AUTH_SERVICE_URL =
 // Proxy all auth requests to auth service
 router.all("/*", async (req: Request, res: Response) => {
   try {
-    // Special handling for health endpoint
+    const originalPath = req.originalUrl.split("?")[0]; // Path without query string
     let targetPath: string;
-    if (req.path === "/health") {
+
+    // Define path mappings from gateway to service
+    const pathMappings: { [key: string]: string } = {
+      "/api/v1/users": "/api/v1/employees",
+      "/api/users": "/api/v1/employees",
+      "/api/v1/employees": "/api/v1/employees",
+      "/api/employees": "/api/v1/employees",
+      "/api/v1/roles": "/api/v1/roles",
+      "/api/roles": "/api/v1/roles",
+      "/api/v1/permissions": "/api/v1/permissions",
+      "/api/permissions": "/api/v1/permissions",
+      "/api/v1/teams": "/api/v1/teams",
+      "/api/teams": "/api/v1/teams",
+      "/api/v1/departments": "/api/v1/departments",
+      "/api/departments": "/api/v1/departments",
+      "/api/v1/auth": "/api/v1/auth",
+      "/api/internal": "/internal",
+      "/api/auth": "/api/v1/auth", // Handles /api/auth/login etc.
+    };
+
+    let mapped = false;
+    for (const prefix in pathMappings) {
+      if (originalPath.startsWith(prefix)) {
+        const restOfPath = originalPath.substring(prefix.length);
+        targetPath = `${pathMappings[prefix]}${restOfPath}`;
+        mapped = true;
+        break;
+      }
+    }
+
+    // Special handling for health endpoint
+    if (originalPath.endsWith("/health")) {
       targetPath = "/health";
-    } else if (req.originalUrl.startsWith("/api/v1/users")) {
-      // Map /api/v1/users to /api/v1/employees (users are handled as employees)
-      targetPath = `/api/v1/employees${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/users")) {
-      // Map /api/users to /api/v1/employees
-      targetPath = `/api/v1/employees${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/v1/employees")) {
-      // Direct mapping for /api/v1/employees
-      targetPath = `/api/v1/employees${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/employees")) {
-      // Map /api/employees to auth service employees endpoints at /api/v1/employees
-      targetPath = `/api/v1/employees${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/v1/roles")) {
-      // Direct mapping for /api/v1/roles
-      targetPath = `/api/v1/roles${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/roles")) {
-      // Map /api/roles to /api/v1/roles
-      targetPath = `/api/v1/roles${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/v1/permissions")) {
-      // Direct mapping for /api/v1/permissions
-      targetPath = `/api/v1/permissions${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/permissions")) {
-      // Map /api/permissions to /api/v1/permissions
-      targetPath = `/api/v1/permissions${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/v1/teams")) {
-      // Direct mapping for /api/v1/teams
-      targetPath = `/api/v1/teams${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/teams")) {
-      // Map /api/teams to /api/v1/teams
-      targetPath = `/api/v1/teams${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/v1/departments")) {
-      // Direct mapping for /api/v1/departments
-      targetPath = `/api/v1/departments${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/departments")) {
-      // Map /api/departments to /api/v1/departments
-      targetPath = `/api/v1/departments${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/v1/auth")) {
-      // Direct mapping for /api/v1/auth
-      targetPath = `/api/v1/auth${req.path === "/" ? "" : req.path}`;
-    } else if (req.originalUrl.startsWith("/api/internal")) {
-      // Map /api/internal to /internal (for city-sync and other internal endpoints)
-      targetPath = `/internal${req.path === "/" ? "" : req.path}`;
-    } else {
-      // Default auth endpoints like /api/auth/login -> /api/v1/auth/login
+      mapped = true;
+    }
+
+    if (!mapped) {
+      // Fallback for any unmapped routes, preserving the original logic's intent.
       targetPath = `/api/v1/auth${req.path}`;
     }
 
-    const targetUrl = `${AUTH_SERVICE_URL}${targetPath}`;
+    const targetUrl = `${AUTH_SERVICE_URL}${targetPath!}`;
 
     console.log(`Auth proxy: ${req.method} ${req.originalUrl} -> ${targetUrl}`);
 
@@ -72,6 +64,7 @@ router.all("/*", async (req: Request, res: Response) => {
         ...req.headers,
         host: undefined, // Remove host header to avoid conflicts
       },
+      params: req.query,
       timeout: 10000,
     });
 

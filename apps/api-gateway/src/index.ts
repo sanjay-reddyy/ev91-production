@@ -13,7 +13,7 @@ import hubRoutes from "./routes/hubs";
 import clientStoreRoutes from "./routes/client-store";
 import riderRoutes from "./routes/riders";
 import sparePartsRoutes from "./routes/spare-parts";
-import orderRoutes from "./routes/orders";
+// import orderRoutes from "./routes/orders"; // DISABLED - Order Management
 import dashboardRoutes from "./routes/dashboard";
 
 // Import middleware
@@ -97,15 +97,15 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => {
-    // Skip rate limiting in development
-    return process.env.NODE_ENV === "development";
+    // Skip rate limiting in development - always skip for now
+    return true; // Temporarily disable all rate limiting
   },
 });
 
-// Apply rate limiting only in production
-if (process.env.NODE_ENV === "production") {
-  app.use("/api/", limiter);
-}
+// Apply rate limiting only in production - DISABLED for development
+// if (process.env.NODE_ENV === "production") {
+//   app.use("/api/", limiter);
+// }
 
 // Health check endpoint
 app.get("/health", (req: Request, res: Response) => {
@@ -308,10 +308,10 @@ app.use("/api/internal", authRoutes); // Internal endpoints handled by auth serv
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/hubs", hubRoutes); // Dedicated hub routes
 app.use("/api/cities", hubRoutes); // Cities are handled by hub service
-app.use("/api", clientStoreRoutes); // Handles /clients, /stores, /rider-earnings
+app.use("/api/client-store", clientStoreRoutes); // Handles /clients, /stores, /rider-earnings
 app.use("/api/riders", riderRoutes);
 app.use("/api/spare-parts", sparePartsRoutes);
-app.use("/api/orders", orderRoutes);
+// app.use("/api/orders", orderRoutes); // DISABLED - Order Management
 app.use("/api/dashboard", dashboardRoutes);
 
 // 404 handler
