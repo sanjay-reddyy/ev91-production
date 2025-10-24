@@ -89,6 +89,9 @@ export interface CityResponse {
   isOperational: boolean;
   hubCount?: number;
   vehicleCount?: number;
+  estimatedPopulation?: number | null;
+  marketPotential?: number | null;
+  launchDate?: Date | null;
 }
 
 // City filters for listing

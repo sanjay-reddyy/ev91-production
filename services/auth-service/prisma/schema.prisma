@@ -210,7 +210,7 @@ model City {
 
   // Business Information
   estimatedPopulation Int?
-  marketPotential     String? // High, Medium, Low
+  marketPotential     Float? // Estimated market size in INR
 
   // Event Sourcing Fields (for cross-service synchronization)
   version        Int      @default(1)

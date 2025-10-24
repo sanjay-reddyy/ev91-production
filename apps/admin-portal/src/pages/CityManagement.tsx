@@ -28,9 +28,7 @@ import {
   Alert,
   Snackbar,
   Tooltip,
-  Badge,
   LinearProgress,
-  Divider,
   Tab,
   Tabs,
 } from '@mui/material';
@@ -50,7 +48,6 @@ import {
   Schedule as ScheduleIcon,
   Assessment as AssessmentIcon,
   Map as MapIcon,
-  Timeline as TimelineIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
@@ -205,7 +202,7 @@ const CityManagement: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
@@ -260,12 +257,11 @@ const CityManagement: React.FC = () => {
   // Get unique values for filter dropdowns
   const uniqueStates = [...new Set(cities.map(city => city.state))].sort();
   const uniqueCountries = [...new Set(cities.map(city => city.country))].sort();
-  const uniqueRegions = [...new Set(cities.map(city => city.regionCode).filter(Boolean))].sort();
 
   return (
     <Box p={3}>
       {/* Header */}
-      <Box display="flex" justifyContent="between" alignItems="center" mb={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h4" component="h1" gutterBottom>
             City Management
@@ -701,7 +697,7 @@ const CityManagement: React.FC = () => {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="subtitle2" color="text.secondary">Status</Typography>
-                <Box gutterBottom>{getStatusChip(selectedCity)}</Box>
+                {getStatusChip(selectedCity)}
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="subtitle2" color="text.secondary">Population</Typography>

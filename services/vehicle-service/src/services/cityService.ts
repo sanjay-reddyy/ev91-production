@@ -156,6 +156,9 @@ export class CityService {
         isActive: city.isActive,
         isOperational: city.isOperational,
         hubCount: city._count.hubs,
+        estimatedPopulation: city.estimatedPopulation,
+        marketPotential: city.marketPotential,
+        launchDate: city.launchDate,
       }));
     } catch (error) {
       Logger.error("Error fetching cities", { filters, error });
