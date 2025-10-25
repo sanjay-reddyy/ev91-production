@@ -6,6 +6,8 @@ services:
     container_name: admin-portal
     env_file:
       - ./apps/admin-portal/.env
+    ports:
+      - "3003:3003"
     networks:
       - ev91-network
     depends_on:
@@ -16,6 +18,8 @@ services:
     container_name: api-gateway
     env_file:
       - ./apps/api-gateway/.env
+    ports:
+      - "8000:8000"
     networks:
       - ev91-network
     depends_on:
@@ -30,6 +34,8 @@ services:
     container_name: auth-service
     env_file:
       - ./services/auth-service/.env
+    ports:
+      - "4001:4001"
     networks:
       - ev91-network
 
@@ -38,6 +44,8 @@ services:
     container_name: client-store-service
     env_file:
       - ./services/client-store-service/.env
+    ports:
+      - "3004:3004"
     networks:
       - ev91-network
 
@@ -46,6 +54,8 @@ services:
     container_name: spare-parts-service
     env_file:
       - ./services/spare-parts-service/.env
+    ports:
+      - "4010:4010"
     networks:
       - ev91-network
 
@@ -88,6 +98,8 @@ services:
     container_name: rider-service
     env_file:
       - ./services/rider-service/.env
+    ports:
+      - "4005:4005"
     networks:
       - ev91-network
 
