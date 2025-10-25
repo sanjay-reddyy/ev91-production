@@ -18,7 +18,7 @@ import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 3004;
+const PORT = process.env.PORT || 3006;
 
 // Security middleware
 app.use(helmet());
