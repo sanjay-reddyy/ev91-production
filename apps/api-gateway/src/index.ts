@@ -273,6 +273,7 @@ app.use("/api/v1/roles", authMiddleware);
 app.use("/api/v1/permissions", authMiddleware);
 
 app.use("/api/vehicles", authMiddleware);
+app.use("/api/analytics", authMiddleware); // Add analytics endpoint
 app.use("/api/hubs", authMiddleware);
 app.use("/api/cities", authMiddleware);
 app.use("/api/clients", authMiddleware);
@@ -303,12 +304,18 @@ app.use("/api/v1/teams", authRoutes);
 app.use("/api/v1/departments", authRoutes);
 
 // Internal API endpoints (for service-to-service and admin portal)
-app.use("/api/internal", authRoutes); // Internal endpoints handled by auth service
+app.use("/api/internal/city-sync", clientStoreRoutes); // City sync endpoints to client-store service
+app.use("/api/internal", authRoutes); // Other internal endpoints handled by auth service
 
 app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/analytics", vehicleRoutes); // Route analytics to vehicle service  
 app.use("/api/hubs", hubRoutes); // Dedicated hub routes
 app.use("/api/cities", hubRoutes); // Cities are handled by hub service
 app.use("/api/client-store", clientStoreRoutes); // Handles /clients, /stores, /rider-earnings
+app.use("/api/clients", clientStoreRoutes); // Route clients to client-store service
+app.use("/api/stores", clientStoreRoutes); // Route stores to client-store service
+app.use("/api/rider-earnings", clientStoreRoutes); // Route rider-earnings to client-store service
+app.use("/api/client-rider-mappings", clientStoreRoutes); // Route client-rider-mappings to client-store service
 app.use("/api/riders", riderRoutes);
 app.use("/api/spare-parts", sparePartsRoutes);
 // app.use("/api/orders", orderRoutes); // DISABLED - Order Management
