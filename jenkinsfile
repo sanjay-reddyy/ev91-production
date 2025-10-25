@@ -1,0 +1,129 @@
+pipeline {
+    agent any
+
+    environment {
+        DEPLOY_DIR = "/home/ubuntu/microservices"
+        EC2_HOST = "dashboard.ev91riderz.com"
+        EC2_USER = "ubuntu"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                echo "📥 Cloning repository..."
+                checkout scm
+            }
+        }
+
+        // Uncomment this stage if you want to inject .env files
+        /*
+        stage('Inject .env Files') {
+            steps {
+                echo "🔑 Injecting environment files..."
+                sh '''
+                    sudo chown -R jenkins:jenkins ${WORKSPACE}
+                    sudo chmod -R 775 ${WORKSPACE}
+                '''
+                withCredentials([file(credentialsId: 'auth-service-env-file', variable: 'AUTH_ENV')]) {
+                    sh 'cp $AUTH_ENV services/auth-service/.env'
+                }
+                withCredentials([file(credentialsId: 'api-gateway-env-file', variable: 'GATEWAY_ENV')]) {
+                    sh 'cp $GATEWAY_ENV apps/api-gateway/.env'
+                }
+                withCredentials([file(credentialsId: 'admin-portal-env-file', variable: 'ADMIN_ENV')]) {
+                    sh 'cp $ADMIN_ENV apps/admin-portal/.env'
+                }
+                withCredentials([file(credentialsId: 'client-store-service-env-file', variable: 'CLIENT_ENV')]) {
+                    sh 'cp $CLIENT_ENV services/client-store-service/.env'
+                }
+                withCredentials([file(credentialsId: 'rider-service-env-file', variable: 'RIDER_ENV')]) {
+                    sh 'cp $RIDER_ENV services/rider-service/.env'
+                }
+                withCredentials([file(credentialsId: 'vehicle-service-env-file', variable: 'VEHICLE_ENV')]) {
+                    sh 'cp $VEHICLE_ENV services/vehicle-service/.env'
+                }
+                withCredentials([file(credentialsId: 'spare-parts-service-env-file', variable: 'SPARE_ENV')]) {
+                    sh 'cp $SPARE_ENV services/spare-parts-service/.env'
+                }
+            }
+        }
+        */
+
+        stage('Deploy to EC2') {
+            steps {
+                script {
+                    echo "🚀 Determining changed folders..."
+
+                    def commitCount = sh(
+                        script: "git rev-list --count HEAD",
+                        returnStdout: true
+                    ).trim().toInteger()
+
+                    def changedFiles = []
+                    if (commitCount > 1) {
+                        changedFiles = sh(
+                            script: "git diff --name-only HEAD~1 HEAD",
+                            returnStdout: true
+                        ).trim().split("\n")
+                    } else {
+                        echo "🆕 First build detected – deploying everything"
+                        changedFiles = sh(
+                            script: "git ls-tree --name-only -r HEAD",
+                            returnStdout: true
+                        ).trim().split("\n")
+                    }
+
+                    def changedFolders = [] as Set
+                    for (file in changedFiles) {
+                        if (file.contains("/")) {
+                            def folder = file.split("/")[0..1].join("/")
+                            changedFolders.add(folder)
+                        }
+                    }
+
+                    sshagent(['EC2_SSH_KEY']) {
+                        if (commitCount <= 1 || changedFolders.isEmpty()) {
+                            echo "🌍 Performing full initial deployment..."
+                            // Ensure main deploy directory exists
+                            sh "ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} 'mkdir -p ${DEPLOY_DIR}'"
+                            // Rsync everything
+                            sh """
+                                rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ${WORKSPACE}/ ${EC2_USER}@${EC2_HOST}:${DEPLOY_DIR}/
+                            """
+                        } else {
+                            echo "📦 Changed folders detected: ${changedFolders}"
+                            for (folder in changedFolders) {
+                                echo "🔄 Updating folder: ${folder}"
+                                // Create folder on EC2 if not exists
+                                sh "ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} 'mkdir -p ${DEPLOY_DIR}/${folder}'"
+                                // Rsync the changed folder
+                                sh """
+                                    rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ${WORKSPACE}/${folder}/ ${EC2_USER}@${EC2_HOST}:${DEPLOY_DIR}/${folder}/
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Post-Deployment Check') {
+            steps {
+                echo "✅ Verifying files on EC2..."
+                sshagent(['EC2_SSH_KEY']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "ls -l ${DEPLOY_DIR}"
+                    """
+                }
+            }
+        }
+
+        stage('Cleanup Jenkins Workspace') {
+            steps {
+                echo "🧹 Cleaning up workspace..."
+                cleanWs()
+            }
+        }
+    }
+}
