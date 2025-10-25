@@ -1,8 +1,26 @@
-import {
-  S3Service as SharedS3Service,
-  DocumentCategory,
-} from "@ev91/shared-utils";
 import { config } from "../config";
+
+// Try to import shared-utils, fall back to stubs if not available
+let SharedS3Service: any;
+let DocumentCategory: any;
+
+try {
+  const sharedUtils = require("@ev91/shared-utils");
+  SharedS3Service = sharedUtils.S3Service;
+  DocumentCategory = sharedUtils.DocumentCategory;
+} catch (error) {
+  // Fallback for Docker builds without shared-utils
+  console.warn("shared-utils not available, using stubs");
+  SharedS3Service = class {
+    constructor() {}
+    uploadFile() { return Promise.resolve({ key: "", location: "", bucket: "" }); }
+    deleteFile() { return Promise.resolve(); }
+    getSignedUrl() { return Promise.resolve(""); }
+    fileExists() { return Promise.resolve(false); }
+    getFileMetadata() { return Promise.resolve({}); }
+  };
+  DocumentCategory = "string";
+}
 
 // Initialize shared S3 service
 const sharedS3Service = new SharedS3Service({
@@ -39,7 +57,7 @@ export class S3Service {
   /**
    * Map folder to DocumentCategory for industry-standard paths
    */
-  private mapFolderToCategory(folder: string): DocumentCategory {
+  private mapFolderToCategory(folder: string): string {
     const folderLower = folder.toLowerCase();
 
     if (

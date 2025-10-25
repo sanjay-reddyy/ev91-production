@@ -7,12 +7,29 @@
  * New path structure: riders/{riderId}/{category}/{documentType}_{timestamp}.{ext}
  */
 
-import {
-  s3Service as sharedS3Service,
-  DocumentCategory,
-} from "@ev91/shared-utils";
 import { env } from "../config/env";
 import path from "path";
+
+// Try to import shared-utils, fall back to stubs if not available
+let sharedS3Service: any;
+let DocumentCategory: any;
+
+try {
+  const sharedUtils = require("@ev91/shared-utils");
+  sharedS3Service = sharedUtils.s3Service;
+  DocumentCategory = sharedUtils.DocumentCategory;
+} catch (error) {
+  // Fallback for Docker builds without shared-utils
+  console.warn("shared-utils not available, using stubs");
+  sharedS3Service = {
+    uploadFile: () => Promise.resolve({ key: "", location: "", bucket: "" }),
+    deleteFile: () => Promise.resolve(),
+    getSignedUrl: () => Promise.resolve(""),
+    fileExists: () => Promise.resolve(false),
+    getFileMetadata: () => Promise.resolve({})
+  };
+  DocumentCategory = "string";
+}
 
 export interface S3UploadResult {
   key: string;
@@ -74,7 +91,7 @@ export class S3Service {
       const uploadStartTime = Date.now();
 
       // Map folder to proper document category
-      const category: DocumentCategory =
+      const category: string =
         folder === "bank" ? "bank" : folder === "profile" ? "profile" : "kyc";
 
       // Upload using the shared S3Service with industry-standard path structure

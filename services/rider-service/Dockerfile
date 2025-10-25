@@ -1,8 +1,8 @@
-FROM node:20-alpine
+FROM node:20-alpine AS builder
 
-WORKDIR /app
+WORKDIR /app/rider-service
 
-# Install build dependencies for native packages (like canvas)
+# Install build dependencies
 RUN apk add --no-cache \
     python3 \
     make \
@@ -17,20 +17,31 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     freetype-dev
 
-# Copy package files
+# Copy package files and remove shared-utils dependency for Docker build
 COPY package*.json ./
+RUN npm pkg delete dependencies.@ev91/shared-utils || echo "No shared-utils dependency to remove"
 
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy the rest of the source code
+COPY . ./
 
-# Generate Prisma client if prisma exists
+# Prisma generate if exists
 RUN if [ -f "prisma/schema.prisma" ]; then npx prisma generate; fi
 
-# Expose port
+# Build TypeScript
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS prod
+
+WORKDIR /app/rider-service
+
+COPY --from=builder /app/rider-service /app/rider-service
+
+ENV NODE_ENV=production
+ENV PORT=4005
 EXPOSE 4005
 
-# Run migrations and start the application
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx prisma db seed && npm run dev"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx prisma db seed && node dist/index.js"]

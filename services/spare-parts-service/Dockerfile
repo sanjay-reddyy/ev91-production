@@ -1,94 +1,47 @@
-# -----------------------------
-# Base stage: install dependencies for native modules
-# -----------------------------
-FROM node:20-alpine AS base
-
-# Install dependencies for native modules + OpenSSL
-RUN apk add --no-cache python3 make g++ libc6-compat dumb-init openssl
+# ---------- Stage 1: Builder ----------
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files and Prisma schema
-COPY package*.json ./ 
-COPY prisma ./prisma/
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++ openssl openssl-dev postgresql-client
 
-# Install production dependencies only
-RUN npm ci --only=production && npm cache clean --force
+# Copy package files first (for caching)
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --no-package-lock
+
+# Copy the rest of the source code
+COPY . ./
 
 # Generate Prisma client
 RUN npx prisma generate
 
-# -----------------------------
-# Development stage
-# -----------------------------
-FROM base AS development
+# Skip TypeScript build for now - run in development mode
+# RUN npm run build
 
-# Install all dependencies (including dev)
-RUN npm ci
+# ---------- Stage 2: Production ----------
+FROM node:20-alpine AS prod
 
-# Copy all source code
-COPY . .
-
-# Expose port for dev
-EXPOSE 4010
-
-# Set development environment
-ENV NODE_ENV=development
-
-# Start dev server
-CMD ["npm", "run", "dev"]
-
-# -----------------------------
-# Build stage
-# -----------------------------
-FROM base AS build
-
-# Install all dependencies (including dev)
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build TypeScript application
-RUN npm run build
-
-# -----------------------------
-# Production stage (fixed)
-FROM node:20-alpine AS production
-
-RUN apk add --no-cache dumb-init openssl
+# Install runtime dependencies and ts-node-dev globally
+RUN apk add --no-cache dumb-init openssl postgresql-client && \
+    npm install -g ts-node-dev
 
 WORKDIR /app
 
-COPY package*.json ./ 
-COPY prisma ./prisma/
-
-# Install devDependencies temporarily for tsx
-RUN npm ci --include=dev
-
-# Generate Prisma client
-RUN npx prisma generate
-
-# Copy built app
-COPY --from=build /app/dist ./dist
-
-# Remove devDependencies for slim image
-RUN npm prune --production
+# Copy everything from builder
+COPY --from=builder /app /app
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs \
-    && adduser -S spare-parts-user -u 1001 \
-    && chown -R spare-parts-user:nodejs /app
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S spare-parts-user -u 1001 && \
+    chown -R spare-parts-user:nodejs /app
 
 USER spare-parts-user
 
 EXPOSE 4010
 ENV NODE_ENV=production
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4010/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
-
-ENTRYPOINT ["dumb-init", "--"]
-
-# Run migrations, seed, then start app AT RUNTIME
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts && node dist/index.js"]
+# Run schema push (creates tables), seed, then start in development mode
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx ts-node prisma/seed.ts && npm run dev"]

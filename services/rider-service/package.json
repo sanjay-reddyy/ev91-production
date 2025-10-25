@@ -4,7 +4,8 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "ts-node-dev --respawn src/index.ts",
-    "build": "tsc && copy src\\openapi.json dist\\openapi.json",
+    "build": "tsc && cp src/openapi.json dist/openapi.json",
+    "build:windows": "tsc && copy src\\openapi.json dist\\openapi.json",
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
