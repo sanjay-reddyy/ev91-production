@@ -1,2 +1,2 @@
 *.db
-.env
+# .env  # Commented out for production deployment

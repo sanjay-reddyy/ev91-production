@@ -7,7 +7,7 @@ build/
 web-build/
 
 # Environment files
-.env
+# .env  # Commented out for production deployment
 .env.local
 .env.development.local
 .env.test.local
