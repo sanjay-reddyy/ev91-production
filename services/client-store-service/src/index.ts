@@ -20,6 +20,9 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3006;
 
+// Disable ETags to prevent 304 responses
+app.set('etag', false);
+
 // Security middleware
 app.use(helmet());
 
@@ -71,6 +74,14 @@ const limiter = rateLimit({
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Disable caching for all API responses
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
 
 // Health check endpoint
 app.get("/health", (req, res) => {

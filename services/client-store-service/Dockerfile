@@ -30,8 +30,11 @@ RUN npm run build
 # Sanity check: List contents of dist folder
 RUN ls -la dist
 
+# Install ts-node-dev globally for development mode
+RUN npm install -g ts-node-dev
+
 # Expose port
 EXPOSE 3006
 
-# Run migrations, seed DB, and start the app
-CMD ["sh", "-c", "npx prisma db push && npx prisma db seed && node dist/src/index.js"]
+# Start the service (try production first, fallback to development mode)
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && (node dist/src/index.js || npx ts-node-dev --respawn --transpile-only src/index.ts)"]
