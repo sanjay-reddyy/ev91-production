@@ -97,9 +97,9 @@ const refreshTokenIfNeeded = async (): Promise<string | null> => {
   }
 };
 
-// Use the Client Store API URL through API Gateway
+// Use the API base URL and make direct calls to /clients endpoints
 const API_GATEWAY_URL =
-  import.meta.env.VITE_CLIENT_STORE_API_URL || "http://localhost:8000/api/client-store";
+  import.meta.env.VITE_API_BASE_URL || "/api";
 
 // Configure axios instance for client-store service through API Gateway
 const api = axios.create({

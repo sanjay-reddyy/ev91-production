@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_VEHICLE_API_URL || 'http://localhost:8000/api/vehicles';
+const API_BASE_URL = import.meta.env.VITE_VEHICLE_API_URL || '/api';
 
 export interface VehicleModel {
   id: string;

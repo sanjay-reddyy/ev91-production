@@ -1,10 +1,10 @@
 import axios from "axios";
 
 const VEHICLE_SERVICE_URL =
-  import.meta.env.VITE_VEHICLE_API_URL || "http://localhost:8000/api/vehicles";
+  import.meta.env.VITE_VEHICLE_API_URL || "/api";
 const VEHICLE_ANALYTICS_URL =
   import.meta.env.VITE_VEHICLE_ANALYTICS_URL ||
-  "http://localhost:4004/api/v1/analytics";
+  "/api/v1/analytics";
 
 // Configure axios instance for general vehicle service
 const vehicleApi = axios.create({
