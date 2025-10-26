@@ -108,6 +108,8 @@ services:
     container_name: nginx
     volumes:
       - /home/ubuntu/microservices/nginx.conf:/etc/nginx/conf.d/default.conf
+      - /etc/letsencrypt/live/dashboard.ev91riderz.com/fullchain.pem:/etc/ssl/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/dashboard.ev91riderz.com/privkey.pem:/etc/ssl/private/privkey.pem:ro
     ports:
       - "80:80"
       - "443:443"
