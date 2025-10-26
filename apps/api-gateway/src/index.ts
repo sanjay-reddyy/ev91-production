@@ -312,10 +312,10 @@ app.use("/api/analytics", vehicleRoutes); // Route analytics to vehicle service
 app.use("/api/hubs", hubRoutes); // Dedicated hub routes
 app.use("/api/cities", hubRoutes); // Cities are handled by hub service
 app.use("/api/client-store", clientStoreRoutes); // Handles /clients, /stores, /rider-earnings
-app.use("/clients", clientStoreRoutes); // Route clients to client-store service
-app.use("/stores", clientStoreRoutes); // Route stores to client-store service
+app.use("/api/clients", clientStoreRoutes); // Route clients to client-store service
+app.use("/api/stores", clientStoreRoutes); // Route stores to client-store service
 app.use("/api/rider-earnings", clientStoreRoutes); // Route rider-earnings to client-store service
-app.use("/client-rider-mappings", clientStoreRoutes); // Route client-rider-mappings to client-store service
+app.use("/api/client-rider-mappings", clientStoreRoutes); // Route client-rider-mappings to client-store service
 app.use("/api/riders", riderRoutes);
 app.use("/api/spare-parts", sparePartsRoutes);
 // app.use("/api/orders", orderRoutes); // DISABLED - Order Management

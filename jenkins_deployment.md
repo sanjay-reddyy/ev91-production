@@ -21,11 +21,12 @@
 - java -version
 
 >>>Add Jenkins repo:
- curl -fsSL https://pkg.jenkins.io/debian/jenkins.io.key | sudo tee \
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
   /usr/share/keyrings/jenkins-keyring.asc > /dev/null
 
-echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian binary/" \
-  | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/" | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
 
 >>>Install Jenkins:
 - sudo apt update
@@ -36,12 +37,47 @@ echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkin
 - sudo systemctl start jenkins
 - sudo systemctl status jenkins
 
->>>Install Docker
-- sudo apt install docker.io -y
-- sudo apt install docker-compose
-- sudo systemctl enable docker
-- sudo systemctl start docker
-- sudo usermod -aG docker $USER
+# 1️⃣ Update packages
+sudo apt update
+
+# 2️⃣ Install dependencies
+sudo apt install ca-certificates curl gnupg lsb-release -y
+
+# 3️⃣ Add Docker’s official GPG key
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# 4️⃣ Add Docker repository to APT sources
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 5️⃣ Update apt again
+sudo apt update
+
+# 6️⃣ Install Docker Engine + CLI + Compose plugin
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+# 7️⃣ Enable and start Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# 8️⃣ Verify installation
+docker --version
+docker compose version
+
+👤 Give permission to your user
+sudo usermod -aG docker $USER
+
+
+(Then logout and login again or run newgrp docker)
+
+✅ Test Docker
+docker run hello-world
+
 
 
 >>>Give Jenkins user permission:

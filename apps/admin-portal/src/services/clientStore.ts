@@ -230,17 +230,17 @@ class ClientStoreService {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }): Promise<ApiResponse<Client[]>> {
-    const response = await this.api.get("/clients", { params });
+    const response = await this.api.get("/api/clients", { params });
     return response.data;
   }
 
   async getClient(id: string): Promise<ApiResponse<Client>> {
-    const response = await this.api.get(`/clients/${id}`);
+    const response = await this.api.get(`/api/clients/${id}`);
     return response.data;
   }
 
   async createClient(client: Partial<Client>): Promise<ApiResponse<Client>> {
-    const response = await this.api.post("/clients", client);
+    const response = await this.api.post("/api/clients", client);
     return response.data;
   }
 
@@ -248,24 +248,24 @@ class ClientStoreService {
     id: string,
     client: Partial<Client>
   ): Promise<ApiResponse<Client>> {
-    const response = await this.api.put(`/clients/${id}`, client);
+    const response = await this.api.put(`/api/clients/${id}`, client);
     return response.data;
   }
 
   async deleteClient(id: string): Promise<ApiResponse<any>> {
-    const response = await this.api.delete(`/clients/${id}`);
+    const response = await this.api.delete(`/api/clients/${id}`);
     return response.data;
   }
 
   async getClientStats(params?: {
     clientType?: string;
   }): Promise<ApiResponse<ClientStats>> {
-    const response = await this.api.get("/clients/stats", { params });
+    const response = await this.api.get("/api/clients/stats", { params });
     return response.data;
   }
 
   async getAccountManagers(): Promise<ApiResponse<AccountManager[]>> {
-    const response = await this.api.get("/clients/account-managers");
+    const response = await this.api.get("/api/clients/account-managers");
     return response.data;
   }
 
@@ -281,17 +281,17 @@ class ClientStoreService {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }): Promise<ApiResponse<Store[]>> {
-    const response = await this.api.get("/stores", { params });
+    const response = await this.api.get("/api/stores", { params });
     return response.data;
   }
 
   async getStore(id: string): Promise<ApiResponse<Store>> {
-    const response = await this.api.get(`/stores/${id}`);
+    const response = await this.api.get(`/api/stores/${id}`);
     return response.data;
   }
 
   async getStoresByClient(clientId: string): Promise<ApiResponse<Store[]>> {
-    const response = await this.api.get(`/stores/client/${clientId}`);
+    const response = await this.api.get(`/api/stores/client/${clientId}`);
     return response.data;
   }
 
@@ -303,7 +303,7 @@ class ClientStoreService {
       delete backendStoreData.contactPersonName;
     }
 
-    const response = await this.api.post("/stores", backendStoreData);
+    const response = await this.api.post("/api/stores", backendStoreData);
     return response.data;
   }
 
@@ -318,19 +318,19 @@ class ClientStoreService {
       delete backendStoreData.contactPersonName;
     }
 
-    const response = await this.api.put(`/stores/${id}`, backendStoreData);
+    const response = await this.api.put(`/api/stores/${id}`, backendStoreData);
     return response.data;
   }
 
   async deleteStore(id: string): Promise<ApiResponse<any>> {
-    const response = await this.api.delete(`/stores/${id}`);
+    const response = await this.api.delete(`/api/stores/${id}`);
     return response.data;
   }
 
   async getStoreStats(params?: {
     clientId?: string;
   }): Promise<ApiResponse<StoreStats>> {
-    const response = await this.api.get("/stores/stats", { params });
+    const response = await this.api.get("/api/stores/stats", { params });
     return response.data;
   }
 
@@ -348,12 +348,12 @@ class ClientStoreService {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }): Promise<ApiResponse<RiderEarning[]>> {
-    const response = await this.api.get("/rider-earnings", { params });
+    const response = await this.api.get("/api/rider-earnings", { params });
     return response.data;
   }
 
   async getRiderEarning(id: string): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.get(`/rider-earnings/${id}`);
+    const response = await this.api.get(`/api/rider-earnings/${id}`);
     return response.data;
   }
 
@@ -389,7 +389,7 @@ class ClientStoreService {
   async createRiderEarning(
     earning: Partial<RiderEarning>
   ): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.post("/rider-earnings", earning);
+    const response = await this.api.post("/api/rider-earnings", earning);
     return response.data;
   }
 
@@ -397,12 +397,12 @@ class ClientStoreService {
     id: string,
     earning: Partial<RiderEarning>
   ): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.put(`/rider-earnings/${id}`, earning);
+    const response = await this.api.put(`/api/rider-earnings/${id}`, earning);
     return response.data;
   }
 
   async deleteRiderEarning(id: string): Promise<ApiResponse<any>> {
-    const response = await this.api.delete(`/rider-earnings/${id}`);
+    const response = await this.api.delete(`/api/rider-earnings/${id}`);
     return response.data;
   }
 
@@ -444,7 +444,7 @@ class ClientStoreService {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }): Promise<ApiResponse<ClientRiderMapping[]>> {
-    const response = await this.api.get("/client-rider-mappings", {
+    const response = await this.api.get("/api/client-rider-mappings", {
       params,
     });
     return response.data;
@@ -453,7 +453,7 @@ class ClientStoreService {
   async getClientRiderMapping(
     id: string
   ): Promise<ApiResponse<ClientRiderMapping>> {
-    const response = await this.api.get(`/client-rider-mappings/${id}`);
+    const response = await this.api.get(`/api/client-rider-mappings/${id}`);
     return response.data;
   }
 
@@ -504,7 +504,7 @@ class ClientStoreService {
   async createClientRiderMapping(
     mapping: Partial<ClientRiderMapping>
   ): Promise<ApiResponse<ClientRiderMapping>> {
-    const response = await this.api.post("/client-rider-mappings", mapping);
+    const response = await this.api.post("/api/client-rider-mappings", mapping);
     return response.data;
   }
 
@@ -523,7 +523,7 @@ class ClientStoreService {
     id: string,
     deactivationReason?: string
   ): Promise<ApiResponse<ClientRiderMapping>> {
-    const response = await this.api.delete(`/client-rider-mappings/${id}`, {
+    const response = await this.api.delete(`/api/client-rider-mappings/${id}`, {
       data: { deactivationReason },
     });
     return response.data;
@@ -554,7 +554,7 @@ class ClientStoreService {
     }>
   > {
     const response = await this.api.post(
-      "/client-rider-mappings/bulk",
+      "/api/client-rider-mappings/bulk",
       data
     );
     return response.data;

@@ -45,7 +45,7 @@ services:
     env_file:
       - ./services/client-store-service/.env
     ports:
-      - "3004:3004"
+      - "3006:3006"
     networks:
       - ev91-network
 
