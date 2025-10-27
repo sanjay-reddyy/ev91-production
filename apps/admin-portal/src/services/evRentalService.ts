@@ -28,11 +28,11 @@ import {
 
 // API Base URLs
 const VEHICLE_SERVICE_URL =
-  import.meta.env.VITE_VEHICLE_SERVICE_URL || "http://localhost:4004";
+  import.meta.env.VITE_VEHICLE_SERVICE_URL || "";
 const RIDER_SERVICE_URL =
-  import.meta.env.VITE_RIDER_SERVICE_URL || "http://localhost:4005";
+  import.meta.env.VITE_RIDER_SERVICE_URL || "";
 const API_GATEWAY_URL =
-  import.meta.env.VITE_API_GATEWAY_URL || "http://localhost:8000";
+  import.meta.env.VITE_API_GATEWAY_URL || "";
 
 // Determine if we should use API Gateway or direct service calls
 // Default to TRUE to use API Gateway (which handles auth properly)
