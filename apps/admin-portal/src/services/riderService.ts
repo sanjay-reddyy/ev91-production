@@ -3,7 +3,7 @@ import axios from "axios";
 // Vite env may provide a URL that already contains the /riders segment.
 // Normalize so we never produce double "/riders/riders" in requests.
 const RAW_RIDER_SERVICE_URL =
-  import.meta.env.VITE_RIDER_API_URL || "http://localhost:8000/api";
+  import.meta.env.VITE_RIDER_API_URL || "/api";
 
 // Remove trailing slashes and ensure a single "/riders" segment exists
 const RIDER_SERVICE_BASE = RAW_RIDER_SERVICE_URL.replace(/\/+$/, "");
