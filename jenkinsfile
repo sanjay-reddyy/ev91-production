@@ -3,12 +3,9 @@ pipeline {
 
     environment {
         DEPLOY_DIR = "/home/ubuntu/microservices"
-<<<<<<< HEAD
-=======
-        EC2_HOST = "dashboard.ev91riderz.com"
->>>>>>> 898e5ce141c97473fbede0884e375c7f63c5763d
-        EC2_USER = "ubuntu"
         EC2_HOST = "3.109.106.132"
+        EC2_USER = "ubuntu"
+       
     }
 
     stages {
