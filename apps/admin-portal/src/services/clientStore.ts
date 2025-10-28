@@ -174,8 +174,9 @@ class ClientStoreService {
   private api: AxiosInstance;
 
   constructor() {
-    // Use the API base URL and make direct calls to client endpoints
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+    // Use the full API URL including /client-store since the API Gateway
+    // routes /api/client-store/* to the client-store service
+    const baseUrl = import.meta.env.VITE_CLIENT_STORE_API_URL || "http://localhost:8000/api/client-store";
 
     this.api = axios.create({
       baseURL: baseUrl,
@@ -347,12 +348,27 @@ class ClientStoreService {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }): Promise<ApiResponse<RiderEarning[]>> {
-    const response = await this.api.get("/rider-earnings", { params });
+    // Use direct axios call for rider-earnings endpoints
+    const token = localStorage.getItem("authToken");
+    const response = await axios.get("/api/rider-earnings", {
+      params,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     return response.data;
   }
 
   async getRiderEarning(id: string): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.get(`/rider-earnings/${id}`);
+    // Use direct axios call for rider-earnings endpoints
+    const token = localStorage.getItem("authToken");
+    const response = await axios.get(`/api/rider-earnings/${id}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     return response.data;
   }
 
@@ -365,7 +381,7 @@ class ClientStoreService {
     }
   ): Promise<ApiResponse<{ earnings: RiderEarning[]; summary: any }>> {
     const response = await this.api.get(
-      `/api/rider-earnings/rider/${riderId}`,
+      `/rider-earnings/rider/${riderId}`,
       { params }
     );
     return response.data;
@@ -379,7 +395,7 @@ class ClientStoreService {
     }
   ): Promise<ApiResponse<RiderEarning[]>> {
     const response = await this.api.get(
-      `/api/rider-earnings/store/${storeId}`,
+      `/rider-earnings/store/${storeId}`,
       { params }
     );
     return response.data;
@@ -388,7 +404,14 @@ class ClientStoreService {
   async createRiderEarning(
     earning: Partial<RiderEarning>
   ): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.post("/rider-earnings", earning);
+    // Use direct axios call for rider-earnings endpoints
+    const token = localStorage.getItem("authToken");
+    const response = await axios.post("/api/rider-earnings", earning, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     return response.data;
   }
 
@@ -396,12 +419,26 @@ class ClientStoreService {
     id: string,
     earning: Partial<RiderEarning>
   ): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.put(`/rider-earnings/${id}`, earning);
+    // Use direct axios call for rider-earnings endpoints
+    const token = localStorage.getItem("authToken");
+    const response = await axios.put(`/api/rider-earnings/${id}`, earning, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     return response.data;
   }
 
   async deleteRiderEarning(id: string): Promise<ApiResponse<any>> {
-    const response = await this.api.delete(`/api/rider-earnings/${id}`);
+    // Use direct axios call for rider-earnings endpoints
+    const token = localStorage.getItem("authToken");
+    const response = await axios.delete(`/api/rider-earnings/${id}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     return response.data;
   }
 
@@ -413,7 +450,7 @@ class ClientStoreService {
     }
   ): Promise<ApiResponse<any>> {
     const response = await this.api.get(
-      `/api/rider-earnings/weekly/${riderId}`,
+      `/rider-earnings/weekly/${riderId}`,
       { params }
     );
     return response.data;
@@ -522,7 +559,7 @@ class ClientStoreService {
     id: string,
     deactivationReason?: string
   ): Promise<ApiResponse<ClientRiderMapping>> {
-    const response = await this.api.delete(`/api/client-rider-mappings/${id}`, {
+    const response = await this.api.delete(`/client-rider-mappings/${id}`, {
       data: { deactivationReason },
     });
     return response.data;
