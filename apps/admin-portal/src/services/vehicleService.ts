@@ -1144,8 +1144,15 @@ export const vehicleService = {
   // Service History operations
   async getVehicleServiceHistory(vehicleId: string) {
     try {
-      const response = await vehicleApi.get(
-        `/services/vehicles/${vehicleId}/history`
+      const token = localStorage.getItem("authToken");
+      const response = await axios.get(
+        `/api/services/vehicles/${vehicleId}/history`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
       return response.data;
     } catch (error: any) {
