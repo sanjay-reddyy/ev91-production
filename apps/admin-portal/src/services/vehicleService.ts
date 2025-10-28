@@ -506,8 +506,38 @@ export const vehicleService = {
   },
 
   async createVehicle(vehicleData: Partial<Vehicle>) {
-    const response = await vehicleApi.post("/vehicles", vehicleData);
-    return response.data;
+    try {
+      const response = await vehicleApi.post("/vehicles", vehicleData);
+      return response.data;
+    } catch (error: any) {
+      // Enhanced error handling for 409 conflicts
+      if (error.response?.status === 409) {
+        const errorMessage = error.response?.data?.message || "Duplicate vehicle data found";
+        const errorCode = error.response?.data?.errorCode || "DUPLICATE_RECORD";
+        
+        console.error("Vehicle creation conflict:", {
+          message: errorMessage,
+          code: errorCode,
+          vehicleData: {
+            registrationNumber: vehicleData.registrationNumber,
+            chassisNumber: vehicleData.chassisNumber,
+            rcNumber: (vehicleData as any).rcNumber,
+            insuranceNumber: (vehicleData as any).insuranceNumber,
+          }
+        });
+        
+        // Throw enhanced error with specific conflict details
+        throw {
+          ...error,
+          message: errorMessage,
+          conflictType: errorCode,
+          conflictDetails: error.response?.data
+        };
+      }
+      
+      // Re-throw other errors as-is
+      throw error;
+    }
   },
 
   async updateVehicle(id: string, vehicleData: Partial<Vehicle>) {
