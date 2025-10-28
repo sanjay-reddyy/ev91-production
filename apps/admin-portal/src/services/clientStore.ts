@@ -469,7 +469,7 @@ class ClientStoreService {
     }>
   > {
     const response = await this.api.get(
-      `/api/client-rider-mappings/resolve/${clientId}/${clientRiderId}`
+      `/client-rider-mappings/resolve/${clientId}/${clientRiderId}`
     );
     return response.data;
   }
@@ -479,7 +479,7 @@ class ClientStoreService {
     includeInactive?: boolean
   ): Promise<ApiResponse<ClientRiderMapping[]>> {
     const response = await this.api.get(
-      `/api/client-rider-mappings/rider/${platformRiderId}`,
+      `/client-rider-mappings/rider/${platformRiderId}`,
       {
         params: { includeInactive },
       }
@@ -492,7 +492,7 @@ class ClientStoreService {
     includeInactive?: boolean
   ): Promise<ApiResponse<ClientRiderMapping[]>> {
     const response = await this.api.get(
-      `/api/client-rider-mappings/client/${clientId}`,
+      `/client-rider-mappings/client/${clientId}`,
       {
         params: { includeInactive },
       }
@@ -534,7 +534,7 @@ class ClientStoreService {
     status: string = "verified"
   ): Promise<ApiResponse<ClientRiderMapping>> {
     const response = await this.api.post(
-      `/api/client-rider-mappings/${id}/verify`,
+      `/client-rider-mappings/${id}/verify`,
       {
         verifiedBy,
         status,
