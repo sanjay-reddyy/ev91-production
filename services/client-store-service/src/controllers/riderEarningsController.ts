@@ -107,63 +107,94 @@ export const getEarningsByStore = asyncHandler(
   }
 );
 
-export const createEarning = asyncHandler(
-  async (req: Request, res: Response) => {
-    const payload = req.body;
+export const createEarning = asyncHandler(async (req: Request, res: Response) => {
+  const {
+    riderId,
+    clientId,
+    storeId,
+    orderId,
+    baseRate,
+    storeOfferRate,
+    totalRate,
+    bulkOrderBonus,
+    performanceBonus,
+    weeklyTargetBonus,
+    specialEventBonus,
+    finalEarning,
+    paymentStatus,
+    orderDate,
+    deliveryTime,
+    distance,
+    riderRating,
+    bonusesApplied,
+    rateCalculationLog,
+    paymentDate,
+    paymentMethod,
+    paymentReference,
+  } = req.body;
 
-    // Basic validation
-    if (
-      !payload.riderId ||
-      !payload.clientId ||
-      !payload.storeId ||
-      payload.finalEarning === undefined
-    ) {
-      throw createError(
-        "Missing required fields: riderId, clientId, storeId, and finalEarning are required",
-        400,
-        "MISSING_FIELDS"
-      );
-    }
-
-    // Verify client exists
-    const client = await prisma.client.findUnique({
-      where: { id: payload.clientId },
-    });
-    if (!client) {
-      throw createError(
-        `Client with ID ${payload.clientId} not found`,
-        404,
-        "CLIENT_NOT_FOUND"
-      );
-    }
-
-    // Verify store exists
-    const store = await prisma.store.findUnique({
-      where: { id: payload.storeId },
-    });
-    if (!store) {
-      throw createError(
-        `Store with ID ${payload.storeId} not found`,
-        404,
-        "STORE_NOT_FOUND"
-      );
-    }
-
-    // Verify store belongs to client
-    if (store.clientId !== payload.clientId) {
-      throw createError(
-        `Store ${payload.storeId} does not belong to client ${payload.clientId}`,
-        400,
-        "STORE_CLIENT_MISMATCH"
-      );
-    }
-
-    const created = await prisma.riderEarning.create({
-      data: { ...payload, createdAt: new Date(), updatedAt: new Date() } as any,
-    });
-    res.status(201).json({ success: true, data: created });
+  // ✅ Fixed validation
+  if (!riderId || !clientId || !storeId || finalEarning === undefined) {
+    throw createError(
+      "Missing required fields: riderId, clientId, storeId, and finalEarning are required",
+      400,
+      "MISSING_FIELDS"
+    );
   }
-);
+
+  // ✅ Client check
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) {
+    throw createError(`Client with ID ${clientId} not found`, 404, "CLIENT_NOT_FOUND");
+  }
+
+  // ✅ Store check
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) {
+    throw createError(`Store with ID ${storeId} not found`, 404, "STORE_NOT_FOUND");
+  }
+
+  // ✅ Validate store-client link
+  if (store.clientId !== clientId) {
+    throw createError(
+      `Store ${storeId} does not belong to client ${clientId}`,
+      400,
+      "STORE_CLIENT_MISMATCH"
+    );
+  }
+
+  // ✅ Prepare payload
+  const earningData = {
+    riderId,
+    clientId,
+    storeId,
+    orderId,
+    baseRate,
+    storeOfferRate,
+    totalRate,
+    bulkOrderBonus,
+    performanceBonus,
+    weeklyTargetBonus,
+    specialEventBonus,
+    finalEarning,
+    paymentStatus,
+    orderDate: orderDate ? new Date(orderDate) : new Date(),
+    deliveryTime,
+    distance,
+    riderRating,
+    bonusesApplied,
+    rateCalculationLog,
+    paymentDate: paymentDate ? new Date(paymentDate) : null,
+    paymentMethod,
+    paymentReference,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  // ✅ Create record
+  const created = await prisma.riderEarning.create({ data: earningData });
+  res.status(201).json({ success: true, data: created });
+});
 
 export const updateEarning = asyncHandler(
   async (req: Request, res: Response) => {
