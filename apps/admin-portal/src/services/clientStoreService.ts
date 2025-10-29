@@ -730,41 +730,67 @@ export const createClient = async (
   clientData: any
 ): Promise<{
   success: boolean;
-  data: Client;
+  data?: Client;
   message?: string;
+  error?: any;
 }> => {
   try {
     console.log('🔍 Creating client with data:', JSON.stringify(clientData, null, 2));
     
-    // Create a minimal test client with only required fields
-    const minimalTestData = {
-      clientCode: `TEST-${Date.now()}`, // Unique client code
-      clientType: "B2B",
-      name: `Test Client ${Date.now()}`, // Unique name
-      baseOrderRate: 25.0,
-      clientStatus: "Active"
-    };
-    
-    console.log('🔍 Testing with minimal data first:', JSON.stringify(minimalTestData, null, 2));
-    
-    // Try with minimal data first
-    const response = await api.post("/clients", minimalTestData);
+    // Validate required fields before sending
+    const requiredFields = ['clientCode', 'name', 'clientType', 'baseOrderRate', 'clientStatus'];
+    const missingFields = requiredFields.filter(field => !clientData[field]);
+    if (missingFields.length > 0) {
+      return {
+        success: false,
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      };
+    }
+
+    // Clean up empty string values to null
+    const cleanedData = Object.fromEntries(
+      Object.entries(clientData).map(([key, value]) => [key, value === '' ? null : value])
+    );
+
+    const response = await api.post("/clients", cleanedData);
     return response.data;
     
     // If minimal works, we'll add more fields later
     
   } catch (error: any) {
     console.error("Error creating client:", error);
-    console.error("Error response data:", error.response?.data);
-    console.error("Error status:", error.response?.status);
-    console.error("Full error response:", error.response);
     
-    // Log the specific error message if available
-    if (error.response?.data?.error) {
-      console.error("Specific error:", error.response.data.error);
+    // Log detailed error information
+    if (error.response?.data) {
+      console.log('Detailed error response:', JSON.stringify(error.response.data, null, 2));
     }
-    
-    throw error;
+
+    if (error.response?.status === 409) {
+      return {
+        success: false,
+        message: 'A client with this code or email already exists. Please use unique values.',
+        error: error.response?.data?.error
+      };
+    }
+
+    if (error.response?.status === 400) {
+      // Get the specific validation error message if available
+      const errorMessage = error.response?.data?.error?.message || 
+                          error.response?.data?.message || 
+                          'Invalid client data. Please check all fields.';
+      return {
+        success: false,
+        message: errorMessage,
+        error: error.response?.data?.error
+      };
+    }
+
+    // For any other error
+    return {
+      success: false,
+      message: 'An unexpected error occurred while creating the client. Please try again.',
+      error: error.response?.data?.error
+    };
   }
 };
 
