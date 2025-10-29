@@ -1176,7 +1176,7 @@ export const vehicleService = {
     try {
       const token = localStorage.getItem("authToken");
       const response = await axios.get(
-        `/api/services/vehicles/${vehicleId}/history`,
+        `/api/vehicles/${vehicleId}/history`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -1198,7 +1198,7 @@ export const vehicleService = {
     try {
       // This would need to call the rider service through API gateway
       const response = await axios.get(
-        `http://localhost:8000/api/v1/riders/${riderId}`
+        `/api/v1/riders/${riderId}`
       );
       return response.data;
     } catch (error: any) {
