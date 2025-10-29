@@ -358,7 +358,7 @@ export class KycService {
       const documentsWithSignedUrls = await Promise.all(
         kycDocuments.map(async (doc) => {
           try {
-            // Extract S3 key from URL (assuming format: https://bucket.s3.region.amazonaws.com/key)
+            // Extract S3 key from URL or use the value directly if it's already a key
             const url = doc.documentImageUrl || "";
             let s3Key = "";
 
@@ -369,51 +369,77 @@ export class KycService {
               )}...`
             );
 
-            // Check if it's an S3 URL
-            if (url.includes(".s3.") || url.includes("s3.amazonaws.com")) {
-              // Extract key from URL
-              const urlParts = url.split("/");
-              const bucketIndex = urlParts.findIndex((part) =>
-                part.includes(".s3.")
-              );
-              if (bucketIndex !== -1) {
-                s3Key = urlParts.slice(bucketIndex + 1).join("/");
-                console.log(`🔑 Extracted S3 key: ${s3Key}`);
-              }
-            } else if (
-              url.startsWith("riders/") ||
-              url.startsWith("vehicles/")
-            ) {
-              // Already a key
+            // Check if it's already just a key (starts with riders/ or vehicles/)
+            if (url.startsWith("riders/") || url.startsWith("vehicles/")) {
               s3Key = url;
               console.log(`🔑 Using existing key: ${s3Key}`);
+            }
+            // Check if it's a full S3 URL that needs parsing
+            else if (
+              url.includes(".s3.") ||
+              url.includes("s3.amazonaws.com") ||
+              url.includes("amazonaws.com")
+            ) {
+              // Extract key from URL
+              // Format: https://bucket.s3.region.amazonaws.com/riders/xxx/kyc/file.png
+              // OR: https://ev91-documents-dev.s3.ap-south-1.amazonaws.com/riders/xxx/kyc/file.png
+
+              try {
+                const urlObj = new URL(url);
+                // Remove leading slash from pathname to get the key
+                s3Key = urlObj.pathname.substring(1);
+                console.log(`🔑 Extracted S3 key from URL: ${s3Key}`);
+              } catch (urlError) {
+                console.error(`❌ Failed to parse URL: ${url}`, urlError);
+                // Fallback: try splitting by / and finding "riders" or "vehicles"
+                const urlParts = url.split("/");
+                const ridersIndex = urlParts.findIndex(
+                  (part) => part === "riders" || part === "vehicles"
+                );
+                if (ridersIndex !== -1) {
+                  s3Key = urlParts.slice(ridersIndex).join("/");
+                  console.log(
+                    `🔑 Extracted S3 key using fallback method: ${s3Key}`
+                  );
+                }
+              }
             }
 
             // Generate pre-signed URL if we have a valid S3 key
             if (s3Key) {
               console.log(`⏳ Generating pre-signed URL for key: ${s3Key}`);
-              const presignedUrl = await s3Service.getPresignedUrl(s3Key, 3600); // 1 hour expiry
-              console.log(
-                `✅ Generated pre-signed URL: ${presignedUrl.substring(
-                  0,
-                  100
-                )}...`
-              );
-              return {
-                ...doc,
-                documentImageUrl: presignedUrl,
-                originalKey: s3Key, // Store original key for reference
-              };
+
+              try {
+                const presignedUrl = await s3Service.getPresignedUrl(
+                  s3Key,
+                  3600
+                ); // 1 hour expiry
+                console.log(
+                  `✅ Generated pre-signed URL: ${presignedUrl.substring(
+                    0,
+                    100
+                  )}...`
+                );
+                return {
+                  ...doc,
+                  documentImageUrl: presignedUrl,
+                  originalKey: s3Key, // Store original key for reference
+                };
+              } catch (presignError) {
+                console.error(
+                  `❌ Failed to generate pre-signed URL for key ${s3Key}:`,
+                  presignError
+                );
+                // Return document with original URL as fallback
+                return doc;
+              }
             }
 
             console.log(`⚠️ No S3 key found, returning original URL`);
             // If URL generation fails, return document with original URL
             return doc;
           } catch (error) {
-            console.error(
-              `❌ Failed to generate pre-signed URL for document ${doc.id}:`,
-              error
-            );
+            console.error(`❌ Failed to process document ${doc.id}:`, error);
             // Return document with original URL as fallback
             return doc;
           }

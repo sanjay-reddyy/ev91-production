@@ -307,7 +307,7 @@ export const getClients = asyncHandler(async (req: Request, res: Response) => {
     }),
     prisma.client.count({ where }),
   ]);
-
+ 
   res.json({
     success: true,
     data: clients,
@@ -535,7 +535,7 @@ export const getClientsByCity = asyncHandler(
     const clients = await prisma.client.findMany({
       where: {
         city: { contains: city, mode: "insensitive" },
-        clientStatus: "Active",
+        clientStatus: { in: ["Active", "active", "ACTIVE"] },
       },
       include: {
         _count: {

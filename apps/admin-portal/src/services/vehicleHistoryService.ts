@@ -169,63 +169,15 @@ const vehicleHistoryService = {
     } catch (error: any) {
       console.error("Error fetching rider vehicle history:", error);
 
-      // Fallback to mock data if the API fails or is not yet deployed
+      // Return empty data if the API fails or rider has no vehicle history
       if (error.response?.status === 404) {
         console.warn(
-          "Vehicle history API not found. Using mock data as fallback."
+          "No vehicle history found for rider. Returning empty data."
         );
-
-        // Mock data to simulate vehicle history
-        const mockHistory: RiderVehicleHistory[] = [
-          {
-            id: "vh1-" + riderId.substring(0, 8),
-            riderId: riderId,
-            vehicleId: "veh-" + Math.random().toString(36).substring(2, 10),
-            assignedAt: new Date(
-              Date.now() - 60 * 24 * 60 * 60 * 1000
-            ).toISOString(), // 60 days ago
-            returnedAt: new Date(
-              Date.now() - 30 * 24 * 60 * 60 * 1000
-            ).toISOString(), // 30 days ago
-            assignedBy: "admin-user",
-            returnedBy: "admin-user",
-            status: "RETURNED",
-            notes: "Regular vehicle rotation",
-            durationDays: 30,
-            registrationNumber: "EV91-001",
-            vehicleMake: "Ather",
-            vehicleModel: "450X",
-          },
-          {
-            id: "vh2-" + riderId.substring(0, 8),
-            riderId: riderId,
-            vehicleId: "veh-" + Math.random().toString(36).substring(2, 10),
-            assignedAt: new Date(
-              Date.now() - 29 * 24 * 60 * 60 * 1000
-            ).toISOString(), // 29 days ago
-            returnedAt: null,
-            assignedBy: "admin-user",
-            returnedBy: null,
-            status: "ACTIVE",
-            notes: "Current vehicle assignment",
-            durationDays: 29,
-            registrationNumber: "EV91-002",
-            vehicleMake: "Ola",
-            vehicleModel: "S1 Pro",
-          },
-        ];
 
         return {
           success: true,
-          data: mockHistory.map((item) => ({
-            ...item,
-            vehicle: {
-              id: item.vehicleId,
-              registrationNumber: item.registrationNumber,
-              make: item.vehicleMake || "Unknown",
-              model: item.vehicleModel || "Unknown",
-            },
-          })),
+          data: [], // Return empty array instead of mock data
         };
       }
 
