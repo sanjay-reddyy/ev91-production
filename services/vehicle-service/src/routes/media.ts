@@ -4,6 +4,7 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { prisma } from "../index";
 import { s3Service } from "../services/s3Service";
+import { authMiddleware } from "../middleware/auth";
 
 const router = Router();
 
@@ -43,6 +44,7 @@ const upload = multer({
 // Upload single file endpoint with S3 integration
 router.post(
   "/upload",
+  authMiddleware, // Protected: requires authentication
   upload.single("file"),
   async (req: Request, res: Response) => {
     try {
@@ -145,6 +147,7 @@ router.post(
 // Upload multiple files endpoint with S3 integration
 router.post(
   "/upload-multiple",
+  authMiddleware, // Protected: requires authentication
   upload.array("files", 10),
   async (req: Request, res: Response) => {
     try {
@@ -250,7 +253,7 @@ router.post(
   }
 );
 
-// View file via presigned URL
+// View file via presigned URL (PUBLIC - secured by time-limited pre-signed URLs)
 router.get("/view/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -299,7 +302,7 @@ router.get("/view/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Get file by ID (legacy endpoint for compatibility)
+// Get file by ID (PUBLIC - legacy endpoint for compatibility)
 router.get("/file/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -336,7 +339,7 @@ router.get("/file/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Get media list for a vehicle
+// Get media list for a vehicle (PUBLIC - returns pre-signed URLs)
 router.get("/vehicle/:vehicleId", async (req: Request, res: Response) => {
   try {
     const { vehicleId } = req.params;
@@ -404,8 +407,8 @@ router.get("/vehicle/:vehicleId", async (req: Request, res: Response) => {
   }
 });
 
-// Delete media file
-router.delete("/:id", async (req: Request, res: Response) => {
+// Delete media file (PROTECTED - requires authentication)
+router.delete("/:id", authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

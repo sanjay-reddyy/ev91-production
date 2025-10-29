@@ -263,7 +263,7 @@ router.get("/riders", async (req: Request, res: Response) => {
 
     // Fetch store information for riders with assigned stores
     const clientStoreServiceUrl =
-      process.env.CLIENT_STORE_SERVICE_URL || "http://localhost:3006";
+      process.env.CLIENT_STORE_SERVICE_URL || "client-store-service:3006";
     const vehicleServiceUrl =
       process.env.VEHICLE_SERVICE_URL || "http://localhost:4004";
 

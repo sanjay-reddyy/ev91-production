@@ -101,6 +101,7 @@ app.get("/health", (req: Request, res: Response) => {
 
 // API Documentation
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
+app.use("/api/v1/media", mediaRoutes); // Publicly accessible media routes (view/download)
 
 // API Routes - vehicles route temporarily without auth for testing
 app.use("/api/v1/vehicles", vehicleRoutes);
@@ -108,7 +109,7 @@ app.use("/api/v1/service", authMiddleware, serviceRoutes);
 // app.use("/api/v1/unified-service", authMiddleware, unifiedServiceRoutes); // DISABLED - Unified Service Management
 app.use("/api/v1/damage", authMiddleware, damageRoutes);
 app.use("/api/v1/handover", authMiddleware, handoverRoutes);
-app.use("/api/v1/media", authMiddleware, mediaRoutes);
+app.use("/api/v1/media", mediaRoutes); // Auth applied per-route (view endpoints public, upload/delete protected)
 app.use("/api/v1/analytics", authMiddleware, analyticsRoutes); // Re-enabled analytics routes
 app.use("/api/v1/oems", authMiddleware, oemRoutes);
 app.use("/api/v1/vehicle-models", authMiddleware, vehicleModelRoutes);

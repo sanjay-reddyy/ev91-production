@@ -79,7 +79,7 @@ const vehicleHistoryService = {
     try {
       // Use the new endpoint in the rider service
       const response = await riderApi.get(
-        `/riders/vehicle-history/riders/${riderId}/vehicle-history`
+        `/vehicle-history/riders/${riderId}/vehicle-history`
       );
 
       // Process the response data to calculate duration days if not provided by API
