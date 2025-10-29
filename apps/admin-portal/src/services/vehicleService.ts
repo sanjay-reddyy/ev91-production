@@ -743,7 +743,7 @@ export const vehicleService = {
 
   async getMediaFiles(vehicleId: string, fileType?: string) {
     const params = fileType ? { mediaType: fileType } : {}; // Changed from fileType to mediaType
-    const response = await vehicleApi.get(`/media/vehicle/${vehicleId}`, {
+    const response = await vehicleApi.get(`/vehicles/media/vehicle/${vehicleId}`, {
       params,
     });
     return response.data;
@@ -762,7 +762,7 @@ export const vehicleService = {
   // Get media file view URL (returns presigned URL for S3 files)
   getMediaViewUrl(mediaId: string, redirect: boolean = true) {
     // The API gateway routes /api/vehicles to the vehicle service, which internally handles /media.
-    return `/api/vehicles/media/view/${mediaId}${
+    return `/api/v1/vehicles/media/view/${mediaId}${
       redirect ? "" : "?redirect=false"
     }`;
   },
