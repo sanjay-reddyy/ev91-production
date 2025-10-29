@@ -334,102 +334,91 @@ class ClientStoreService {
   }
 
   // Rider Earnings methods
-  async getRiderEarnings(params?: {
-    page?: number;
-    limit?: number;
-    riderId?: string;
-    clientRiderId?: string;
-    storeId?: string;
-    clientId?: string;
-    paymentStatus?: string;
+  // Rider Earnings methods
+async getRiderEarnings(params?: {
+  page?: number;
+  limit?: number;
+  riderId?: string;
+  clientRiderId?: string;
+  storeId?: string;
+  clientId?: string;
+  paymentStatus?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}): Promise<ApiResponse<RiderEarning[]>> {
+  const response = await this.api.get("/rider-earnings", { params });
+  return response.data;
+}
+
+async getRiderEarning(id: string): Promise<ApiResponse<RiderEarning>> {
+  const response = await this.api.get(`/rider-earnings/${id}`);
+  return response.data;
+}
+
+async getRiderEarningsByRider(
+  riderId: string,
+  params?: {
     dateFrom?: string;
     dateTo?: string;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-  }): Promise<ApiResponse<RiderEarning[]>> {
-    const response = await this.api.get("/rider-earnings", { params });
-    return response.data;
+    paymentStatus?: string;
   }
+): Promise<ApiResponse<{ earnings: RiderEarning[]; summary: any }>> {
+  const response = await this.api.get(`/rider-earnings/rider/${riderId}`, { params });
+  return response.data;
+}
 
-  async getRiderEarning(id: string): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.get(`/rider-earnings/${id}`);
-    return response.data;
+async getRiderEarningsByStore(
+  storeId: string,
+  params?: {
+    dateFrom?: string;
+    dateTo?: string;
   }
+): Promise<ApiResponse<RiderEarning[]>> {
+  const response = await this.api.get(`/rider-earnings/store/${storeId}`, { params });
+  return response.data;
+}
 
-  async getRiderEarningsByRider(
-    riderId: string,
-    params?: {
-      dateFrom?: string;
-      dateTo?: string;
-      paymentStatus?: string;
-    }
-  ): Promise<ApiResponse<{ earnings: RiderEarning[]; summary: any }>> {
-    const response = await this.api.get(
-      `/api/rider-earnings/rider/${riderId}`,
-      { params }
-    );
-    return response.data;
-  }
+async createRiderEarning(
+  earning: Partial<RiderEarning>
+): Promise<ApiResponse<RiderEarning>> {
+  const response = await this.api.post("/rider-earnings", earning);
+  return response.data;
+}
 
-  async getRiderEarningsByStore(
-    storeId: string,
-    params?: {
-      dateFrom?: string;
-      dateTo?: string;
-    }
-  ): Promise<ApiResponse<RiderEarning[]>> {
-    const response = await this.api.get(
-      `/api/rider-earnings/store/${storeId}`,
-      { params }
-    );
-    return response.data;
-  }
+async updateRiderEarning(
+  id: string,
+  earning: Partial<RiderEarning>
+): Promise<ApiResponse<RiderEarning>> {
+  const response = await this.api.put(`/rider-earnings/${id}`, earning);
+  return response.data;
+}
 
-  async createRiderEarning(
-    earning: Partial<RiderEarning>
-  ): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.post("/rider-earnings", earning);
-    return response.data;
-  }
+async deleteRiderEarning(id: string): Promise<ApiResponse<any>> {
+  const response = await this.api.delete(`/rider-earnings/${id}`);
+  return response.data;
+}
 
-  async updateRiderEarning(
-    id: string,
-    earning: Partial<RiderEarning>
-  ): Promise<ApiResponse<RiderEarning>> {
-    const response = await this.api.put(`/rider-earnings/${id}`, earning);
-    return response.data;
+async getWeeklyRiderSummary(
+  riderId: string,
+  params?: {
+    year?: number;
+    week?: number;
   }
+): Promise<ApiResponse<any>> {
+  const response = await this.api.get(`/rider-earnings/weekly/${riderId}`, { params });
+  return response.data;
+}
 
-  async deleteRiderEarning(id: string): Promise<ApiResponse<any>> {
-    const response = await this.api.delete(`/api/rider-earnings/${id}`);
-    return response.data;
-  }
-
-  async getWeeklyRiderSummary(
-    riderId: string,
-    params?: {
-      year?: number;
-      week?: number;
-    }
-  ): Promise<ApiResponse<any>> {
-    const response = await this.api.get(
-      `/api/rider-earnings/weekly/${riderId}`,
-      { params }
-    );
-    return response.data;
-  }
-
-  async generateWeeklyReport(data: {
-    riderIds: string[];
-    startDate: string;
-    endDate: string;
-  }): Promise<ApiResponse<any>> {
-    const response = await this.api.post(
-      "/rider-earnings/reports/weekly",
-      data
-    );
-    return response.data;
-  }
+async generateWeeklyReport(data: {
+  riderIds: string[];
+  startDate: string;
+  endDate: string;
+}): Promise<ApiResponse<any>> {
+  const response = await this.api.post("/rider-earnings/reports/weekly", data);
+  return response.data;
+}
 
   // Client Rider Mapping methods
   async getClientRiderMappings(params?: {
