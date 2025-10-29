@@ -255,9 +255,9 @@ const RiderEarningsPage: React.FC = () => {
 
       // Calculate totalRate (base + offer)
       const totalRate = formData.baseRate + formData.storeOfferRate
-
+      const { clientRiderId, ...restOfFormData } = formData;
       const earningData = {
-        ...formData,
+        ...restOfFormData,
         totalRate, // Add the calculated totalRate
         orderDate: new Date(formData.orderDate).toISOString(),
       }
