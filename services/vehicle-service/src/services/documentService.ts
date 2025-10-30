@@ -3,6 +3,10 @@ import { v4 as uuidv4 } from "uuid";
 import { prisma } from "../index";
 import { AppError } from "../utils/errorHandler";
 import { Logger } from "../utils";
+import fs from "fs";
+import path from "path";
+
+
 
 // Configure AWS SDK
 console.log("DocumentService: Initializing AWS S3 client with:");
@@ -441,5 +445,48 @@ export class DocumentService {
         source: "web_admin",
       },
     });
+  }
+   static async downloadVehicleDocument(documentId: string) {
+    const document = await prisma.vehicleMedia.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) throw new AppError("Document not found", 404);
+
+    if (document.s3Key && process.env.AWS_S3_BUCKET) {
+      try {
+        const s3Object = await s3
+          .getObject({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: document.s3Key,
+          })
+          .promise();
+
+        const fileStream = Buffer.isBuffer(s3Object.Body)
+          ? s3Object.Body
+          : Buffer.from(s3Object.Body as any);
+
+        return { fileStream, document };
+      } catch (error: any) {
+        Logger.error("Failed to fetch document from S3", error);
+        throw new AppError("Failed to download document from S3", 500);
+      }
+    }
+
+    const filePath = path.join(__dirname, "../../uploads", document.fileName);
+    if (!fs.existsSync(filePath)) throw new AppError("File not found", 404);
+
+    const fileStream = fs.createReadStream(filePath);
+    return { fileStream, document };
+  }
+
+  static async getDocumentById(documentId: string) {
+    const document = await prisma.vehicleMedia.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) throw new AppError("Document not found", 404);
+
+    return document;
   }
 }

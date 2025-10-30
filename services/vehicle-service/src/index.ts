@@ -101,11 +101,14 @@ app.get("/health", (req: Request, res: Response) => {
 
 // API Documentation
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
-//app.use("/api/v1/media", mediaRoutes); // Publicly accessible media routes (view/download)
 
-// API Routes - Mount more specific routes before general routes
-app.use("/api/v1/vehicles/media", mediaRoutes); // Mount media routes first
-app.use("/api/v1/vehicles", vehicleRoutes); // Then mount general vehicle routes
+// ✅ Serve uploaded files publicly (for view/download)
+app.use("/uploads", express.static("uploads"));
+
+
+// API Routes - vehicles route temporarily without auth for testing
+app.use("/api/v1/vehicles", vehicleRoutes);
+app.use("/api/v1/vehicles/media", mediaRoutes); // Mount media routes relative to vehicles
 app.use("/api/v1/service", authMiddleware, serviceRoutes);
 // app.use("/api/v1/unified-service", authMiddleware, unifiedServiceRoutes); // DISABLED - Unified Service Management
 app.use("/api/v1/damage", authMiddleware, damageRoutes);

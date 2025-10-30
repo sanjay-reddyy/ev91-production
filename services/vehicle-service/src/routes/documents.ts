@@ -5,6 +5,8 @@ import {
   getVehicleDocuments,
   deleteVehicleDocument,
   updateDocumentVerification,
+  downloadVehicleDocument,
+  viewVehicleDocument,
 } from "../controllers/documentController";
 import { upload, uploadDocument } from "../middleware/upload";
 
@@ -32,5 +34,11 @@ router.delete("/documents/:documentId", deleteVehicleDocument);
 
 // Update document verification status
 router.patch("/documents/:documentId/verification", updateDocumentVerification);
+
+// Download a specific document
+router.get("/documents/:documentId/download", downloadVehicleDocument);
+
+router.get("/view/:documentId", viewVehicleDocument);
+
 
 export default router;

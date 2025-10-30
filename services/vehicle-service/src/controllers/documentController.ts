@@ -166,3 +166,63 @@ export const updateDocumentVerification = asyncHandler(
     }
   }
 );
+
+// Download vehicle document
+export const downloadVehicleDocument = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    Logger.info("Download vehicle document request received", {
+      userId: req.user?.id,
+      documentId: req.params.documentId,
+    });
+
+    const { documentId } = req.params;
+
+    try {
+      const { fileStream, document } = await DocumentService.downloadVehicleDocument(documentId);
+
+      res.setHeader("Content-Disposition", `attachment; filename="${document.fileName}"`);
+      res.setHeader("Content-Type", document.fileType);
+
+      // ✅ If fileStream is a stream, pipe it directly to response
+      if ((fileStream as any).pipe) {
+        (fileStream as any).pipe(res);
+      } else {
+        // ✅ If it's a buffer, just send it directly
+        res.end(fileStream);
+      }
+    } catch (error) {
+      Logger.error("Error downloading document", { error });
+      throw error;
+    }
+  }
+);
+
+// View vehicle document by ID
+export const viewVehicleDocument = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    Logger.info("View vehicle document request received", {
+      documentId: req.params.documentId,
+    });
+
+    const { documentId } = req.params;
+
+    try {
+      const document = await DocumentService.getDocumentById(documentId);
+
+      if (!document) {
+        throw new AppError("Document not found", 404);
+      }
+
+      // Construct view URL dynamically
+      const baseUrl = process.env.BASE_URL || "http://localhost:4004";
+      const viewUrl = `${baseUrl}/uploads/${document.fileName}`;
+
+      return res.json({
+        success: true,
+        viewUrl,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+);
