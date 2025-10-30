@@ -271,7 +271,7 @@ router.get("/view/:id", async (req: Request, res: Response) => {
 
     if (!mediaRecord.s3Key) {
       // Fallback to direct URL for legacy files
-      return res.redirect(mediaRecord.fileUrl);
+      return res.json({ success: true, viewUrl: mediaRecord.fileUrl });
     }
 
     // Generate presigned URL for secure access
@@ -291,7 +291,7 @@ router.get("/view/:id", async (req: Request, res: Response) => {
       });
     }
 
-    return res.redirect(presignedUrl);
+    return res.json({ success: true, viewUrl: presignedUrl });
   } catch (error) {
     console.error("❌ File view error:", error);
     return res.status(500).json({
@@ -320,7 +320,7 @@ router.get("/file/:id", async (req: Request, res: Response) => {
 
     if (!mediaRecord.s3Key) {
       // Legacy files stored locally or with direct URLs
-      return res.redirect(mediaRecord.fileUrl);
+      return res.json({ success: true, viewUrl: mediaRecord.fileUrl });
     }
 
     // Generate presigned URL for S3 files
@@ -328,7 +328,7 @@ router.get("/file/:id", async (req: Request, res: Response) => {
       mediaRecord.s3Key,
       3600
     );
-    return res.redirect(presignedUrl);
+    return res.json({ success: true, viewUrl: presignedUrl });
   } catch (error) {
     console.error("❌ File retrieval error:", error);
     return res.status(500).json({
