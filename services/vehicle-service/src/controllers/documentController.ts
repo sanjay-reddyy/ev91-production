@@ -4,6 +4,7 @@ import { asyncHandler } from "../middleware/errorHandler";
 import { DocumentService } from "../services/documentService";
 import { Logger } from "../utils";
 import { AppError } from "../utils/errorHandler";
+import { s3Service } from "../services/s3Service";
 
 // Upload vehicle document (RC, Insurance, or Vehicle Photo)
 export const uploadVehicleDocument = asyncHandler(
@@ -198,6 +199,7 @@ export const downloadVehicleDocument = asyncHandler(
 );
 
 // View vehicle document by ID
+// View vehicle document by ID
 export const viewVehicleDocument = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
     Logger.info("View vehicle document request received", {
@@ -208,14 +210,28 @@ export const viewVehicleDocument = asyncHandler(
 
     try {
       const document = await DocumentService.getDocumentById(documentId);
+      console.log("📄 Document fetched:", document);
 
       if (!document) {
         throw new AppError("Document not found", 404);
       }
 
-      // Construct view URL dynamically
-      const baseUrl = process.env.BASE_URL || "http://localhost:4004";
-      const viewUrl = `${baseUrl}/uploads/${document.fileName}`;
+      let viewUrl = "";
+
+      // Modern approach: Use s3Key to generate a secure, time-limited URL
+      if (document.s3Key) {
+        try {
+          // Generate a URL that expires in 1 hour (3600 seconds)
+          viewUrl = await s3Service.getPresignedUrl(document.s3Key, 3600);
+        } catch (s3Error) {
+          Logger.error("Failed to generate presigned URL", { s3Key: document.s3Key, s3Error });
+          // Fallback to direct URL if presigned URL fails
+          viewUrl = document.fileUrl || "";
+        }
+      } else {
+        // Legacy fallback: Use the direct public URL if s3Key is not available
+        viewUrl = document.fileUrl || "";
+      }
 
       return res.json({
         success: true,
