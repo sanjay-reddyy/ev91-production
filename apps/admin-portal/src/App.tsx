@@ -180,7 +180,7 @@ const App: React.FC = () => {
           <ProtectedRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<ManagementDashboard />} />
 
                 {/* Department Dashboard Routes */}
                 <Route path="/dashboard/operations" element={<OperationsDashboard />} />
