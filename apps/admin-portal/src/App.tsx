@@ -19,7 +19,7 @@ import ResetPasswordForm from './components/auth/ResetPasswordForm'
 import EmailVerificationPage from './components/auth/EmailVerificationPage'
 import ResendVerificationForm from './components/auth/ResendVerificationForm'
 
-import Dashboard from './pages/Dashboard'
+//import Dashboard from './pages/Dashboard'
 import OperationsDashboard from './pages/OperationsDashboard'
 import SalesDashboard from './pages/SalesDashboard'
 import FinanceDashboard from './pages/FinanceDashboard'
