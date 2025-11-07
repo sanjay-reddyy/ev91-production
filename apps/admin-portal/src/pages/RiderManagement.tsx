@@ -296,6 +296,7 @@ const RiderManagement: React.FC = () => {
       const response = await riderService.getRiderStats()
       if (response.success) {
         setStats(response.data)
+        window.dispatchEvent(new CustomEvent('riderStatsUpdated'))
       }
     } catch (error) {
       console.error('Error loading rider stats:', error)
@@ -306,7 +307,7 @@ const RiderManagement: React.FC = () => {
   const loadCities = useCallback(async () => {
     try {
       setLoadingCities(true);
-      const response = await fetch('/internal/cities');
+      const response = await fetch('http://localhost:3006/internal/cities');
       const data = await response.json();
       if (data.success && data.data) {
         setCities(data.data.map((city: any) => ({
@@ -325,7 +326,7 @@ const RiderManagement: React.FC = () => {
   const loadStores = useCallback(async () => {
     try {
       setLoadingStores(true);
-      const response = await fetch('/internal/stores');
+      const response = await fetch('http://localhost:3006/internal/stores');
       const data = await response.json();
       if (data.success && data.data) {
         setStores(data.data.map((store: any) => ({

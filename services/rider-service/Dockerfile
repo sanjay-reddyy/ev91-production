@@ -22,6 +22,8 @@ COPY package*.json ./
 RUN npm pkg delete dependencies.@ev91/shared-utils || echo "No shared-utils dependency to remove"
 
 # Install dependencies
+
+
 RUN npm install
 
 # Copy the rest of the source code

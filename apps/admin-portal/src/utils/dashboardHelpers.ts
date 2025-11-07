@@ -11,12 +11,9 @@ import {
 export function getUserDepartment(user: User | null): DepartmentType | null {
   if (!user) return null;
 
-  // Check if user has department info
   if (user.department?.code) {
-    // Map department code to DepartmentType
     const code = user.department.code.toUpperCase();
 
-    // Find matching department type
     for (const [key, value] of Object.entries(DEPARTMENT_CODES)) {
       if (value === code) {
         return key as DepartmentType;
@@ -24,7 +21,6 @@ export function getUserDepartment(user: User | null): DepartmentType | null {
     }
   }
 
-  // Check by department name as fallback
   if (user.department?.name) {
     const name = user.department.name.toLowerCase();
 
@@ -42,7 +38,6 @@ export function getUserDepartment(user: User | null): DepartmentType | null {
       return DepartmentType.MANAGEMENT;
   }
 
-  // Check by user roles (role-based department detection)
   const roles = user.roles?.map((r) => r.name.toLowerCase()) || [];
 
   if (
@@ -69,7 +64,6 @@ export function getUserDepartment(user: User | null): DepartmentType | null {
     return DepartmentType.OPERATIONS;
   }
 
-  // Default to operations if no specific department found
   return DepartmentType.OPERATIONS;
 }
 
@@ -82,14 +76,11 @@ export function canViewDashboard(
 ): boolean {
   if (!user) return false;
 
-  // Management can view all dashboards
   const userDept = getUserDepartment(user);
   if (userDept === DepartmentType.MANAGEMENT) return true;
 
-  // Check if user's department matches requested dashboard
   if (userDept === department) return true;
 
-  // Check user permissions
   const requiredPermissions = DEPARTMENT_PERMISSIONS[department];
   const userPermissions =
     user.roles?.flatMap(
@@ -101,7 +92,6 @@ export function canViewDashboard(
         ) || []
     ) || [];
 
-  // Check if user has any of the required permissions
   return requiredPermissions.some(
     (required) =>
       userPermissions.includes(required) ||
@@ -118,12 +108,10 @@ export function getAccessibleDashboards(user: User | null): DepartmentType[] {
 
   const userDept = getUserDepartment(user);
 
-  // Management can access all dashboards
   if (userDept === DepartmentType.MANAGEMENT) {
     return Object.values(DepartmentType);
   }
 
-  // Return user's primary dashboard
   if (userDept) {
     return [userDept];
   }
@@ -162,12 +150,10 @@ export function getDefaultDashboard(user: User | null): string {
 }
 
 /**
- * Format currency for display
+ * Format currency for display (without ₹)
  */
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
 }
@@ -180,22 +166,19 @@ export function formatPercentage(value: number, decimals: number = 1): string {
 }
 
 /**
- * Format number with abbreviations (K, L, Cr)
+ * Format number with abbreviations (K, L, Cr) — ₹ removed
  */
 export function formatNumber(num: number): string {
   if (num >= 10000000) {
-    // 1 Crore
-    return `₹${(num / 10000000).toFixed(2)}Cr`;
+    return `${(num / 10000000).toFixed(2)}Cr`;
   }
   if (num >= 100000) {
-    // 1 Lakh
-    return `₹${(num / 100000).toFixed(2)}L`;
+    return `${(num / 100000).toFixed(2)}L`;
   }
   if (num >= 1000) {
-    // 1 Thousand
-    return `₹${(num / 1000).toFixed(1)}K`;
+    return `${(num / 1000).toFixed(1)}K`;
   }
-  return `₹${num.toFixed(0)}`;
+  return `${num.toFixed(0)}`;
 }
 
 /**

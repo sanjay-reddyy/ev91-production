@@ -7,6 +7,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ openssl openssl-dev postgresql-client
 
 # Copy package files first (for caching)
+
 COPY package*.json ./
 
 # Create a clean package.json without shared-utils dependency

@@ -20,8 +20,14 @@ import {
 } from '@mui/icons-material'
 import { useAuth } from '../contexts/AuthContext'
 import { dashboardApi } from '../services/dashboardService'
+import { riderService, vehicleService } from '../services' // 🧩 import rider stats API
 import { ManagementDashboardMetrics } from '../types/department'
-import { formatCurrency, formatNumber, formatPercentage, getGreeting } from '../utils/dashboardHelpers'
+import {
+  formatCurrency,
+  formatNumber,
+  formatPercentage,
+  getGreeting,
+} from '../utils/dashboardHelpers'
 
 export default function ManagementDashboard() {
   const { user } = useAuth()
@@ -30,26 +36,61 @@ export default function ManagementDashboard() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadDashboardData()
+  loadDashboardData()
 
-    // Refresh every 2 minutes
-    const interval = setInterval(loadDashboardData, 120000)
+  const handleRiderStatsUpdate = () => loadDashboardData()
+  const handleVehicleStatsUpdate = () => loadDashboardData()
 
-    return () => clearInterval(interval)
-  }, [])
+  // 👂 Listen for both events
+  window.addEventListener('riderStatsUpdated', handleRiderStatsUpdate)
+  window.addEventListener('vehicleStatsUpdated', handleVehicleStatsUpdate)
+
+  return () => {
+    window.removeEventListener('riderStatsUpdated', handleRiderStatsUpdate)
+    window.removeEventListener('vehicleStatsUpdated', handleVehicleStatsUpdate)
+  }
+}, [])
+
 
   const loadDashboardData = async () => {
-    try {
-      setError(null)
-      const data = await dashboardApi.getManagementDashboard()
-      setMetrics(data)
-    } catch (err: any) {
-      console.error('Error loading management dashboard:', err)
-      setError(err.message || 'Failed to load management dashboard')
-    } finally {
-      setLoading(false)
+  try {
+    setError(null)
+
+    // Fetch all 3 sources in parallel
+    const [dashboardRes, riderStatsRes, vehicleStatsRes] = await Promise.all([
+      dashboardApi.getManagementDashboard(),
+      riderService.getRiderStats(),
+      vehicleService.getVehicleAnalytics('month'),
+    ])
+
+    const riderStats = riderStatsRes?.data || {}
+    const vehicleSummary = vehicleStatsRes?.data?.summary || {}
+
+    // Merge everything into one object
+    const mergedData = {
+      ...dashboardRes,
+      // Rider stats
+      totalRiders: riderStats.totalRiders ?? 0,
+      activeRiders: riderStats.activeRiders ?? 0,
+      inactiveRiders:
+        (riderStats.totalRiders ?? 0) - (riderStats.activeRiders ?? 0),
+
+      // Vehicle stats
+      totalFleetSize: vehicleSummary.totalVehicles ?? 0,
+      availableVehicles: vehicleSummary.activeVehicles ?? 0,
+      assignedVehicles: vehicleSummary.assignedVehicles ?? 0,
+      underMaintenance: vehicleSummary.underMaintenance ?? 0,
     }
+
+    setMetrics(mergedData)
+  } catch (err: any) {
+    console.error('Error loading management dashboard:', err)
+    setError(err.message || 'Failed to load management dashboard')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   if (loading) {
     return (
@@ -172,15 +213,14 @@ export default function ManagementDashboard() {
         </Typography>
       </Box>
 
-      {/* Key Performance Indicators */}
+      {/* Key Rider Metrics */}
       <Grid container spacing={3} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
           <QuickStatCard
-            label="Total Revenue"
-            value={formatCurrency(metrics.totalRevenue)}
-            icon={<MoneyIcon />}
-            color="success"
-            trend={metrics.revenueGrowth}
+            label="Total Riders"
+            value={formatNumber(metrics.totalRiders)}
+            icon={<PeopleIcon />}
+            color="info"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -188,40 +228,66 @@ export default function ManagementDashboard() {
             label="Active Riders"
             value={formatNumber(metrics.activeRiders)}
             icon={<PeopleIcon />}
-            color="primary"
+            color="success"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <QuickStatCard
-            label="Active Vehicles"
-            value={formatNumber(metrics.activeVehicles)}
-            icon={<CarIcon />}
-            color="info"
+            label="Inactive Riders"
+            value={formatNumber(metrics.inactiveRiders)}
+            icon={<PeopleIcon />}
+            color="error"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <QuickStatCard
-            label="Total Stores"
-            value={formatNumber(metrics.totalStores)}
-            icon={<StoreIcon />}
-            color="warning"
-          />
-        </Grid>
-      </Grid>
+       
+         {/* Total Stores */}
+  <Grid item xs={12} sm={6} md={3}>
+    <QuickStatCard
+      label="Total Stores"
+      value={formatNumber(metrics.totalStores)}
+      icon={<StoreIcon />}
+      color="warning"
+    />
+  </Grid>
 
-      {/* Critical Alerts */}
-      {metrics.criticalAlerts.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          <Typography variant="body2" fontWeight="bold">
-            System Alerts ({metrics.criticalAlerts.length})
-          </Typography>
-          {metrics.criticalAlerts.slice(0, 3).map((alert, index) => (
-            <Typography key={index} variant="body2">
-              • [{alert.department}] {alert.message}
-            </Typography>
-          ))}
-        </Alert>
-      )}
+  {/* 🚗 Vehicle Overview Cards */}
+<Grid item xs={12} sm={6} md={3}>
+  <QuickStatCard
+    label="Total Fleet Size"
+    value={formatNumber(metrics.totalFleetSize)}
+    icon={<CarIcon />}
+    color="info"
+  />
+</Grid>
+
+<Grid item xs={12} sm={6} md={3}>
+  <QuickStatCard
+    label="Available Vehicles"
+    value={formatNumber(metrics.availableVehicles)}
+    icon={<CarIcon />}
+    color="success"
+  />
+</Grid>
+
+<Grid item xs={12} sm={6} md={3}>
+  <QuickStatCard
+    label="Assigned Vehicles"
+    value={formatNumber(metrics.assignedVehicles)}
+    icon={<CarIcon />}
+    color="primary"
+  />
+</Grid>
+
+<Grid item xs={12} sm={6} md={3}>
+  <QuickStatCard
+    label="Under Maintenance"
+    value={formatNumber(metrics.underMaintenance)}
+    icon={<CarIcon />}
+    color="warning"
+  />
+</Grid>
+
+      </Grid>
 
       {/* Department Performance Overview */}
       <Typography variant="h5" gutterBottom mb={2}>
@@ -259,21 +325,6 @@ export default function ManagementDashboard() {
           />
         </Grid>
 
-        {/* Finance Department */}
-        <Grid item xs={12} md={6}>
-          <DepartmentCard
-            title="Finance"
-            icon={<MoneyIcon />}
-            color="warning"
-            metrics={[
-              { label: 'Total Revenue', value: formatCurrency(metrics.totalRevenue) },
-              { label: 'Revenue Growth', value: formatPercentage(metrics.revenueGrowth) },
-              { label: 'Net Profit', value: formatCurrency(metrics.netProfit) },
-              { label: 'Profit Margin', value: formatPercentage(metrics.profitMargin) },
-            ]}
-          />
-        </Grid>
-
         {/* Fleet/Vehicle Department */}
         <Grid item xs={12} md={6}>
           <DepartmentCard
@@ -281,8 +332,8 @@ export default function ManagementDashboard() {
             icon={<CarIcon />}
             color="info"
             metrics={[
-              { label: 'Total Vehicles', value: formatNumber(metrics.totalVehicles) },
-              { label: 'Active Vehicles', value: formatNumber(metrics.activeVehicles) },
+              { label: 'Total Vehicles', value: formatNumber(metrics.totalFleetSize) },
+              { label: 'Active Vehicles', value: formatNumber(metrics.availableVehicles) },
               { label: 'Total Riders', value: formatNumber(metrics.totalRiders) },
               { label: 'Total Hubs', value: formatNumber(metrics.totalHubs) },
             ]}

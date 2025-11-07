@@ -61,8 +61,8 @@ services:
 
   vehicle-service:
     build: 
-      context: ./services/vehicle-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/vehicle-service/Dockerfile
     container_name: vehicle-service
     env_file:
       - ./services/vehicle-service/.env
@@ -94,7 +94,9 @@ services:
     cpus: 1
 
   rider-service:
-    build: ./services/rider-service
+    build: 
+      context: .
+      dockerfile: services/rider-service/Dockerfile
     container_name: rider-service
     env_file:
       - ./services/rider-service/.env

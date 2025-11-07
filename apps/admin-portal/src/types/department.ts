@@ -284,7 +284,11 @@ export interface ManagementDashboardMetrics extends BaseDashboardMetrics {
   avgDeliveryTime: number;
   onTimeRate: number;
   customerSatisfaction: number;
-
+  inactiveRiders?: number;          // 👈 added
+  totalFleetSize?: number;          // 👈 added
+  availableVehicles?: number;       // 👈 added
+  assignedVehicles?: number;        // 👈 added
+  underMaintenance?: number;
   // Resources
   totalRiders: number;
   activeRiders: number;

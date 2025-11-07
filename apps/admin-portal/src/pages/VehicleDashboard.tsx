@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState , useEffect} from 'react'
 import {
   Box,
   Typography,
@@ -153,6 +153,19 @@ const VehicleDashboard: React.FC = () => {
   const serviceAnalytics = serviceAnalyticsData?.data || {}
   const damageAnalytics = damageAnalyticsData?.data || {}
   const fleetPerformance = fleetPerformanceData?.data || {}
+
+
+useEffect(() => {
+  if (vehicleAnalytics?.summary) {
+    // ✅ Dispatch event whenever vehicle stats change
+    window.dispatchEvent(
+      new CustomEvent("vehicleStatsUpdated", {
+        detail: vehicleAnalytics.summary,
+      })
+    )
+  }
+}, [vehicleAnalytics])
+
 
   // Loading state
   if (vehicleAnalyticsLoading || serviceAnalyticsLoading || damageAnalyticsLoading || fleetPerformanceLoading) {
